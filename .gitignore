@@ -1,0 +1,25 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node / Web
+node_modules/
+dist/
+.next/
+out/
+
+# Environment & OS
+.env
+.env.local
+.DS_Store
+Thumbs.db
+
+# Obsidian local workspace (keep vault markdown files, ignore local workspace state)
+second_brain/.obsidian/workspace*

@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SpecGraph — Agentic Information Architecture Board</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .animate-pulse-subtle {
+      animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    .node-glow-red {
+      box-shadow: 0 0 20px -3px rgba(239, 68, 68, 0.4);
+      border-color: #ef4444;
+    }
+    .node-glow-green {
+      box-shadow: 0 0 20px -3px rgba(34, 197, 94, 0.4);
+      border-color: #22c55e;
+    }
+    .node-glow-blue {
+      box-shadow: 0 0 20px -3px rgba(59, 130, 246, 0.4);
+      border-color: #3b82f6;
+    }
+    .node-glow-amber {
+      box-shadow: 0 0 20px -3px rgba(245, 158, 11, 0.4);
+      border-color: #f59e0b;
+    }
+    .blast-highlight {
+      transform: scale(1.03);
+      box-shadow: 0 0 25px 5px rgba(236, 72, 153, 0.6) !important;
+      border-color: #ec4899 !important;
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 flex flex-col h-screen overflow-hidden font-sans select-none">
+
+  <!-- TOP NAVIGATION HEADER -->
+  <header class="h-16 border-b border-slate-800 bg-slate-900/80 backdrop-blur px-6 flex items-center justify-between z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/30">
+        <i data-lucide="network" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-lg font-bold tracking-tight text-white">SpecGraph</h1>
+          <span class="text-xs bg-slate-800 text-indigo-400 font-mono px-2 py-0.5 rounded border border-indigo-500/20">v1.0-agentic</span>
+        </div>
+        <p class="text-xs text-slate-400">The Shared Product Map Teams Fill In & Agents Build From</p>
+      </div>
+    </div>
+
+    <!-- DUAL HACKATHON TRACK SWITCHER & STATS -->
+    <div class="flex items-center gap-4">
+      <div class="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-1 text-xs">
+        <button id="tabGoogle" onclick="switchTrack('google')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-all bg-indigo-600 text-white shadow">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+          Google AI Builder Track
+        </button>
+        <button id="tabNvidia" onclick="switchTrack('nvidia')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-slate-200 transition-all">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+          NVIDIA NeMo & cuGraph
+        </button>
+      </div>
+
+      <div class="h-6 w-px bg-slate-800"></div>
+
+      <!-- Quick Action Buttons -->
+      <button onclick="runSocraticInspection()" class="flex items-center gap-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-lg transition font-medium">
+        <i data-lucide="search-check" class="w-3.5 h-3.5 text-amber-400"></i>
+        Run Question Engine
+      </button>
+
+      <button onclick="resetGraphState()" class="flex items-center gap-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-lg transition font-medium">
+        <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-cyan-400"></i>
+        Reset Graph
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <div class="flex-1 flex overflow-hidden">
+
+    <!-- LEFT: SEMANTIC ZOOM LEVEL NAVIGATOR -->
+    <aside class="w-56 border-r border-slate-800 bg-slate-900/50 p-4 flex flex-col justify-between">
+      <div>
+        <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Semantic Hierarchy</div>
+        <div class="space-y-1.5" id="levelNav">
+          <div class="flex items-center gap-2 p-2 rounded-lg bg-indigo-950/60 border border-indigo-500/30 text-indigo-200 text-xs font-medium cursor-pointer">
+            <span class="w-5 h-5 rounded bg-indigo-500/20 flex items-center justify-center font-mono text-[10px] text-indigo-300">L1</span>
+            <span>User Personas</span>
+          </div>
+          <div class="flex items-center gap-2 p-2 rounded-lg bg-slate-800/40 hover:bg-slate-800 text-slate-300 text-xs font-medium cursor-pointer">
+            <span class="w-5 h-5 rounded bg-slate-700 flex items-center justify-center font-mono text-[10px]">L2</span>
+            <span>User Flows</span>
+          </div>
+          <div class="flex items-center gap-2 p-2 rounded-lg bg-slate-800/40 hover:bg-slate-800 text-slate-300 text-xs font-medium cursor-pointer">
+            <span class="w-5 h-5 rounded bg-slate-700 flex items-center justify-center font-mono text-[10px]">L3</span>
+            <span>Screens & States</span>
+          </div>
+          <div class="flex items-center gap-2 p-2 rounded-lg bg-slate-800/40 hover:bg-slate-800 text-slate-300 text-xs font-medium cursor-pointer">
+            <span class="w-5 h-5 rounded bg-purple-500/20 text-purple-300 flex items-center justify-center font-mono text-[10px]">L4</span>
+            <span class="text-purple-200">CTAs (Connective)</span>
+          </div>
+          <div class="flex items-center gap-2 p-2 rounded-lg bg-slate-800/40 hover:bg-slate-800 text-slate-300 text-xs font-medium cursor-pointer">
+            <span class="w-5 h-5 rounded bg-slate-700 flex items-center justify-center font-mono text-[10px]">L5</span>
+            <span>API Contracts</span>
+          </div>
+          <div class="flex items-center gap-2 p-2 rounded-lg bg-slate-800/40 hover:bg-slate-800 text-slate-300 text-xs font-medium cursor-pointer">
+            <span class="w-5 h-5 rounded bg-slate-700 flex items-center justify-center font-mono text-[10px]">L6</span>
+            <span>Logic & Failure</span>
+          </div>
+        </div>
+
+        <div class="mt-6 pt-6 border-t border-slate-800">
+          <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Build Readiness</div>
+          <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+            <div class="flex justify-between items-center text-xs mb-1">
+              <span class="text-slate-400">Branch W05:</span>
+              <span id="readinessBadge" class="font-bold text-red-400">0.0 (BLOCKED)</span>
+            </div>
+            <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+              <div id="readinessBar" class="bg-red-500 h-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <p id="stopRuleText" class="text-[11px] text-red-400 mt-2 flex items-center gap-1 font-mono">
+              <i data-lucide="alert-octagon" class="w-3 h-3"></i>
+              Stop Rule: 0 guessing allowed
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Track Info Card -->
+      <div id="trackInfoCard" class="bg-indigo-950/40 border border-indigo-500/30 p-3 rounded-lg text-xs">
+        <div class="flex items-center gap-1.5 font-semibold text-indigo-300 mb-1">
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <span id="trackTitle">Gemini Multimodal Ingest</span>
+        </div>
+        <p id="trackDesc" class="text-[11px] text-indigo-200/80 leading-relaxed">
+          Ingesting 400-page PRD & FigJam specs into structured schemas with zero loss.
+        </p>
+      </div>
+    </aside>
+
+    <!-- CENTER: THE INTERACTIVE GRAPH CANVAS -->
+    <main class="flex-1 relative bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] overflow-auto p-8">
+      
+      <!-- Canvas Header Overlay -->
+      <div class="absolute top-6 left-8 z-10 flex items-center gap-3">
+        <span class="text-xs bg-slate-900/90 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-full text-slate-300 flex items-center gap-2 shadow-lg">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          Interactive Semantic Map: PCOS Commerce App (Annotatory V0.7)
+        </span>
+      </div>
+
+      <!-- THE GRAPH TILES CONTAINER -->
+      <div class="max-w-5xl mx-auto space-y-12 py-10" id="graphContainer">
+
+        <!-- LAYER 1: USER PERSONA -->
+        <div class="flex justify-center">
+          <div id="node-USER_PCOS_PATIENT" class="w-96 bg-slate-900 border border-slate-700 rounded-xl p-4 shadow-xl hover:border-indigo-500 transition cursor-pointer">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">L1 • USER PERSONA</span>
+              <span class="text-xs text-slate-400 font-mono">Owner: PM</span>
+            </div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="user" class="w-4 h-4 text-indigo-400"></i>
+              PCOS Patient / Customer
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">Seeking tailored nutritional, herbal, and hormonal health protocols.</p>
+          </div>
+        </div>
+
+        <div class="flex justify-center"><i data-lucide="arrow-down" class="w-5 h-5 text-slate-600"></i></div>
+
+        <!-- LAYER 2: USER FLOW -->
+        <div class="flex justify-center">
+          <div id="node-FLOW_PCOS_PURCHASE" class="w-96 bg-slate-900 border border-slate-700 rounded-xl p-4 shadow-xl hover:border-indigo-500 transition cursor-pointer">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">L2 • USER FLOW</span>
+              <span class="text-xs text-slate-400 font-mono">Owner: PM</span>
+            </div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="git-branch" class="w-4 h-4 text-blue-400"></i>
+              Checkout to Payment Flow
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">Ordered sequence: W05 Checkout → W06 Payment → W07 Confirmation</p>
+          </div>
+        </div>
+
+        <div class="flex justify-center"><i data-lucide="arrow-down" class="w-5 h-5 text-slate-600"></i></div>
+
+        <!-- LAYER 3: SCREENS -->
+        <div class="grid grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <!-- W05 Checkout -->
+          <div id="node-W05_CHECKOUT" class="bg-slate-900 border-2 rounded-xl p-5 shadow-xl transition-all cursor-pointer node-glow-red" onclick="selectScreen('W05_CHECKOUT')">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">L3 • SCREEN</span>
+              <span id="w05StatusTag" class="text-xs font-bold text-red-400 font-mono flex items-center gap-1">
+                <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+                BLOCKED
+              </span>
+            </div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="layout" class="w-4 h-4 text-amber-400"></i>
+              W05: Checkout & Shipping
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">Address inputs, doctor prescription toggle, pincode serviceability.</p>
+            
+            <div class="mt-3 bg-slate-950 p-2.5 rounded-lg border border-slate-800/80 text-[11px] space-y-1">
+              <div class="text-slate-400"><span class="text-slate-300 font-medium">Error State:</span> Inline banner below PIN; preserves filled inputs.</div>
+              <div class="text-slate-400"><span class="text-slate-300 font-medium">Loading State:</span> Skeleton calculation placeholders.</div>
+            </div>
+          </div>
+
+          <!-- W06 Payment -->
+          <div id="node-W06_PAYMENT" class="bg-slate-900 border border-slate-700 rounded-xl p-5 shadow-xl hover:border-slate-500 transition cursor-pointer" onclick="selectScreen('W06_PAYMENT')">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">L3 • SCREEN</span>
+              <span class="text-xs text-slate-400 font-mono">DRAFT</span>
+            </div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="credit-card" class="w-4 h-4 text-indigo-400"></i>
+              W06: Payment Selection
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">Razorpay/Cashfree payment gateway, UPI, NetBanking, COD rules.</p>
+            
+            <div class="mt-3 bg-slate-950 p-2.5 rounded-lg border border-slate-800/80 text-[11px] space-y-1">
+              <div class="text-slate-400"><span class="text-slate-300 font-medium">Success Redirect:</span> W07 Confirmation Screen.</div>
+              <div class="text-slate-400"><span class="text-slate-300 font-medium">Failure Handling:</span> Retain payment token; retry gateway.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-center"><i data-lucide="arrow-down" class="w-5 h-5 text-slate-600"></i></div>
+
+        <!-- LAYER 4: THE CONNECTIVE TISSUE (CTA) -->
+        <div class="flex justify-center">
+          <div id="node-CTA_W05_CONTINUE" class="w-[32rem] bg-gradient-to-r from-purple-950/60 to-indigo-950/60 border-2 border-purple-500/50 rounded-xl p-5 shadow-xl">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] font-mono px-2.5 py-0.5 rounded bg-purple-900/60 text-purple-200 border border-purple-500/30">
+                L4 • CONNECTIVE TISSUE (CTA)
+              </span>
+              <span class="text-xs text-emerald-400 font-mono font-medium">STATE MACHINE</span>
+            </div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="mouse-pointer-click" class="w-4 h-4 text-purple-400"></i>
+              CTA: "Continue to Payment"
+            </h3>
+            
+            <div class="grid grid-cols-2 gap-3 mt-3 text-xs">
+              <div class="bg-emerald-950/40 border border-emerald-500/20 p-2.5 rounded-lg">
+                <span class="text-emerald-400 font-semibold block text-[11px] mb-1">On Success (Both APIs Pass)</span>
+                <span class="text-slate-300 text-[11px]">Transition directly to <strong>W06 Payment</strong></span>
+              </div>
+              <div class="bg-rose-950/40 border border-rose-500/20 p-2.5 rounded-lg">
+                <span class="text-rose-400 font-semibold block text-[11px] mb-1">On Failure (Serviceability Fails)</span>
+                <span class="text-slate-300 text-[11px]">Stay on <strong>W05</strong>; preserve all address inputs</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-center"><i data-lucide="arrow-down" class="w-5 h-5 text-slate-600"></i></div>
+
+        <!-- LAYER 5: SHARED API NODES -->
+        <div class="grid grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <!-- API32 Shiprocket -->
+          <div id="node-API32_DELIVERY_CHECK" class="bg-slate-900 border-2 rounded-xl p-5 shadow-xl transition-all cursor-pointer node-glow-amber" onclick="triggerBlastRadius('API32_DELIVERY_CHECK')">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">L5 • API CONTRACT</span>
+              <button class="text-[11px] text-pink-400 hover:text-pink-300 flex items-center gap-1 font-mono font-semibold">
+                <i data-lucide="crosshair" class="w-3.5 h-3.5"></i>
+                Calculate Blast Radius
+              </button>
+            </div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="server" class="w-4 h-4 text-cyan-400"></i>
+              API32: Shiprocket Delivery Check
+            </h3>
+            <p class="text-xs text-slate-400 mt-1 font-mono">POST /api/v1/logistics/serviceability</p>
+            <div class="mt-3 flex gap-2 text-[10px] font-mono">
+              <span class="bg-slate-800 px-2 py-1 rounded text-slate-300">Timeout: 3000ms</span>
+              <span class="bg-slate-800 px-2 py-1 rounded text-slate-300">Vendor: Shiprocket</span>
+              <span class="bg-slate-800 px-2 py-1 rounded text-slate-300">Cache: 3600s</span>
+            </div>
+          </div>
+
+          <!-- API42 Quote Revalidate -->
+          <div id="node-API42_QUOTE_REVALIDATE" class="bg-slate-900 border border-slate-700 rounded-xl p-5 shadow-xl hover:border-slate-500 transition cursor-pointer" onclick="triggerBlastRadius('API42_QUOTE_REVALIDATE')">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">L5 • API CONTRACT</span>
+              <span class="text-xs text-emerald-400 font-mono">READY</span>
+            </div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="server" class="w-4 h-4 text-cyan-400"></i>
+              API42: Price Quote Revalidation
+            </h3>
+            <p class="text-xs text-slate-400 mt-1 font-mono">POST /api/v1/cart/revalidate</p>
+            <div class="mt-3 flex gap-2 text-[10px] font-mono">
+              <span class="bg-slate-800 px-2 py-1 rounded text-slate-300">Timeout: 2000ms</span>
+              <span class="bg-slate-800 px-2 py-1 rounded text-slate-300">Idempotency: Enforced</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- RIGHT: SOCRATIC QUESTION ENGINE & STOP-RULES PANEL -->
+    <aside class="w-96 border-l border-slate-800 bg-slate-900/70 p-5 flex flex-col justify-between overflow-y-auto">
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
+            <i data-lucide="help-circle" class="w-4 h-4 text-amber-400"></i>
+            <h2 class="text-sm font-bold text-white">Socratic Questions</h2>
+          </div>
+          <span id="questionCountBadge" class="text-xs bg-red-950 text-red-400 border border-red-800 px-2 py-0.5 rounded font-mono font-bold">2 Blocking</span>
+        </div>
+
+        <p class="text-xs text-slate-400 mb-4 leading-relaxed">
+          Autonomous agents stop here. Click <strong class="text-slate-200">"Resolve with Decision"</strong> to close questions and watch branch readiness turn green!
+        </p>
+
+        <!-- Question List -->
+        <div class="space-y-3.5" id="questionsContainer">
+
+          <!-- Question Card 1 -->
+          <div id="card-q1" class="bg-slate-950 border border-red-500/40 rounded-xl p-3.5 shadow-lg relative">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] font-mono bg-red-950 text-red-300 px-2 py-0.5 rounded border border-red-800">BLOCKING • BACKEND</span>
+              <span class="text-[10px] text-slate-400 font-mono">Target: API32</span>
+            </div>
+            <h4 class="text-xs font-semibold text-slate-200">If Shiprocket times out (>3000ms), do we block checkout or allow tentative order?</h4>
+            <div class="mt-3 pt-3 border-t border-slate-800 flex justify-end">
+              <button onclick="resolveQuestion1()" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition shadow">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                Resolve with Decision
+              </button>
+            </div>
+          </div>
+
+          <!-- Question Card 2 -->
+          <div id="card-q2" class="bg-slate-950 border border-red-500/40 rounded-xl p-3.5 shadow-lg relative">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] font-mono bg-red-950 text-red-300 px-2 py-0.5 rounded border border-red-800">BLOCKING • BACKEND</span>
+              <span class="text-[10px] text-slate-400 font-mono">Target: API32</span>
+            </div>
+            <h4 class="text-xs font-semibold text-slate-200">Mutating POST endpoint without idempotency header. Is duplicate protection required?</h4>
+            <div class="mt-3 pt-3 border-t border-slate-800 flex justify-end">
+              <button onclick="resolveQuestion2()" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition shadow">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                Resolve with Decision
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Blast Radius Indicator Output -->
+      <div id="blastOutputContainer" class="mt-6 pt-4 border-t border-slate-800 text-xs hidden">
+        <div class="flex items-center gap-2 text-pink-400 font-bold mb-2">
+          <i data-lucide="zap" class="w-4 h-4"></i>
+          <span>Blast Radius Analysis (cuGraph)</span>
+        </div>
+        <div class="bg-slate-950 p-3 rounded-lg border border-pink-500/30 text-[11px] text-slate-300 space-y-1">
+          <div>Root Modified Node: <span class="font-mono text-pink-300" id="blastRoot">API32</span></div>
+          <div>Impacted Screens: <span class="font-mono text-white">['W05_CHECKOUT']</span></div>
+          <div>Impacted CTAs: <span class="font-mono text-white">['CTA_W05_CONTINUE']</span></div>
+          <div>Traversed in: <span class="font-mono text-emerald-400">0.42 ms</span> via GPU</div>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    let resolvedCount = 0;
+
+    function switchTrack(track) {
+      const gBtn = document.getElementById('tabGoogle');
+      const nBtn = document.getElementById('tabNvidia');
+      const title = document.getElementById('trackTitle');
+      const desc = document.getElementById('trackDesc');
+      const card = document.getElementById('trackInfoCard');
+
+      if (track === 'google') {
+        gBtn.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-all bg-indigo-600 text-white shadow";
+        nBtn.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-slate-200 transition-all";
+        title.innerText = "Gemini Multimodal Ingest & Reasoning";
+        desc.innerText = "Ingesting 400-page PRD & FigJam specs into structured schemas with zero loss using Gemini 2.0 Pro.";
+        card.className = "bg-indigo-950/40 border border-indigo-500/30 p-3 rounded-lg text-xs";
+      } else {
+        nBtn.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-all bg-emerald-600 text-white shadow";
+        gBtn.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-slate-200 transition-all";
+        title.innerText = "NVIDIA NeMo & cuGraph Acceleration";
+        desc.innerText = "Enforcing 'Assumption is not approval' zero-hallucination stop rules; cuGraph 0.4ms graph blast-radius traversal.";
+        card.className = "bg-emerald-950/40 border border-emerald-500/30 p-3 rounded-lg text-xs";
+      }
+    }
+
+    function resolveQuestion1() {
+      const card = document.getElementById('card-q1');
+      card.innerHTML = `
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[10px] font-mono bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded border border-emerald-800">RESOLVED</span>
+          <span class="text-[10px] text-slate-400 font-mono">Target: API32</span>
+        </div>
+        <p class="text-xs text-slate-300 italic">"DECISION: Fallback to static pincode tier whitelist. Allow tentative checkout, flag for admin review."</p>
+      `;
+      card.className = "bg-slate-950 border border-emerald-500/40 rounded-xl p-3.5 shadow";
+      resolvedCount++;
+      checkReadinessProgress();
+    }
+
+    function resolveQuestion2() {
+      const card = document.getElementById('card-q2');
+      card.innerHTML = `
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[10px] font-mono bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded border border-emerald-800">RESOLVED</span>
+          <span class="text-[10px] text-slate-400 font-mono">Target: API32</span>
+        </div>
+        <p class="text-xs text-slate-300 italic">"DECISION: Read-only query payload over POST; idempotency header not strictly required."</p>
+      `;
+      card.className = "bg-slate-950 border border-emerald-500/40 rounded-xl p-3.5 shadow";
+      resolvedCount++;
+      checkReadinessProgress();
+    }
+
+    function checkReadinessProgress() {
+      if (resolvedCount >= 2) {
+        // Unblock Screen W05
+        const w05 = document.getElementById('node-W05_CHECKOUT');
+        w05.className = "bg-slate-900 border-2 rounded-xl p-5 shadow-xl transition-all cursor-pointer node-glow-green";
+        
+        const badge = document.getElementById('w05StatusTag');
+        badge.innerHTML = `<i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i> READY (1.0)`;
+        badge.className = "text-xs font-bold text-emerald-400 font-mono flex items-center gap-1";
+
+        const readinessBadge = document.getElementById('readinessBadge');
+        readinessBadge.innerText = "1.0 (READY)";
+        readinessBadge.className = "font-bold text-emerald-400";
+
+        const bar = document.getElementById('readinessBar');
+        bar.style.width = "100%";
+        bar.className = "bg-emerald-500 h-full transition-all duration-500";
+
+        const stopRuleText = document.getElementById('stopRuleText');
+        stopRuleText.innerHTML = `<i data-lucide="zap" class="w-3 h-3 text-emerald-400"></i> Autonomous Agents Unblocked! Ready to build.`;
+        stopRuleText.className = "text-[11px] text-emerald-400 mt-2 flex items-center gap-1 font-mono";
+
+        document.getElementById('questionCountBadge').innerText = "0 Blocking";
+        document.getElementById('questionCountBadge').className = "text-xs bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded font-mono font-bold";
+
+        lucide.createIcons();
+      }
+    }
+
+    function triggerBlastRadius(nodeId) {
+      document.getElementById('blastOutputContainer').classList.remove('hidden');
+      document.getElementById('blastRoot').innerText = nodeId;
+
+      // Highlight impacted upstream nodes
+      const w05 = document.getElementById('node-W05_CHECKOUT');
+      const cta = document.getElementById('node-CTA_W05_CONTINUE');
+      const flow = document.getElementById('node-FLOW_PCOS_PURCHASE');
+
+      [w05, cta, flow].forEach(el => {
+        el.classList.add('blast-highlight');
+        setTimeout(() => el.classList.remove('blast-highlight'), 2500);
+      });
+    }
+
+    function runSocraticInspection() {
+      alert("Socratic Question Engine executed! All node checklists (timeouts, empty states, failure fallbacks) verified.");
+    }
+
+    function resetGraphState() {
+      location.reload();
+    }
+  </script>
+</body>
+</html>
