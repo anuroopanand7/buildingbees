@@ -1,4 +1,4 @@
-# Dockerfile for SpecGraph - Google Cloud Run Deployment
+# Dockerfile for BuildingBees - Google Cloud Run Deployment
 FROM python:3.11-slim
 
 WORKDIR /app

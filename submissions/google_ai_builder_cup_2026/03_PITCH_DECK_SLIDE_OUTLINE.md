@@ -1,13 +1,13 @@
-# 📊 SpecGraph Pitch Deck (10-Slide Championship Outline)
+# 📊 BuildingBees Pitch Deck (10-Slide Championship Outline)
 ### Google Cloud AI Builder Cup 2026
 
 ---
 
 ### Slide 1: Cover Slide
-- **Title**: SpecGraph
+- **Title**: BuildingBees
 - **Subtitle**: The Agentic Information Architecture Board
 - **Tagline**: The shared map your team fills in and your agents build from.
-- **Presenter**: SpecGraph Engineering Team | JAPAC Track: Future of Work
+- **Presenter**: BuildingBees Engineering Team | JAPAC Track: Future of Work
 
 ### Slide 2: The Core Problem
 - **Headline**: Building is cheap. Deciding *what* to build is the new bottleneck.
@@ -22,7 +22,7 @@
 - **Visual**: Diagram showing humans writing code in the 2010s vs agents reading structured specs in the 2020s.
 - **Core Principle**: If agents read specs directly, the specification must be as strongly typed, testable, and deterministic as code itself.
 
-### Slide 4: The Solution — SpecGraph
+### Slide 4: The Solution — BuildingBees
 - **Headline**: 6-Level Semantic Zoom for Products
 - **Levels**:
   - L1: User Personas
@@ -42,7 +42,7 @@
 
 ### Slide 7: Innovation 3 — Bottom-Up Blast Radius
 - **Headline**: Microservice Impact Analysis in 0.4 Milliseconds
-- **Mechanism**: Change an API endpoint or vendor, and SpecGraph immediately highlights every dependent screen and flow across the company.
+- **Mechanism**: Change an API endpoint or vendor, and BuildingBees immediately highlights every dependent screen and flow across the company.
 
 ### Slide 8: Technical Architecture on Google Cloud
 - **Headline**: Enterprise-Grade Scale with Google Cloud

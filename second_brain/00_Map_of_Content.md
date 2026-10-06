@@ -1,4 +1,4 @@
-# 🧠 SpecGraph / Blueprint — Second Brain Map of Content (MOC)
+# 🧠 BuildingBees / Blueprint — Second Brain Map of Content (MOC)
 
 > **Project Mission**: Reimagining the PRD into an Agentic, Clickable Information Architecture Graph that bridges human product design and autonomous agent code generation.
 > **Dual Hackathon Target**: **Google AI Builder Cup 2026** & **NVIDIA Hackathon 2026**.
@@ -18,8 +18,8 @@
 | [[07_PCOS_Reference_Flow_Model]] | Canonical reference benchmark (W05 Checkout $\to$ W06 Payment $\to$ API32/42) | Completed |
 | [[08_Google_AI_Builder_Cup_2026_Submission_Dossier]] | Complete submission entry form, pitch deck, video script, Cloud Run deploy | Completed |
 | [[09_Founder_Registration_Copy_and_Forms]] | Copy-paste registration answers in natural founder voice (Anuroop persona) | Completed |
-| [[10_SI_Product_Master_PRD]] | **Master PRD v1.0**: 5-stage evolutionary pipeline, universal plugins, dual-track specs | Completed |
-| [[11_SI_Product_Hive_Requirements_and_Architecture]] | **The Hive Requirements**: Gamified multi-agent Bees (Frontend, Backend, Design, Tester), player roster, Q&A game | Completed |
+| [[10_BuildingBees_Master_PRD]] | **Master PRD v1.0**: 5-stage evolutionary pipeline, universal plugins, dual-track specs | Completed |
+| [[11_BuildingBees_Hive_Requirements_and_Architecture]] | **The Hive Requirements**: Gamified multi-agent Bees (Frontend, Backend, Design, Tester), player roster, Q&A game | Completed |
 | [[12_Market_Research_and_Competitive_Intelligence]] | **Market Research**: 25% rework metric, 1-10-100 cost rule, competitor matrix (ChatPRD, Archify, UXMagic) | **Completed (Final)** |
 
 
@@ -30,7 +30,7 @@
 ---
 
 ## 🏷️ Key Tags
-#specgraph #agentic-ia #dual-hackathon #google-builder-cup #nvidia-hackathon #mcp #socratic-engine #graph-architecture
+#buildingbees #agentic-ia #dual-hackathon #google-builder-cup #nvidia-hackathon #mcp #socratic-engine #graph-architecture
 
 ---
 

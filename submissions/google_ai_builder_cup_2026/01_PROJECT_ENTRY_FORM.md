@@ -4,7 +4,7 @@
 
 ## 📌 Project Overview
 
-- **Project Name**: **SpecGraph (Agentic Information Architecture Board)**
+- **Project Name**: **BuildingBees (Agentic Information Architecture Board)**
 - **Tagline**: The shared product map human teams fill in and autonomous AI agents build from.
 - **Challenge Track / Theme**: **Future of Work & Developer Productivity**
 - **Target Audience**: Product Managers, Engineering Leads, Software Agencies, Autonomous AI Agent Developers.
@@ -17,10 +17,10 @@
 
 In the era of autonomous coding agents, building code has become instantaneous, but deciding **exactly what to build** remains slow, ambiguous, and fragmented. Autonomous agents lack common sense: whatever traditional PRDs leave out, agents hallucinate with extreme confidence.
 
-**SpecGraph** replaces static text PRDs and shallow Figma wireframes with an interactive, 6-level semantic information architecture graph:
+**BuildingBees** replaces static text PRDs and shallow Figma wireframes with an interactive, 6-level semantic information architecture graph:
 `User Personas` $\to$ `User Flows` $\to$ `Screens & States` $\to$ `CTAs (Connective Tissue)` $\to$ `API Contracts` $\to$ `Backend Logic & Failure Paths`.
 
-Powered by **Google Gemini 2.0 Pro**, SpecGraph features a **Socratic Question Engine** that systematically interrogates missing business rules, unstated API timeouts, and edge cases. Under the foundational protocol **"Assumption is not approval,"** agents are mathematically blocked from generating code on incomplete branches until humans or architect agents provide decisions. The specification is transformed into executable, zero-drift source code.
+Powered by **Google Gemini 2.0 Pro**, BuildingBees features a **Socratic Question Engine** that systematically interrogates missing business rules, unstated API timeouts, and edge cases. Under the foundational protocol **"Assumption is not approval,"** agents are mathematically blocked from generating code on incomplete branches until humans or architect agents provide decisions. The specification is transformed into executable, zero-drift source code.
 
 ---
 
@@ -42,13 +42,13 @@ Calls-to-Action (buttons, gestures) are modeled as deterministic state machines 
 - **On Failure**: Retains form field states, displays contextual error banners, and triggers retry backoff.
 
 ### 2. Socratic Question Engine Powered by Gemini
-Rather than passive documentation, SpecGraph acts as an active technical interviewer:
+Rather than passive documentation, BuildingBees acts as an active technical interviewer:
 - Gemini analyzes the entire graph to discover unstated edge cases (e.g. *What if Shiprocket times out after 3 seconds?*).
 - Routes blocking questions to designated owners (PM, Frontend, Backend).
 
 ### 3. Stop Rules & Mathematical Branch Readiness
 - Branch Readiness = $0.0$ if any open blocking question exists.
-- Coding agents query the SpecGraph via **MCP (Model Context Protocol)**, autonomously pulling only branches with $Score = 1.0$.
+- Coding agents query the BuildingBees via **MCP (Model Context Protocol)**, autonomously pulling only branches with $Score = 1.0$.
 
 ### 4. Bottom-Up Blast Radius Analysis
 Changing a backend API or vendor instantly traverses the graph, highlighting all affected screens, CTAs, and flows in real-time.
@@ -64,7 +64,7 @@ Changing a backend API or vendor instantly traverses the graph, highlighting all
 [Gemini 2.0 Pro Multimodal Ingestion] (Parses 400-page specs into typed DAG)
            │
            ▼
-[SpecGraph Core Engine on Google Cloud Run]
+[BuildingBees Core Engine on Google Cloud Run]
   ├── Pydantic V2 Strict Schema Validation
   ├── NetworkX Bidirectional Graph State
   ├── Socratic Question Generator (Gemini Thinking)

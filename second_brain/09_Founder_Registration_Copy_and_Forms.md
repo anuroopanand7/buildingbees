@@ -8,7 +8,7 @@
 ## 🟢 Track 1: Google Cloud AI Builder Cup 2026 (Hack2skill)
 
 ### Project Name:
-`SpecGraph`
+`BuildingBees`
 
 ### Tagline / One-liner (Under 100 chars):
 `the shared product map your team fills in and your agents build from`
@@ -29,7 +29,7 @@ The core thing is what we call connective tissue: CTAs link directly to APIs and
 ## 🟢 Track 2: Nebius x NVIDIA Global AI Hackathon (Devpost)
 
 ### Project Title:
-`SpecGraph: Agentic IA Board with NeMo Guardrails`
+`BuildingBees: Agentic IA Board with NeMo Guardrails`
 
 ### Short Description / Elevator Pitch:
 `An agentic architecture board that replaces PRDs. Uses NeMo guardrails to stop coding agents from guessing missing specs, plus cuGraph for instant dependency blast-radius analysis.`
@@ -37,7 +37,7 @@ The core thing is what we call connective tissue: CTAs link directly to APIs and
 ### What it does:
 `Most coding agents fail in production because specs leave out backend edge cases and the agent assumes things on its own. 
 
-SpecGraph turns requirements into a typed dependency graph. Every screen CTA connects to APIs and error paths. We use NeMo Guardrails to enforce a simple stop-rule: 'assumption is not approval'. When an agent hits an unclear spec, it pauses, flags a blocking question for the backend lead, and works on another branch. We also use cuGraph so whenever someone touches an API contract, it instantly calculates the blast radius across every screen and flow in less than a millisecond.`
+BuildingBees turns requirements into a typed dependency graph. Every screen CTA connects to APIs and error paths. We use NeMo Guardrails to enforce a simple stop-rule: 'assumption is not approval'. When an agent hits an unclear spec, it pauses, flags a blocking question for the backend lead, and works on another branch. We also use cuGraph so whenever someone touches an API contract, it instantly calculates the blast radius across every screen and flow in less than a millisecond.`
 
 ### How we built it:
 `Built with Python, FastMCP for IDE agent connections, NVIDIA NeMo Guardrails to block unauthorized business assumptions, cuGraph for GPU graph traversal, and an interactive zoomable canvas.`

@@ -13,7 +13,7 @@ To win both the **Google AI Builder Cup 2026** and the **NVIDIA Hackathon**, we 
 
 ```
                       ┌──────────────────────────────────────┐
-                      │    SpecGraph Unified Core Engine     │
+                      │    BuildingBees Unified Core Engine     │
                       │  (Canvas, DAG State, MCP Server,     │
                       │   Readiness Logic, Branch Builder)   │
                       └──────────────────┬───────────────────┘
@@ -32,7 +32,7 @@ To win both the **Google AI Builder Cup 2026** and the **NVIDIA Hackathon**, we 
 ## 🟢 Track 1: Google AI Builder Cup 2026 Strategy
 
 ### Pitch & Theme
-> **"SpecGraph: Multimodal Socratic Architect for Autonomous Software Engineering powered by Gemini."**
+> **"BuildingBees: Multimodal Socratic Architect for Autonomous Software Engineering powered by Gemini."**
 
 ### 1. Key Google Technologies Used
 | Component | Google Technology | Strategic Advantage |
@@ -52,7 +52,7 @@ To win both the **Google AI Builder Cup 2026** and the **NVIDIA Hackathon**, we 
 ## 🟢 Track 2: NVIDIA Hackathon Strategy
 
 ### Pitch & Theme
-> **"SpecGraph: GPU-Accelerated Agentic Verification & NeMo Guardrailed Build-Loop for Mission-Critical Software."**
+> **"BuildingBees: GPU-Accelerated Agentic Verification & NeMo Guardrailed Build-Loop for Mission-Critical Software."**
 
 ### 1. Key NVIDIA Technologies Used
 | Component | NVIDIA Technology | Strategic Advantage |
@@ -60,7 +60,7 @@ To win both the **Google AI Builder Cup 2026** and the **NVIDIA Hackathon**, we 
 | **Enforcing Stop Rules** | **NVIDIA NeMo Guardrails** | Programmable guardrails guaranteeing agents **never guess or assume** unapproved business logic. Stops hallucinations mathematically. |
 | **Microservice High-Throughput** | **NVIDIA NIM (Inference Microservices)** | Self-hosted or Cloud NIMs (e.g. Llama-3-70B-Instruct, Mistral-Large) running parallel interview passes over 500+ nodes in seconds. |
 | **Blast Radius & Graph Analytics**| **NVIDIA cuGraph (RAPIDS)** | GPU-accelerated graph algorithms: topological sort for branch readiness, cycle detection, and calculating full application blast radius when an API node changes. |
-| **Edge / Local AI Developer Experience** | **TensorRT-LLM / RTX AI PC** | Enables local developers to run SpecGraph and local coding agents offline with RTX workstation acceleration. |
+| **Edge / Local AI Developer Experience** | **TensorRT-LLM / RTX AI PC** | Enables local developers to run BuildingBees and local coding agents offline with RTX workstation acceleration. |
 
 ### 2. Hackathon Scoring Rubric Alignment
 - **Technical Rigor**: Leverages cuGraph for real GPU graph analytics, showing deep NVIDIA infrastructure integration.

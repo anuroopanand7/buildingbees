@@ -1,14 +1,14 @@
-# 11. SI-Product: The Super Intelligent Product Management Hive (Master Requirements)
+# 11. BuildingBees: The Super Intelligent Product Management Hive (Master Requirements)
 
 > **Document Status**: Requirements Baseline (Gamified Multi-Agent Hive)  
-> **Tags**: #hive #multi-agent #bees #gamification #si-product #requirements  
+> **Tags**: #hive #multi-agent #bees #gamification #buildingbees #requirements  
 > **Parent**: [[00_Map_of_Content]]
 
 ---
 
 ## 🐝 1. The Core Paradigm: The Super Intelligent Hive
 
-Instead of another boring spreadsheet, PRD doc, or static diagramming board, **SI-Product is a gamified, multi-agent product management Hive**.
+Instead of another boring spreadsheet, PRD doc, or static diagramming board, **BuildingBees is a gamified, multi-agent product management Hive**.
 
 Software is not built by a single generic AI model. It is designed, debated, and verified by a **swarm of specialized AI Bees** who collaborate with human players (or a solo founder wearing multiple hats) to turn a raw idea into bulletproof, buildable architecture.
 

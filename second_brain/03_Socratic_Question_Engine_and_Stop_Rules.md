@@ -12,7 +12,7 @@ Autonomous coding agents (e.g., Devin, Claude Code, GitHub Copilot Workspace) fr
 - When an address failure occurs, the agent wipes all form fields.
 - When a payment gateway hiccups, the agent re-submits without idempotency, causing double billing.
 
-The **Socratic Question Engine** in SpecGraph solves this by transforming the spec from a passive document into an **active interrogator**.
+The **Socratic Question Engine** in BuildingBees solves this by transforming the spec from a passive document into an **active interrogator**.
 
 ---
 
@@ -44,7 +44,7 @@ $$\text{Readiness}(B) = \begin{cases} 0.0 & \text{if } \exists \, q \in \text{Qu
 sequenceDiagram
     autonumber
     actor Builder as Code Generation Agent
-    participant Engine as SpecGraph Readiness Engine
+    participant Engine as BuildingBees Readiness Engine
     participant Graph as Node Graph / Plane
     actor Human as PM / Tech Lead
 

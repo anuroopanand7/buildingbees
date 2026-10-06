@@ -17,11 +17,11 @@ from src.core.schema import (
     QuestionCategory,
     NodeStatus
 )
-from src.core.graph import SpecGraphEngine
+from src.core.graph import BuildingBeesEngine
 
 
-def build_pcos_graph() -> SpecGraphEngine:
-    engine = SpecGraphEngine()
+def build_pcos_graph() -> BuildingBeesEngine:
+    engine = BuildingBeesEngine()
 
     # 1. User Persona
     user = UserNode(

@@ -9,25 +9,25 @@
 
 Software engineering in 2026 has a massive paradox: **code generation takes 10 seconds, but fixing the wrong code takes weeks.**
 
-| Industry Metric | Industry Standard Data | Source & Impact on SI-Product |
+| Industry Metric | Industry Standard Data | Source & Impact on BuildingBees |
 | :--- | :--- | :--- |
-| **Engineering Rework** | **20% to 40%** of total engineering capacity is lost to rework (25% baseline). | SI-Product directly reclaims this lost 25% by verifying requirements upfront. |
+| **Engineering Rework** | **20% to 40%** of total engineering capacity is lost to rework (25% baseline). | BuildingBees directly reclaims this lost 25% by verifying requirements upfront. |
 | **Requirements Root Cause** | **45% of total rework cost** is caused by ambiguous or missing specifications. | While spec defects are only ~15% of bug count, they cause nearly half the total financial waste. |
 | **The 1-10-100 Cost Rule** | Fixing a defect costs **$1** at spec time, **$10** in testing, and **$100+** in production. | Stopping assumptions at Stage 2/3 yields a 100x cost reduction compared to hotfixing deployed code. |
-| **Shared Understanding Gap** | **78% of requirements rework** stems from avoidable disconnects between PMs, designers, and engineers. | SI-Product's Hive (Frontend, Backend, Design, Tester Bees) forces cross-functional alignment before code generation. |
+| **Shared Understanding Gap** | **78% of requirements rework** stems from avoidable disconnects between PMs, designers, and engineers. | BuildingBees's Hive (Frontend, Backend, Design, Tester Bees) forces cross-functional alignment before code generation. |
 | **The "TBD Trap"** | When specs are vague, developers either block the sprint or **guess** ("building the wrong thing beautifully"). | In the autonomous agent era, AI coding agents **never stop—they always guess**, multiplying silent production errors. |
 
 ---
 
 ## 🥊 2. Competitive Landscape: Where Existing Tools Fail
 
-The 2026 market is split into four incomplete categories, leaving a massive gap for SI-Product:
+The 2026 market is split into four incomplete categories, leaving a massive gap for BuildingBees:
 
 ```
                       [High-Level / Abstract]
                                  ▲
                                  │
-           ChatPRD / Notion AI   │    SI-Product (The Hive)
+           ChatPRD / Notion AI   │    BuildingBees (The Hive)
           (Text-only PRDs)       │    (Gamified Multi-Agent IA
                                  │     with Dual Specs & MCP)
                                  │
@@ -61,7 +61,7 @@ The 2026 market is split into four incomplete categories, leaving a massive gap 
 
 ---
 
-## 🏆 3. SI-Product's Unfair Advantages (Our Moat)
+## 🏆 3. BuildingBees's Unfair Advantages (Our Moat)
 
 1. **The Specialist Hive (Bees)**: Instead of a single model hallucinating a full spec, specialist Bees (Frontend, Backend, Designer, Tester) interrogate players in their exact domain.
 2. **Upfront Stakeholder Mapping**: Solves the "who is responsible for what" dilemma so confirmation questions go to the right player.

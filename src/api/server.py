@@ -1,5 +1,5 @@
 """
-SpecGraph FastAPI Server
+BuildingBees FastAPI Server
 Provides REST endpoints and state synchronization for the Semantic Zoom Canvas,
 Socratic Question Engine, and Dual Hackathon Track Adapters.
 """
@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import os
 
-from src.core.graph import SpecGraphEngine
+from src.core.graph import BuildingBeesEngine
 from src.core.schema import (
     NodeStatus,
     QuestionNode,
@@ -25,7 +25,7 @@ from src.adapters.gemini_adapter import GoogleGeminiAdapter
 from src.adapters.nvidia_adapter import NvidiaNeMoGuardrailAdapter, NvidiaCuGraphAccelerator
 
 app = FastAPI(
-    title="SpecGraph API",
+    title="BuildingBees API",
     description="Agentic Information Architecture & Stop-Rule Verification Engine",
     version="1.0.0"
 )
@@ -38,7 +38,7 @@ def serve_index():
     index_path = os.path.join(WEB_DIR, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
-    return {"message": "SpecGraph API is running"}
+    return {"message": "BuildingBees API is running"}
 
 
 # Enable CORS for local development and canvas UI
@@ -165,7 +165,7 @@ def get_blast_radius(node_id: str) -> Dict[str, Any]:
 
 @app.post("/api/ingest-prd")
 def ingest_prd(payload: IngestPRDRequest) -> Dict[str, Any]:
-    """Google Gemini Track: Ingests unstructured PRD markdown into SpecGraph nodes."""
+    """Google Gemini Track: Ingests unstructured PRD markdown into BuildingBees nodes."""
     return gemini_adapter.ingest_prd_markdown(payload.prd_markdown)
 
 

@@ -1,5 +1,5 @@
 """
-SpecGraph Automated Test Suite
+BuildingBees Automated Test Suite
 Verifies:
 1. Core Graph DAG traversal and node registration
 2. Socratic Question Engine inspection checklists
@@ -11,7 +11,7 @@ Verifies:
 import pytest
 from starlette.testclient import TestClient
 
-from src.core.graph import SpecGraphEngine
+from src.core.graph import BuildingBeesEngine
 from src.core.schema import (
     ScreenNode,
     CTANode,

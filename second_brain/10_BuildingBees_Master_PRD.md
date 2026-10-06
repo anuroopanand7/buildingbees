@@ -1,26 +1,26 @@
-# 10. SI-Product: The Super Intelligent Product Management System (Master PRD v1.0)
+# 10. BuildingBees: The Super Intelligent Product Management System (Master PRD v1.0)
 
 > **Document Status**: Final Architecture Blueprint  
 > **Target Audience**: Solo Founders, Product Managers, Engineering Teams  
 > **Dual Hackathon Tracks**: Google Cloud AI Builder Cup 2026 & Nebius x NVIDIA Global AI Hackathon  
-> **Tags**: #si-product #super-intelligence #prd #master-spec #agentic-pm #universal-plugin  
+> **Tags**: #buildingbees #super-intelligence #prd #master-spec #agentic-pm #universal-plugin  
 > **Parent**: [[00_Map_of_Content]]
 
 ---
 
 ## 1. Executive Summary & Vision
 
-**SI-Product** is the world's first **Super Intelligent Product Management (SI-PM) platform**. It bridges the massive semantic chasm between high-level human ideas and deterministic AI code generation.
+**BuildingBees** is the world's first **Super Intelligent Product Management (SI-PM) platform**. It bridges the massive semantic chasm between high-level human ideas and deterministic AI code generation.
 
 Today, AI models write code in seconds, but **what to build** remains broken. Solo founders struggle with ambiguous specs, while teams battle 3-way drift between PRDs, Figma boards, and Jira/Plane backlogs. When specifications omit edge cases, autonomous coding agents ("the builders") don't ask—they hallucinate with supreme confidence.
 
-**SI-Product** replaces static documentation with an **evolving, 5-stage Socratic software architecture engine**. It acts as a universal plugin for both project management ecosystems (Plane, Jira, Linear) and autonomous agent runtimes (Google Antigravity, Claude Code, OpenAI Codex, Cursor).
+**BuildingBees** replaces static documentation with an **evolving, 5-stage Socratic software architecture engine**. It acts as a universal plugin for both project management ecosystems (Plane, Jira, Linear) and autonomous agent runtimes (Google Antigravity, Claude Code, OpenAI Codex, Cursor).
 
 ---
 
 ## 2. The 5-Stage Evolving System Architecture
 
-SI-Product does not generate a monolithic blob of code from a one-line prompt. Instead, it guides the founder through an **evolutionary Socratic ladder**:
+BuildingBees does not generate a monolithic blob of code from a one-line prompt. Instead, it guides the founder through an **evolutionary Socratic ladder**:
 
 ```mermaid
 graph TD
@@ -71,9 +71,9 @@ Once flows are locked, the engine decomposes each flow step into concrete **Scre
 
 ## 3. Universal Plugin Ecosystem
 
-SI-Product is designed as a headless, pluggable intelligence layer that connects to the tools teams already use:
+BuildingBees is designed as a headless, pluggable intelligence layer that connects to the tools teams already use:
 
-| Ecosystem Type | Integrations Supported | How SI-Product Interacts |
+| Ecosystem Type | Integrations Supported | How BuildingBees Interacts |
 | :--- | :--- | :--- |
 | **Project Management** | **Plane (plane.so)** | Pushes verified flows as Epics, screens as Work Items, and blocking questions as blocker relations via Plane OAuth & MCP. |
 | **Project Management** | **Jira & Linear** | Syncs screen/API tickets and auto-updates status when code commits land. |

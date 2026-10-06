@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SpecGraph End-to-End Interactive Demonstration
+BuildingBees End-to-End Interactive Demonstration
 Showcases:
 1. 6-layer canonical PCOS graph initialization
 2. Socratic Question Engine inspection

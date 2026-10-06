@@ -1,5 +1,5 @@
 """
-SpecGraph Core Graph Engine
+BuildingBees Core Graph Engine
 Implements Directed Acyclic Graph (DAG) state management, bidirectional traversal,
 blast radius impact analysis, and readiness evaluation.
 """
@@ -19,7 +19,7 @@ from .schema import (
 )
 
 
-class SpecGraphEngine:
+class BuildingBeesEngine:
     def __init__(self):
         # In-memory node store: ID -> BaseGraphNode
         self.nodes: Dict[str, BaseGraphNode] = {}

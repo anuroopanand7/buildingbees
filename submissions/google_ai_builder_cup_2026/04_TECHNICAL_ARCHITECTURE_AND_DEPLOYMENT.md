@@ -1,4 +1,4 @@
-# 🚀 SpecGraph: Deployment & Verification Guide
+# 🚀 BuildingBees: Deployment & Verification Guide
 ### Google Cloud Run & Local Staging
 
 ---
@@ -15,7 +15,7 @@
 source .venv/bin/activate
 
 # 2. Run automated test suite (5 tests covering all core modules)
-PYTHONPATH=. pytest tests/test_specgraph.py -v
+PYTHONPATH=. pytest tests/test_buildingbees.py -v
 
 # 3. Run interactive CLI demo
 python3 scripts/run_demo.py
@@ -38,7 +38,7 @@ gcloud builds submit --config=cloudbuild.yaml .
 ### Option B: Direct CLI Deployment to Cloud Run
 ```bash
 # Build and deploy in a single command
-gcloud run deploy specgraph \
+gcloud run deploy buildingbees \
   --source . \
   --region asia-southeast1 \
   --platform managed \
@@ -46,18 +46,18 @@ gcloud run deploy specgraph \
   --set-env-vars GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
 ```
 
-Once deployed, Google Cloud Run provisions an HTTPS URL (e.g., `https://specgraph-xyz.a.run.app`) that judges can immediately access and test without local setup.
+Once deployed, Google Cloud Run provisions an HTTPS URL (e.g., `https://buildingbees-xyz.a.run.app`) that judges can immediately access and test without local setup.
 
 ---
 
 ## 🔌 3. FastMCP IDE Integration
 
-To connect SpecGraph to Cursor, Windsurf, or Claude Code:
+To connect BuildingBees to Cursor, Windsurf, or Claude Code:
 Add to your `mcp_config.json`:
 ```json
 {
   "mcpServers": {
-    "specgraph": {
+    "buildingbees": {
       "command": "python3",
       "args": ["-m", "src.mcp.server"],
       "cwd": "/path/to/graph blueprint"

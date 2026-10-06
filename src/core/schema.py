@@ -1,5 +1,5 @@
 """
-SI-Product Core Domain Schema
+BuildingBees Core Domain Schema
 Defines strongly typed representations for the 5-Stage Evolutionary Pipeline,
 The Multi-Agent Hive (Bees), Department Input Boxes, and Dual Hackathon Engine Tracks.
 """

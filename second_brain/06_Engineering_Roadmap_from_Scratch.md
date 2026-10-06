@@ -37,7 +37,7 @@
 - [ ] Implement LLM-powered domain question generation (Google Gemini & NVIDIA NIM adapters)
 - [ ] Build the Branch Readiness scoring engine ($Readiness = 0.0$ if blocking questions exist)
 
-### Phase 2: SpecGraph MCP Server (Days 5–6)
+### Phase 2: BuildingBees MCP Server (Days 5–6)
 - [ ] Expose standard MCP tools:
   - `list_ready_branches()`
   - `get_node_details(node_id)`
@@ -54,4 +54,4 @@
 ### Phase 4: Dual Hackathon Polish & Showcase (Days 10–12)
 - [ ] **Google Track Showcase**: One-click PDF PRD & FigJam ingestion into live Graph + Gemini 2.0 reasoning
 - [ ] **NVIDIA Track Showcase**: NeMo Guardrails stopping hallucinated code + cuGraph blast radius visualization
-- [ ] Record high-impact video demos & side-by-side comparison benchmark (Traditional PRD vs SpecGraph)
+- [ ] Record high-impact video demos & side-by-side comparison benchmark (Traditional PRD vs BuildingBees)

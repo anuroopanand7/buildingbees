@@ -20,7 +20,7 @@
 
 ---
 
-## 💡 The Solution: Agentic Information Architecture (SpecGraph / Blueprint)
+## 💡 The Solution: Agentic Information Architecture (BuildingBees / Blueprint)
 
 A zoomable, semantic dependency graph that opens level-by-level (Semantic Zoom: country $\to$ city $\to$ street):
 1. **L1: User** (Customer, Admin, Merchant)

@@ -1,5 +1,5 @@
 """
-SpecGraph Socratic Question Engine
+BuildingBees Socratic Question Engine
 Implements automated inspection checklists across Screen, CTA, API, and Flow nodes.
 Detects missing architectural specifications and generates owner-routed questions.
 """
@@ -16,11 +16,11 @@ from .schema import (
     QuestionCategory,
     QuestionStatus
 )
-from .graph import SpecGraphEngine
+from .graph import BuildingBeesEngine
 
 
 class SocraticQuestionEngine:
-    def __init__(self, graph: SpecGraphEngine):
+    def __init__(self, graph: BuildingBeesEngine):
         self.graph = graph
 
     def inspect_screen(self, screen: ScreenNode) -> List[QuestionNode]:

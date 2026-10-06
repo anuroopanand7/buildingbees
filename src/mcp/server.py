@@ -1,5 +1,5 @@
 """
-SpecGraph Model Context Protocol (MCP) Server
+BuildingBees Model Context Protocol (MCP) Server
 Allows autonomous coding agents (Claude Code, Gemini CLI, Cursor, Windsurf)
 to query graph specifications, check branch readiness, enforce stop rules,
 and post/resolve blocking questions.
@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Optional
 
 try:
     from mcp.server.fastmcp import FastMCP
-    mcp = FastMCP("specgraph-mcp")
+    mcp = FastMCP("buildingbees-mcp")
 except ImportError:
     # Graceful mock/fallback for environments without official MCP library (e.g. Python < 3.10)
     class FastMCPFallback:
@@ -27,9 +27,9 @@ except ImportError:
         def run(self):
             print(f"[{self.name}] FastMCP running in stdio simulation mode.")
 
-    mcp = FastMCPFallback("specgraph-mcp")
+    mcp = FastMCPFallback("buildingbees-mcp")
 
-from src.core.graph import SpecGraphEngine
+from src.core.graph import BuildingBeesEngine
 from src.core.schema import (
     NodeStatus,
     QuestionNode,
@@ -41,14 +41,14 @@ from src.core.question_engine import SocraticQuestionEngine
 
 
 # Shared in-memory graph instance (initialized with PCOS canonical fixture)
-graph_instance: SpecGraphEngine = build_pcos_graph()
+graph_instance: BuildingBeesEngine = build_pcos_graph()
 question_engine_instance = SocraticQuestionEngine(graph_instance)
 
 
 @mcp.tool()
 def list_nodes(layer: Optional[str] = None) -> List[Dict[str, Any]]:
     """
-    List nodes in the SpecGraph information architecture.
+    List nodes in the BuildingBees information architecture.
     Optionally filter by layer: 'USER', 'FLOW', 'SCREEN', 'CTA', 'API', 'QUESTION'.
     """
     results = []

@@ -22,7 +22,7 @@ class NvidiaNeMoGuardrailAdapter:
         Returns Colang 2.0 guardrail policy rules enforcing strict stop-rule behavior.
         """
         return """
-        # SpecGraph Strict Stop-Rule Policy
+        # BuildingBees Strict Stop-Rule Policy
         define user ask to guess unstated behavior
             "Assume a timeout value"
             "Just write default fallback logic"

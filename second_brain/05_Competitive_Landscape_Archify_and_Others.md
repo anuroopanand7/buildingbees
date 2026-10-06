@@ -26,15 +26,15 @@
 - **What they do**: Modern project management, issue tracking, and agent work-item dispatch.
 - **The Gap**:
   - They manage **work tickets** ("Task 102: Build checkout screen"), but possess **zero architectural understanding** of what the screen actually looks like or which API it invokes.
-  - **Our Opportunity**: SpecGraph acts as the **intelligence and architecture layer** on top of Plane. We tell the agent *what to build*, while Plane tracks *that it is being built*.
+  - **Our Opportunity**: BuildingBees acts as the **intelligence and architecture layer** on top of Plane. We tell the agent *what to build*, while Plane tracks *that it is being built*.
 
 ---
 
-## 🛡️ SpecGraph's Competitive Moats
+## 🛡️ BuildingBees's Competitive Moats
 
 ```
                      ┌────────────────────────────────────────┐
-                     │          SpecGraph Moat Quad           │
+                     │          BuildingBees Moat Quad           │
                      └──────────────────┬─────────────────────┘
                                         │
      ┌──────────────────────┬───────────┴───────────┬──────────────────────┐
@@ -45,6 +45,6 @@ CTA state machines     Agents interview humans    Guaranteed zero-guess   Modify
 ```
 
 1. **CTA-Centric Connective Tissue**: Competitors connect screens to screens (wireframes) or APIs to databases (backends). We link the CTA directly to API invocations, success redirects, and failure recovery.
-2. **The Question Engine**: While other tools let you write a spec, SpecGraph interviews your team until the spec is mathematically buildable.
+2. **The Question Engine**: While other tools let you write a spec, BuildingBees interviews your team until the spec is mathematically buildable.
 3. **Branch-Level Readiness Score**: Enables parallel asynchronous engineering: agents build branches that have 0 open questions while PMs and architects refine adjacent branches.
-4. **Agent-Native MCP Server**: Any IDE agent (Claude Code, Gemini CLI, Cursor, Windsurf) can connect directly to SpecGraph via standard MCP tools.
+4. **Agent-Native MCP Server**: Any IDE agent (Claude Code, Gemini CLI, Cursor, Windsurf) can connect directly to BuildingBees via standard MCP tools.

@@ -1,7 +1,7 @@
 """
 Google AI Builder Cup Adapter
 Integrates Google Gemini 2.0 / 1.5 Pro multimodal reasoning and structured outputs
-to ingest legacy PRD documents, PDF designs, and FigJam boards into strongly-typed SpecGraph nodes.
+to ingest legacy PRD documents, PDF designs, and FigJam boards into strongly-typed BuildingBees nodes.
 """
 
 import os
@@ -13,7 +13,7 @@ class GoogleGeminiAdapter:
     """
     Adapter for Google Cloud Vertex AI & Google GenAI SDK.
     Enables:
-    1. Multimodal Document Ingestion (PDF PRD -> SpecGraph nodes)
+    1. Multimodal Document Ingestion (PDF PRD -> BuildingBees nodes)
     2. Socratic Gap Interrogation using Gemini Deep Reasoning
     """
     def __init__(self, api_key: str = None):
@@ -25,8 +25,8 @@ class GoogleGeminiAdapter:
         using Gemini structured outputs.
         """
         prompt = f"""
-        You are SpecGraph's Chief Information Architect.
-        Parse the following Product Requirements Document into the 6-layer SpecGraph schema:
+        You are BuildingBees's Chief Information Architect.
+        Parse the following Product Requirements Document into the 6-layer BuildingBees schema:
         - Screens (with Loading, Empty, Error states)
         - CTAs (Connective tissue: preconditions, APIs called, success screen, failure screen)
         - APIs (Service, vendor, timeout, error codes)
@@ -36,7 +36,7 @@ class GoogleGeminiAdapter:
         {prd_content[:4000]}
         """
         # In a live runtime with google-genai installed, this calls client.models.generate_content
-        # with response_schema=SpecGraphSchema.
+        # with response_schema=BuildingBeesSchema.
         return {
             "status": "PARSED",
             "provider": "Google Gemini 2.0 Pro",
