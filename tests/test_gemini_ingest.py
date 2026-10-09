@@ -2,7 +2,7 @@
 
 from fastapi.testclient import TestClient
 
-from src.adapters.gemini_adapter import (
+from src.adapters.spec_prompts import (
     SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
 )
 from src.api import server
@@ -41,6 +41,8 @@ def test_extract_builds_connected_graph():
 
 
 class FakeGemini:
+    key = "gemini"
+    label = "Fake Gemini"
     enabled = True
     model = "fake"
 
@@ -53,11 +55,11 @@ class FakeGemini:
 
 
 def test_ingest_interrogate_resolve_flow(monkeypatch):
-    monkeypatch.setattr(server, "gemini_adapter", FakeGemini())
+    monkeypatch.setitem(server.engines, "gemini", FakeGemini())
     c = TestClient(server.app)
     try:
-        assert c.post("/api/ingest-prd", json={"prd_markdown": "a shop"}).json()["total_nodes"] > 0
-        assert c.post("/api/nodes/CTA_PAY/interrogate").json()["added"][0]["question_text"] == "Double tap on Pay?"
+        assert c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "a shop"}).json()["total_nodes"] > 0
+        assert c.post("/api/nodes/CTA_PAY/interrogate?engine=gemini").json()["added"][0]["question_text"] == "Double tap on Pay?"
         screens = {s["screen_id"]: s for s in c.get("/api/screens").json()}
         assert screens["W01_CART"]["is_build_ready"] is False
         for q in screens["W01_CART"]["open_blocking_questions"]:
@@ -71,5 +73,22 @@ def test_ingest_interrogate_resolve_flow(monkeypatch):
 def test_ingest_without_key_is_refused(monkeypatch):
     class Off(FakeGemini):
         enabled = False
-    monkeypatch.setattr(server, "gemini_adapter", Off())
-    assert TestClient(server.app).post("/api/ingest-prd", json={"prd_markdown": "x"}).status_code == 503
+    monkeypatch.setitem(server.engines, "gemini", Off())
+    assert TestClient(server.app).post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "x"}).status_code == 503
+
+
+def test_unknown_engine_rejected():
+    assert TestClient(server.app).post("/api/ingest-prd?engine=openai", json={"prd_markdown": "x"}).status_code == 400
+
+
+def test_nvidia_adapter_parses_json_reply(monkeypatch):
+    from src.adapters import nvidia_adapter as nv
+
+    class Resp:
+        def raise_for_status(self): pass
+        def json(self):
+            return {"choices": [{"message": {"content": "<think>x</think>Sure: " + EXTRACT.model_dump_json()}}]}
+
+    monkeypatch.setattr(nv.httpx, "post", lambda *a, **k: Resp())
+    out = nv.NvidiaNemotronAdapter(api_key="k").extract_spec(text="shop")
+    assert out.product_name == "Tiny Shop"

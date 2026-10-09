@@ -70,6 +70,8 @@ def test_blast_radius_calculation():
 
 
 def test_api_endpoints():
+    from src.api import server
+    server._set_graph(build_pcos_graph())
     # 1. Root route
     res = client.get("/")
     assert res.status_code == 200
@@ -89,7 +91,7 @@ def test_api_endpoints():
     res = client.get("/api/status")
     assert res.status_code == 200
     tracks = res.json()
-    assert "gemini" in tracks
+    assert set(tracks["engines"]) == {"gemini", "nvidia"}
 
     # 5. Blast radius API
     res = client.get("/api/blast-radius/API32_DELIVERY_CHECK")

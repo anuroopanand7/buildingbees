@@ -29,9 +29,9 @@ from src.core.schema import (
     QuestionStatus,
     QuestionCategory
 )
-from src.data.pcos_fixture import build_pcos_graph
 from src.core.question_engine import SocraticQuestionEngine
 from src.adapters.gemini_adapter import GoogleGeminiAdapter
+from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.core.ingest import add_questions, build_graph_from_extract
 
 app = FastAPI(
@@ -60,10 +60,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Shared in-memory graph initialized with canonical PCOS flow
-graph = build_pcos_graph()
+# Shared in-memory graph. Starts empty; a spec ingest fills it.
+graph = BuildingBeesEngine()
 question_engine = SocraticQuestionEngine(graph)
-gemini_adapter = GoogleGeminiAdapter()
+engines = {e.key: e for e in (GoogleGeminiAdapter(), NvidiaNemotronAdapter())}
 
 
 class QuestionResolveRequest(BaseModel):
@@ -180,45 +180,50 @@ def _set_graph(new_graph) -> None:
     question_engine = SocraticQuestionEngine(graph)
 
 
-def _require_gemini() -> None:
-    if not gemini_adapter.enabled:
-        raise HTTPException(status_code=503, detail="Gemini is not configured. Set GEMINI_API_KEY and restart.")
+def _engine(name: str):
+    """Every AI call names its engine; the hackathon rules require each track to run on its sponsor's models."""
+    eng = engines.get(name)
+    if not eng:
+        raise HTTPException(status_code=400, detail=f"Unknown engine '{name}'. Choose 'gemini' or 'nvidia'.")
+    if not eng.enabled:
+        raise HTTPException(status_code=503, detail=f"{eng.label} is not configured. Add its API key to .env and restart.")
+    return eng
 
 
 @app.post("/api/ingest-prd")
-def ingest_prd(payload: IngestPRDRequest) -> Dict[str, Any]:
-    """Gemini turns pasted PRD text into a fresh typed graph, with blocking questions."""
-    _require_gemini()
+def ingest_prd(payload: IngestPRDRequest, engine: str) -> Dict[str, Any]:
+    """The chosen engine turns pasted PRD text into a fresh typed graph, with blocking questions."""
+    eng = _engine(engine)
     if not payload.prd_markdown.strip():
         raise HTTPException(status_code=400, detail="PRD text is empty")
     try:
-        _set_graph(build_graph_from_extract(gemini_adapter.extract_spec(text=payload.prd_markdown)))
+        _set_graph(build_graph_from_extract(eng.extract_spec(text=payload.prd_markdown), eng.label))
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Gemini ingest failed: {e}")
+        raise HTTPException(status_code=502, detail=f"{eng.label} ingest failed: {e}")
     return get_graph_state()
 
 
 @app.post("/api/ingest-file")
-async def ingest_file(file: UploadFile = File(...)) -> Dict[str, Any]:
-    """Gemini reads an uploaded PDF (multimodal) or text/markdown file into a fresh graph."""
-    _require_gemini()
+async def ingest_file(engine: str, file: UploadFile = File(...)) -> Dict[str, Any]:
+    """The chosen engine reads an uploaded PDF or text/markdown file into a fresh graph."""
+    eng = _engine(engine)
     data = await file.read()
     if len(data) > 20 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="File is over 20 MB")
     is_pdf = data[:4] == b"%PDF"
     try:
-        extract = (gemini_adapter.extract_spec(pdf_bytes=data) if is_pdf
-                   else gemini_adapter.extract_spec(text=data.decode("utf-8", errors="ignore")))
-        _set_graph(build_graph_from_extract(extract))
+        extract = (eng.extract_spec(pdf_bytes=data) if is_pdf
+                   else eng.extract_spec(text=data.decode("utf-8", errors="ignore")))
+        _set_graph(build_graph_from_extract(extract, eng.label))
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Gemini ingest failed: {e}")
+        raise HTTPException(status_code=502, detail=f"{eng.label} ingest failed: {e}")
     return get_graph_state()
 
 
 @app.post("/api/nodes/{node_id}/interrogate")
-def interrogate_node(node_id: str) -> Dict[str, Any]:
-    """Gemini Socratic pass over one node: adds new blocking questions to the graph."""
-    _require_gemini()
+def interrogate_node(node_id: str, engine: str) -> Dict[str, Any]:
+    """Socratic pass over one node: adds new blocking questions to the graph."""
+    eng = _engine(engine)
     node = graph.get_node(node_id)
     if not node:
         raise HTTPException(status_code=404, detail=f"Node '{node_id}' not found")
@@ -230,10 +235,10 @@ def interrogate_node(node_id: str) -> Dict[str, Any]:
     }
     asked = [q.question_text for q in graph.get_questions_for_node(node_id)]
     try:
-        questions = gemini_adapter.interrogate(node_id, json.dumps(context, default=str)[:12000], asked)
+        questions = eng.interrogate(node_id, json.dumps(context, default=str)[:12000], asked)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Gemini interrogation failed: {e}")
-    added = add_questions(graph, questions)
+        raise HTTPException(status_code=502, detail=f"{eng.label} interrogation failed: {e}")
+    added = add_questions(graph, questions, eng.label)
     return {"node_id": node_id, "added": [q.model_dump() for q in added]}
 
 
@@ -246,8 +251,8 @@ def list_screen_readiness() -> List[Dict[str, Any]]:
 
 @app.post("/api/reset")
 def reset_to_sample() -> Dict[str, Any]:
-    """Reloads the built-in PCOS checkout sample."""
-    _set_graph(build_pcos_graph())
+    """Clears the board."""
+    _set_graph(BuildingBeesEngine())
     return get_graph_state()
 
 
@@ -255,8 +260,8 @@ def reset_to_sample() -> Dict[str, Any]:
 def get_status() -> Dict[str, Any]:
     """Honest runtime status: is a real model connected, and which one."""
     return {
-        "product_name": getattr(graph, "product_name", "PCOS Wellness Store (sample)"),
-        "gemini": {"enabled": gemini_adapter.enabled, "model": gemini_adapter.model},
+        "product_name": getattr(graph, "product_name", ""),
+        "engines": {k: {"label": e.label, "enabled": e.enabled, "model": e.model} for k, e in engines.items()},
         "total_nodes": len(graph.nodes),
     }
 

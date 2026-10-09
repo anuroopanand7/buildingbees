@@ -1,8 +1,8 @@
-"""Turns a Gemini SpecExtract into a BuildingBeesEngine graph, and attaches generated questions."""
+"""Turns an engine SpecExtract into a BuildingBeesEngine graph, and attaches generated questions."""
 
 from typing import Iterable
 
-from src.adapters.gemini_adapter import SpecExtract, XQuestion
+from src.adapters.spec_prompts import SpecExtract, XQuestion
 from src.core.graph import BuildingBeesEngine
 from src.core.schema import (
     APINode, BeeType, CTANode, FlowNode, QuestionCategory, QuestionNode,
@@ -24,7 +24,7 @@ def _state(value: str) -> str:
     return "" if not value or value.strip().upper() == "UNSPECIFIED" else value
 
 
-def add_questions(engine: BuildingBeesEngine, questions: Iterable[XQuestion]) -> list:
+def add_questions(engine: BuildingBeesEngine, questions: Iterable[XQuestion], source: str = "ai") -> list:
     added = []
     for q in questions:
         if q.target_id not in engine.nodes:
@@ -43,7 +43,7 @@ def add_questions(engine: BuildingBeesEngine, questions: Iterable[XQuestion]) ->
             question_status=QuestionStatus.OPEN,
             author_bee=BEE_FOR_CATEGORY[cat],
             suggested_options=q.suggested_options,
-            metadata={"source": "gemini"},
+            metadata={"source": source},
         )
         engine.add_node(node)
         engine.add_edge(q.target_id, node.id)
@@ -51,7 +51,7 @@ def add_questions(engine: BuildingBeesEngine, questions: Iterable[XQuestion]) ->
     return added
 
 
-def build_graph_from_extract(x: SpecExtract) -> BuildingBeesEngine:
+def build_graph_from_extract(x: SpecExtract, source: str = "ai") -> BuildingBeesEngine:
     g = BuildingBeesEngine()
     g.product_name = x.product_name
 
@@ -87,5 +87,5 @@ def build_graph_from_extract(x: SpecExtract) -> BuildingBeesEngine:
             if api_id in g.nodes:
                 g.add_edge(c.id, api_id)
 
-    add_questions(g, x.questions)
+    add_questions(g, x.questions, source)
     return g

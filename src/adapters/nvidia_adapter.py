@@ -1,73 +1,95 @@
 """
-NVIDIA Hackathon Adapter
-Integrates NVIDIA NIM microservices, NeMo Guardrails ("Assumption is not approval"),
-and cuGraph GPU-accelerated dependency analysis.
+NVIDIA adapter: Nemotron through any OpenAI-compatible endpoint.
+Default is NVIDIA's API catalogue (build.nvidia.com). For the Nebius hackathon, point
+NVIDIA_BASE_URL at Nebius AI Studio and use a Nemotron model id it serves.
+Same two jobs as the Gemini adapter, with the same output schemas, so the graph code
+does not care which engine ran. PDFs are converted to text first (no multimodal input).
 """
 
+import io
+import json
 import os
-from typing import Dict, Any, List
+import re
+from typing import List, Optional
+
+import httpx
+
+from src.adapters.gemini_adapter import EngineNotConfigured
+from src.adapters.spec_prompts import INGEST_PROMPT, INTERROGATE_PROMPT, QuestionList, SpecExtract, XQuestion
+
+DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1"
+DEFAULT_MODEL = "nvidia/llama-3.3-nemotron-super-49b-v1"
 
 
-class NvidiaNeMoGuardrailAdapter:
-    """
-    Enforces 'Assumption is not approval' at the LLM generation layer using NeMo Guardrails.
-    Prevents autonomous agents from hallucinating business policies when specs have gaps.
-    """
-    def __init__(self, nim_endpoint: str = None, api_key: str = None):
-        self.nim_endpoint = nim_endpoint or os.getenv("NVIDIA_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
+def pdf_to_text(data: bytes) -> str:
+    from pypdf import PdfReader
+    return "\n".join((p.extract_text() or "") for p in PdfReader(io.BytesIO(data)).pages)
+
+
+def _first_json_object(text: str) -> str:
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.S)
+    start = text.find("{")
+    end = text.rfind("}")
+    if start < 0 or end < start:
+        raise ValueError("Model reply contained no JSON object")
+    return text[start:end + 1]
+
+
+class NvidiaNemotronAdapter:
+    key = "nvidia"
+    label = "NVIDIA Nemotron"
+
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None, base_url: Optional[str] = None):
         self.api_key = api_key or os.getenv("NVIDIA_API_KEY", "")
+        self.model = model or os.getenv("NVIDIA_MODEL", DEFAULT_MODEL)
+        self.base_url = (base_url or os.getenv("NVIDIA_BASE_URL", DEFAULT_BASE_URL)).rstrip("/")
 
-    def get_colang_policy_definition(self) -> str:
-        """
-        Returns Colang 2.0 guardrail policy rules enforcing strict stop-rule behavior.
-        """
-        return """
-        # BuildingBees Strict Stop-Rule Policy
-        define user ask to guess unstated behavior
-            "Assume a timeout value"
-            "Just write default fallback logic"
-            "Pick any screen to redirect to"
+    @property
+    def enabled(self) -> bool:
+        return bool(self.api_key)
 
-        define bot refuse to guess
-            "Violation: 'Assumption is not approval'. The specification for this node has an unresolved blocking question. You must post a question to the node owner and switch to another ready branch."
+    def _generate(self, prompt: str, schema):
+        if not self.enabled:
+            raise EngineNotConfigured("NVIDIA_API_KEY is not set")
+        instructions = (
+            prompt
+            + "\n\nReply with ONLY one JSON object matching this JSON Schema, no prose:\n"
+            + json.dumps(schema.model_json_schema())
+        )
+        messages = [
+            {"role": "system", "content": "detailed thinking off"},
+            {"role": "user", "content": instructions},
+        ]
+        last_error = None
+        for _ in range(2):  # one retry when the reply is not valid JSON for the schema
+            resp = httpx.post(
+                f"{self.base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json={"model": self.model, "messages": messages, "temperature": 0.2, "max_tokens": 8192},
+                timeout=180,
+            )
+            resp.raise_for_status()
+            content = resp.json()["choices"][0]["message"]["content"] or ""
+            try:
+                return schema.model_validate_json(_first_json_object(content))
+            except Exception as e:
+                last_error = e
+                messages += [
+                    {"role": "assistant", "content": content},
+                    {"role": "user", "content": f"That was not valid for the schema ({e}). Reply with only the corrected JSON."},
+                ]
+        raise ValueError(f"Nemotron did not return valid JSON: {last_error}")
 
-        define flow enforce_zero_guessing
-            user ask to guess unstated behavior
-            bot refuse to guess
-        """
+    def extract_spec(self, text: str = "", pdf_bytes: Optional[bytes] = None) -> SpecExtract:
+        if pdf_bytes:
+            text = pdf_to_text(pdf_bytes)
+        return self._generate(INGEST_PROMPT + text[:60000], SpecExtract)
 
-    def verify_agent_output_safety(self, generated_code: str, node_spec: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Evaluates whether agent output contains unapproved assumptions.
-        """
-        # NeMo Guardrails verification logic
-        return {
-            "is_compliant": True,
-            "guardrail_engine": "NVIDIA NeMo Guardrails v0.10",
-            "violations_detected": []
-        }
-
-
-class NvidiaCuGraphAccelerator:
-    """
-    GPU Graph Analytics using NVIDIA cuGraph (RAPIDS).
-    Accelerates large enterprise product graphs (10,000+ nodes) for:
-    - Sub-millisecond topological sorting of build branches
-    - Real-time blast radius calculations when APIs change
-    - Cycle & deadlock detection across complex state transitions
-    """
-    def __init__(self, enable_gpu: bool = False):
-        self.enable_gpu = enable_gpu
-
-    def calculate_gpu_blast_radius(self, node_id: str, edge_list: List[tuple]) -> Dict[str, Any]:
-        """
-        Calculates blast radius via cuGraph BFS / Two-Hop traversal.
-        Falls back to fast CPU matrix traversal when GPU is not present.
-        """
-        return {
-            "mode": "NVIDIA cuGraph GPU Accelerated" if self.enable_gpu else "CPU Matrix Emulation",
-            "root_node": node_id,
-            "latency_ms": 0.42 if self.enable_gpu else 3.8,
-            "subgraph_depth": 3,
-            "connected_components": 1
-        }
+    def interrogate(self, node_id: str, context_json: str, asked: List[str]) -> List[XQuestion]:
+        prompt = INTERROGATE_PROMPT.format(
+            node_id=node_id, context=context_json, asked="\n".join(f"- {q}" for q in asked) or "(none)"
+        )
+        result = self._generate(prompt, QuestionList)
+        for q in result.questions:
+            q.target_id = node_id
+        return result.questions
