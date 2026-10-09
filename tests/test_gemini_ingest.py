@@ -92,3 +92,20 @@ def test_nvidia_adapter_parses_json_reply(monkeypatch):
     monkeypatch.setattr(nv.httpx, "post", lambda *a, **k: Resp())
     out = nv.NvidiaNemotronAdapter(api_key="k").extract_spec(text="shop")
     assert out.product_name == "Tiny Shop"
+
+
+def test_boards_are_per_visitor_and_restorable(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", FakeGemini())
+    c = TestClient(server.app)
+    a, b = {"X-Board": "judge-a"}, {"X-Board": "judge-b"}
+    c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=a)
+    saved = c.get("/api/graph", headers=a).json()
+    assert saved["total_nodes"] > 0 and saved["product_name"] == "Tiny Shop"
+    assert c.get("/api/graph", headers=b).json()["total_nodes"] == 0  # B never sees A's board
+
+    server.boards.clear()  # server slept: memory gone
+    assert c.get("/api/graph", headers=a).json()["total_nodes"] == 0
+    back = c.post("/api/restore", json=saved, headers=a).json()
+    assert back["total_nodes"] == saved["total_nodes"] and back["total_edges"] == saved["total_edges"]
+    screens = {s["screen_id"]: s for s in c.get("/api/screens", headers=a).json()}
+    assert screens["W01_CART"]["is_build_ready"] is False  # questions survived the round trip

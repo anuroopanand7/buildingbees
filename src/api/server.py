@@ -13,6 +13,8 @@ from typing import Dict, Any, List, Optional
 import datetime
 import json
 import os
+from collections import OrderedDict
+from contextvars import ContextVar
 
 # Load KEY=value lines from a local .env (never committed) before adapters read the environment.
 _ENV = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
@@ -24,6 +26,12 @@ if os.path.exists(_ENV):
 
 from src.core.graph import BuildingBeesEngine
 from src.core.schema import (
+    APINode,
+    CTANode,
+    FlowNode,
+    LogicStepNode,
+    ScreenNode,
+    UserNode,
     NodeStatus,
     QuestionNode,
     QuestionStatus,
@@ -60,9 +68,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Shared in-memory graph. Starts empty; a spec ingest fills it.
-graph = BuildingBeesEngine()
-question_engine = SocraticQuestionEngine(graph)
+# One board per visitor, keyed by the X-Board header the web app sends.
+# shortcut: boards live in memory and vanish when Cloud Run scales to zero; the browser keeps a
+# copy and re-uploads it via /api/restore. Move to Firestore if accounts are added.
+MAX_BOARDS = 300
+boards: "OrderedDict[str, BuildingBeesEngine]" = OrderedDict()
+_board_id: ContextVar[str] = ContextVar("board_id", default="default")
+
+
+def _board() -> BuildingBeesEngine:
+    bid = _board_id.get()
+    if bid not in boards:
+        boards[bid] = BuildingBeesEngine()
+        while len(boards) > MAX_BOARDS:
+            boards.popitem(last=False)
+    boards.move_to_end(bid)
+    return boards[bid]
+
+
+class _BoardProxy:
+    """Lets the endpoints keep writing `graph.x` while each request sees its own board."""
+    def __getattr__(self, name):
+        return getattr(_board(), name)
+
+
+graph = _BoardProxy()
+
+
+@app.middleware("http")
+async def _select_board(request, call_next):
+    _board_id.set((request.headers.get("x-board") or "default")[:64])
+    return await call_next(request)
 engines = {e.key: e for e in (GoogleGeminiAdapter(), NvidiaNemotronAdapter())}
 
 
@@ -96,6 +132,7 @@ def get_graph_state() -> Dict[str, Any]:
     return {
         "nodes": nodes_serialized,
         "edges": edges,
+        "product_name": getattr(graph, "product_name", ""),
         "total_nodes": len(graph.nodes),
         "total_edges": len(edges)
     }
@@ -114,7 +151,7 @@ def get_branch_readiness(screen_id: str) -> Dict[str, Any]:
 @app.post("/api/inspect")
 def run_socratic_inspection() -> Dict[str, Any]:
     """Runs automated Socratic Question Engine checklists over the entire graph."""
-    results = question_engine.run_full_graph_inspection()
+    results = SocraticQuestionEngine(_board()).run_full_graph_inspection()
     return results
 
 
@@ -178,9 +215,33 @@ def get_blast_radius(node_id: str) -> Dict[str, Any]:
 
 
 def _set_graph(new_graph) -> None:
-    global graph, question_engine
-    graph = new_graph
-    question_engine = SocraticQuestionEngine(graph)
+    boards[_board_id.get()] = new_graph
+
+
+LAYER_CLASSES = {c.model_fields["layer"].default.value: c for c in
+                 (UserNode, FlowNode, ScreenNode, CTANode, APINode, LogicStepNode, QuestionNode)}
+
+
+class RestoreRequest(BaseModel):
+    product_name: str = ""
+    nodes: List[Dict[str, Any]]
+    edges: List[Dict[str, str]]
+
+
+@app.post("/api/restore")
+def restore_board(payload: RestoreRequest) -> Dict[str, Any]:
+    """Rebuilds a board from the copy the browser kept (after the server slept)."""
+    g = BuildingBeesEngine()
+    g.product_name = payload.product_name
+    for n in payload.nodes[:2000]:
+        cls = LAYER_CLASSES.get(n.get("layer"))
+        if cls:
+            g.add_node(cls.model_validate(n))
+    for e in payload.edges[:10000]:
+        if e.get("source") in g.nodes and e.get("target") in g.nodes:
+            g.add_edge(e["source"], e["target"])
+    _set_graph(g)
+    return get_graph_state()
 
 
 def _engine(name: str):
