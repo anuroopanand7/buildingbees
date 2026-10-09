@@ -4,12 +4,14 @@ Provides REST endpoints and state synchronization for the Semantic Zoom Canvas,
 Socratic Question Engine, and Dual Hackathon Track Adapters.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
+import datetime
+import json
 import os
 
 from src.core.graph import BuildingBeesEngine
@@ -22,7 +24,7 @@ from src.core.schema import (
 from src.data.pcos_fixture import build_pcos_graph
 from src.core.question_engine import SocraticQuestionEngine
 from src.adapters.gemini_adapter import GoogleGeminiAdapter
-from src.adapters.nvidia_adapter import NvidiaNeMoGuardrailAdapter, NvidiaCuGraphAccelerator
+from src.core.ingest import add_questions, build_graph_from_extract
 
 app = FastAPI(
     title="BuildingBees API",
@@ -54,8 +56,6 @@ app.add_middleware(
 graph = build_pcos_graph()
 question_engine = SocraticQuestionEngine(graph)
 gemini_adapter = GoogleGeminiAdapter()
-nvidia_guardrails = NvidiaNeMoGuardrailAdapter()
-nvidia_cugraph = NvidiaCuGraphAccelerator(enable_gpu=True)
 
 
 class QuestionResolveRequest(BaseModel):
@@ -76,7 +76,7 @@ class IngestPRDRequest(BaseModel):
 @app.get("/api/graph")
 def get_graph_state() -> Dict[str, Any]:
     """Returns the full graph state: nodes, edges, and open blocking questions."""
-    nodes_serialized = [node.dict() for node in graph.nodes.values()]
+    nodes_serialized = [node.model_dump() for node in graph.nodes.values()]
     edges = []
     for source, targets in graph.forward_edges.items():
         for target in targets:
@@ -95,7 +95,7 @@ def get_branch_readiness(screen_id: str) -> Dict[str, Any]:
     """Calculates branch readiness score and checks stop-rule conditions."""
     try:
         readiness = graph.evaluate_branch_readiness(screen_id)
-        return readiness.dict()
+        return readiness.model_dump()
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -114,8 +114,11 @@ def resolve_question(question_id: str, payload: QuestionResolveRequest) -> Dict[
     if not node or not isinstance(node, QuestionNode):
         raise HTTPException(status_code=404, detail=f"Question '{question_id}' not found")
 
+    if not payload.answer_text.strip():
+        raise HTTPException(status_code=400, detail="Answer is empty")
     node.question_status = QuestionStatus.ANSWERED
     node.answer_text = payload.answer_text
+    node.answered_at = datetime.datetime.utcnow().isoformat()
     
     # Target node status can be updated to READY if no other blocking questions exist
     target_node = graph.get_node(node.target_node_id)
@@ -154,7 +157,7 @@ def post_question(payload: PostQuestionRequest) -> Dict[str, Any]:
     graph.add_node(q)
     graph.add_edge(payload.target_node_id, q.id)
 
-    return {"status": "CREATED", "question": q.dict()}
+    return {"status": "CREATED", "question": q.model_dump()}
 
 
 @app.get("/api/blast-radius/{node_id}")
@@ -163,32 +166,93 @@ def get_blast_radius(node_id: str) -> Dict[str, Any]:
     return graph.get_blast_radius(node_id)
 
 
+def _set_graph(new_graph) -> None:
+    global graph, question_engine
+    graph = new_graph
+    question_engine = SocraticQuestionEngine(graph)
+
+
+def _require_gemini() -> None:
+    if not gemini_adapter.enabled:
+        raise HTTPException(status_code=503, detail="Gemini is not configured. Set GEMINI_API_KEY and restart.")
+
+
 @app.post("/api/ingest-prd")
 def ingest_prd(payload: IngestPRDRequest) -> Dict[str, Any]:
-    """Google Gemini Track: Ingests unstructured PRD markdown into BuildingBees nodes."""
-    return gemini_adapter.ingest_prd_markdown(payload.prd_markdown)
+    """Gemini turns pasted PRD text into a fresh typed graph, with blocking questions."""
+    _require_gemini()
+    if not payload.prd_markdown.strip():
+        raise HTTPException(status_code=400, detail="PRD text is empty")
+    try:
+        _set_graph(build_graph_from_extract(gemini_adapter.extract_spec(text=payload.prd_markdown)))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Gemini ingest failed: {e}")
+    return get_graph_state()
 
 
-@app.get("/api/tracks-status")
-def get_tracks_status() -> Dict[str, Any]:
-    """Returns real-time status of both hackathon acceleration layers."""
+@app.post("/api/ingest-file")
+async def ingest_file(file: UploadFile = File(...)) -> Dict[str, Any]:
+    """Gemini reads an uploaded PDF (multimodal) or text/markdown file into a fresh graph."""
+    _require_gemini()
+    data = await file.read()
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File is over 20 MB")
+    is_pdf = data[:4] == b"%PDF"
+    try:
+        extract = (gemini_adapter.extract_spec(pdf_bytes=data) if is_pdf
+                   else gemini_adapter.extract_spec(text=data.decode("utf-8", errors="ignore")))
+        _set_graph(build_graph_from_extract(extract))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Gemini ingest failed: {e}")
+    return get_graph_state()
+
+
+@app.post("/api/nodes/{node_id}/interrogate")
+def interrogate_node(node_id: str) -> Dict[str, Any]:
+    """Gemini Socratic pass over one node: adds new blocking questions to the graph."""
+    _require_gemini()
+    node = graph.get_node(node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail=f"Node '{node_id}' not found")
+    neighbour_ids = graph.forward_edges.get(node_id, set()) | graph.reverse_edges.get(node_id, set())
+    context = {
+        "node": node.model_dump(),
+        "neighbours": [graph.nodes[i].model_dump() for i in neighbour_ids
+                       if i in graph.nodes and graph.nodes[i].layer.value != "QUESTION"],
+    }
+    asked = [q.question_text for q in graph.get_questions_for_node(node_id)]
+    try:
+        questions = gemini_adapter.interrogate(node_id, json.dumps(context, default=str)[:12000], asked)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Gemini interrogation failed: {e}")
+    added = add_questions(graph, questions)
+    return {"node_id": node_id, "added": [q.model_dump() for q in added]}
+
+
+@app.get("/api/screens")
+def list_screen_readiness() -> List[Dict[str, Any]]:
+    """Readiness for every screen branch, for the dashboard."""
+    return [graph.evaluate_branch_readiness(n.id).model_dump()
+            for n in graph.nodes.values() if n.layer.value == "SCREEN"]
+
+
+@app.post("/api/reset")
+def reset_to_sample() -> Dict[str, Any]:
+    """Reloads the built-in PCOS checkout sample."""
+    _set_graph(build_pcos_graph())
+    return get_graph_state()
+
+
+@app.get("/api/status")
+def get_status() -> Dict[str, Any]:
+    """Honest runtime status: is a real model connected, and which one."""
     return {
-        "google_track": {
-            "name": "Google AI Builder Cup 2026",
-            "model": "Gemini 2.0 Pro Multimodal",
-            "capabilities": ["Large Context Spec Ingestion", "Structured JSON Schema Generation", "Firebase Live Sync"],
-            "status": "ONLINE"
-        },
-        "nvidia_track": {
-            "name": "NVIDIA Hackathon 2026",
-            "technology": "NeMo Guardrails + cuGraph GPU Analytics",
-            "policy": "Strict Zero-Guessing 'Assumption is not approval'",
-            "gpu_latency_ms": 0.42,
-            "status": "ONLINE"
-        }
+        "product_name": getattr(graph, "product_name", "PCOS Wellness Store (sample)"),
+        "gemini": {"enabled": gemini_adapter.enabled, "model": gemini_adapter.model},
+        "total_nodes": len(graph.nodes),
     }
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("src.api.server.py:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("src.api.server:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")), reload=True)

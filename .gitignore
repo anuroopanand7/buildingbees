@@ -23,3 +23,4 @@ Thumbs.db
 
 # Obsidian local workspace (keep vault markdown files, ignore local workspace state)
 second_brain/.obsidian/workspace*
+.env

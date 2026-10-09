@@ -86,11 +86,10 @@ def test_api_endpoints():
     assert res.json()["readiness_score"] == 0.0
 
     # 4. Tracks status
-    res = client.get("/api/tracks-status")
+    res = client.get("/api/status")
     assert res.status_code == 200
     tracks = res.json()
-    assert "google_track" in tracks
-    assert "nvidia_track" in tracks
+    assert "gemini" in tracks
 
     # 5. Blast radius API
     res = client.get("/api/blast-radius/API32_DELIVERY_CHECK")
