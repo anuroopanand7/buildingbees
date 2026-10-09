@@ -12,7 +12,7 @@ from src.adapters.spec_prompts import (  # noqa: F401  (re-exported for callers)
     INGEST_PROMPT, INTERROGATE_PROMPT, QuestionList, SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
 )
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-3.7-flash"
 
 
 class EngineNotConfigured(RuntimeError):
