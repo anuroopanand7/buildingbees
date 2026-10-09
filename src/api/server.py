@@ -81,6 +81,9 @@ class IngestPRDRequest(BaseModel):
     prd_markdown: str
 
 
+app.mount("/examples", StaticFiles(directory=os.path.join(WEB_DIR, "examples")), name="examples")
+
+
 @app.get("/api/graph")
 def get_graph_state() -> Dict[str, Any]:
     """Returns the full graph state: nodes, edges, and open blocking questions."""

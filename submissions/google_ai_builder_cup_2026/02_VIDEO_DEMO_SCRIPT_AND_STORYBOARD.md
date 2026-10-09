@@ -1,23 +1,16 @@
-# 🎥 BuildingBees: 3-Minute Video Demo Script & Storyboard
-### Google Cloud AI Builder Cup 2026 Submission Video
+# Demo Video Script (under 3 minutes)
 
----
+Record the real app at a 1440 px wide window. Use the built-in QuickBite example so the demo is repeatable.
 
-## ⏱️ Video Breakdown (180 Seconds Total)
+| Time | On screen | Voice-over |
+|---|---|---|
+| 0:00 to 0:20 | A plain PRD document scrolling | "AI can write code in minutes now. But when the spec is vague, the agent guesses, and you find out in production." |
+| 0:20 to 0:35 | BuildingBees opens on "Choose your AI engine". Click Google Gemini | "BuildingBees is an AI product manager. It runs on Google Gemini." |
+| 0:35 to 1:05 | Click "Try an example spec", then "Build graph". The board fills: users, flows, screens, CTAs, APIs | "I give it a normal PRD for a food delivery app. Gemini turns it into a map of every user, flow, screen, button and API." |
+| 1:05 to 1:35 | Red "blocking" badges. Click the Pay now CTA, then the payment API. Inspector shows "Timeout: not specified" in red and the questions | "Then it asks what the spec forgot. What happens if Razorpay times out? Can the customer pay twice? These are blocking questions." |
+| 1:35 to 2:05 | Pick a suggested answer, then type another. Readiness for the Payment screen climbs to 100% and turns green | "I answer, the answer goes into the spec, and the screen becomes ready to build. Assumption is not approval." |
+| 2:05 to 2:30 | Click "Ask Gemini what this node is missing" on the Address screen. New questions appear | "I can ask Gemini to go deeper on any part of the product." |
+| 2:30 to 2:50 | README section on the MCP server, then the stats panel | "Coding agents read the same map, and they only build branches with no open questions." |
+| 2:50 to 3:00 | Logo and GitHub link | "BuildingBees. Decide what to build, before you build it." |
 
-| Timestamp | Visual on Screen | Voiceover / Narration |
-| :--- | :--- | :--- |
-| **0:00 - 0:30** | Opening slide $\to$ Frustration showing traditional 400-page PRD vs broken AI-generated code. | *"AI coding agents have made code generation fast and cheap, but deciding exactly what to build is still painfully vague. When requirements leave out an edge case, agents don't stop—they guess with confidence, introducing critical bugs into production. Meet BuildingBees: the shared product map human teams fill in, and autonomous agents build from."* |
-| **0:30 - 1:00** | Interactive Canvas: Zooming from L1 User Persona $\to$ L2 Flow $\to$ L3 Screen $\to$ L4 CTA $\to$ L5 API $\to$ L6 Logic. | *"BuildingBees replaces static text PRDs with an agentic, 6-level information architecture map. Powered by Google Gemini 2.0 Pro's 2M-token context window, we ingest entire 400-page PDFs—like our live PCOS Commerce App benchmark—and compile them into strongly-typed graph nodes. Notice Level 4: Call-to-Actions are deterministic state machines connecting screen gestures directly to backend APIs."* |
-| **1:00 - 1:45** | Socratic Question Engine in action $\to$ Screen W05 is highlighted RED with Readiness Score: 0.0. | *"Notice screen W05 Checkout: its readiness badge is RED (0.0). Why? Because our Socratic Question Engine, powered by Gemini Thinking, detected that backend API32 has no defined behavior if third-party vendor Shiprocket times out. Under our foundational stop-rule, 'Assumption is not approval,' the coding agent is strictly forbidden from guessing. The branch is paused, and a blocking question is routed to the Backend Lead."* |
-| **1:45 - 2:15** | Clicking "Resolve with Decision" $\to$ Screen turns GREEN (Readiness 1.0) $\to$ MCP agent starts building. | *"Watch what happens when the human architect provides a decision: 'Fallback to static pincode tier lookup; allow tentative checkout.' The decision is written directly into the specification. Instantly, the readiness score jumps to 1.0 GREEN. Our MCP server notifies the waiting autonomous agent, which now builds the exact branch with zero hallucination and verified unit tests."* |
-| **2:15 - 2:45** | Clicking API32 $\to$ Instant Blast Radius highlight of all upstream screens and flows. | *"What if an API contract changes next month? Click API32 to trigger our Bottom-Up Blast Radius Analyzer. Within milliseconds, BuildingBees flags every screen, CTA, and flow across the company that depends on this endpoint, preventing silent regressions before a single line of code is pushed."* |
-| **2:45 - 3:00** | Google Cloud architecture diagram $\to$ Call to Action. | *"Built on Google Cloud Run, Firebase, and Gemini 2.0 Pro, BuildingBees transforms the specification into the new source code. Join us in shaping the future of autonomous software engineering."* |
-
----
-
-## 🎬 Production & Recording Checklist
-- [ ] Record high-resolution screen capture of the interactive canvas (`web/index.html`).
-- [ ] Show both Red (Blocked) and Green (Unblocked) state transitions clearly.
-- [ ] Show the FastAPI interactive swagger docs (`/docs`) and automated test run (`pytest`).
-- [ ] Export in 1080p / 60fps MP4 format with crisp voiceover and subtitle captions.
+Checklist before recording: Gemini key set, server running, browser zoom 100%, notifications off.

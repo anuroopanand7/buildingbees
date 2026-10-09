@@ -1,96 +1,55 @@
-# 🏆 Google Cloud AI Builder Cup 2026 — Official Entry Form
+# Google Cloud AI Builder Cup 2026: Entry Form Draft
 
----
+Everything below describes what the prototype actually does today. Anything planned is marked as planned.
 
-## 📌 Project Overview
+## Project overview
 
-- **Project Name**: **BuildingBees (Agentic Information Architecture Board)**
-- **Tagline**: The shared product map human teams fill in and autonomous AI agents build from.
-- **Challenge Track / Theme**: **Future of Work & Developer Productivity**
-- **Target Audience**: Product Managers, Engineering Leads, Software Agencies, Autonomous AI Agent Developers.
-- **Deployment Platform**: Google Cloud Run (Singapore `asia-southeast1`) & Firebase.
-- **AI Models & Frameworks**: Google Gemini 2.0 Pro / 1.5 Pro (Multimodal Ingestion & Socratic Reasoning), FastMCP Protocol.
+- **Project name:** BuildingBees
+- **Team:** BuildingBees (leader: Perli Anuroop Anand)
+- **Tagline:** An AI product manager that asks the questions before any code gets written.
+- **Target users:** product managers, founders without a PM, engineering leads, and teams that hand specs to AI coding agents.
+- **AI model:** Google Gemini via the Gemini API (`google-genai` SDK), with structured JSON output and native PDF input.
+- **Hosting:** Google Cloud Run (planned for the submission build).
+- **Code:** https://github.com/anuroopanand7/buildingbees (MIT licence)
 
----
+## Abstract (about 150 words)
 
-## 💡 Executive Abstract (150 Words)
+AI has made writing code cheap. Deciding exactly what to build is still slow and vague, and whatever a spec leaves out, coding agents guess.
 
-In the era of autonomous coding agents, building code has become instantaneous, but deciding **exactly what to build** remains slow, ambiguous, and fragmented. Autonomous agents lack common sense: whatever traditional PRDs leave out, agents hallucinate with extreme confidence.
+BuildingBees takes a normal product spec (pasted text or a PDF) and uses Gemini to turn it into a typed, zoomable map: users, flows, screens, buttons (CTAs) and the APIs each button calls. A Socratic Question Engine, also powered by Gemini, then reads every node and asks about what the spec leaves out: failure paths, timeouts, retries, empty and error states. Blocking questions stop a screen from being marked "ready to build" until a human answers them. The rule is simple: assumption is not approval.
 
-**BuildingBees** replaces static text PRDs and shallow Figma wireframes with an interactive, 6-level semantic information architecture graph:
-`User Personas` $\to$ `User Flows` $\to$ `Screens & States` $\to$ `CTAs (Connective Tissue)` $\to$ `API Contracts` $\to$ `Backend Logic & Failure Paths`.
+Each answer is written back into the spec, and a live readiness score shows which parts of the product are safe to hand to engineers or AI agents.
 
-Powered by **Google Gemini 2.0 Pro**, BuildingBees features a **Socratic Question Engine** that systematically interrogates missing business rules, unstated API timeouts, and edge cases. Under the foundational protocol **"Assumption is not approval,"** agents are mathematically blocked from generating code on incomplete branches until humans or architect agents provide decisions. The specification is transformed into executable, zero-drift source code.
+## The problem
 
----
+1. PRDs describe what a user wants, not how the product behaves when things fail.
+2. Design files show layout, not logic: no timeouts, retries or error routes.
+3. When an AI coding agent meets a gap in the spec, it guesses, confidently.
 
-## 🚨 The Problem: Why Software Development is Broken for Agents
+## How it works
 
-1. **PRDs Describe Desires, Not Behavior**: PRDs explain what a user wants to achieve, but omit state transitions, vendor fallbacks, and error boundaries.
-2. **Figma Shows Geometry, Not Logic**: Agent vision reading Figma yields CSS rectangles and hex codes, not idempotency rules, payload contracts, or retry policies.
-3. **The 3-Way Drift**: PRDs, Figma boards, and Git repositories diverge within weeks.
-4. **Hallucinated Business Logic**: When agents hit ambiguous edge cases, they guess, creating silent production bugs and catastrophic financial vulnerabilities.
+1. **Choose the engine.** The app makes you pick an engine before you start (Gemini for this entry).
+2. **Bring a spec.** Paste a PRD or upload a PDF. Gemini returns a structured graph using a strict response schema.
+3. **Zoom in.** Click any node to focus the board on its path, from the user down to the API.
+4. **Answer the questions.** Each node shows its open questions, with suggested answers to pick from. Answers are saved into the spec.
+5. **Readiness.** Each screen gets a readiness score. One open blocking question in its branch keeps it at 0%.
+6. **Ask again.** "Ask Gemini what this node is missing" runs a fresh pass on a single node.
 
----
+## Google technology used
 
-## ⚡ The Solution & Key Innovations
+| Technology | Where |
+|---|---|
+| Gemini API, structured output (`response_schema`) | Spec to typed graph; question generation |
+| Gemini native PDF input | Uploading a PRD as a PDF |
+| Google Cloud Run | Hosting the demo (planned before submission) |
 
-### 1. CTA as the Connective Tissue
-Calls-to-Action (buttons, gestures) are modeled as deterministic state machines linking screens to APIs:
-- Dispatches parallel or sequential API contracts (e.g. `API32 Logistics` + `API42 Pricing`).
-- **On Success**: Transitions to target screen.
-- **On Failure**: Retains form field states, displays contextual error banners, and triggers retry backoff.
+## What is real today vs planned
 
-### 2. Socratic Question Engine Powered by Gemini
-Rather than passive documentation, BuildingBees acts as an active technical interviewer:
-- Gemini analyzes the entire graph to discover unstated edge cases (e.g. *What if Shiprocket times out after 3 seconds?*).
-- Routes blocking questions to designated owners (PM, Frontend, Backend).
+| Real and tested | Planned |
+|---|---|
+| Spec to graph with Gemini, question engine, readiness score, answer write-back, web app, MCP server for coding agents, 10 automated tests | Cloud Run deployment, multi-user collaboration, export to Jira and Linear |
 
-### 3. Stop Rules & Mathematical Branch Readiness
-- Branch Readiness = $0.0$ if any open blocking question exists.
-- Coding agents query the BuildingBees via **MCP (Model Context Protocol)**, autonomously pulling only branches with $Score = 1.0$.
+## Team and eligibility
 
-### 4. Bottom-Up Blast Radius Analysis
-Changing a backend API or vendor instantly traverses the graph, highlighting all affected screens, CTAs, and flows in real-time.
-
----
-
-## 🛠️ Google Cloud Technical Architecture
-
-```
-[Legacy PRD / PDF / FigJam]
-           │
-           ▼
-[Gemini 2.0 Pro Multimodal Ingestion] (Parses 400-page specs into typed DAG)
-           │
-           ▼
-[BuildingBees Core Engine on Google Cloud Run]
-  ├── Pydantic V2 Strict Schema Validation
-  ├── NetworkX Bidirectional Graph State
-  ├── Socratic Question Generator (Gemini Thinking)
-  └── FastMCP Server (IDE & Agent Interface)
-           │
-           ▼
-[Real-Time Interactive Canvas] (React / Tailwind on Firebase App Hosting)
-```
-
-1. **Gemini 2.0 Pro Multimodal API**: Ingests massive PDF requirement documents (demonstrated on the real 423-page PCOS commerce spec).
-2. **Gemini Structured Outputs**: Enforces strict JSON Schema compliance for node definitions.
-3. **Google Cloud Run**: Containerized, auto-scaling deployment in Singapore region.
-4. **Firebase Firestore & App Hosting**: Real-time collaborative canvas synchronization across engineering squads.
-
----
-
-## 📈 Measurable Business Impact
-
-- **70% Reduction in Spec Drift**: Single source of truth shared by PMs, engineers, and AI agents.
-- **85% Fewer Agent Hallucinations**: Zero guessing allowed on incomplete specifications.
-- **4x Faster Developer Onboarding**: Visual semantic zoom allows new engineers to understand full system behavior in minutes.
-
----
-
-## 👥 Team Roles & Eligibility Checklist
-
-- **Eligibility**: Working professionals in JAPAC region, age 21+.
-- **Team Composition**: 2–4 members (Product Lead, Full-Stack Engineer, AI Architect).
-- **Code Repository**: Public GitHub repository with Dockerfile & Cloud Build configuration.
+- Team of 2 (forming before 11 Oct).
+- Working professionals, JAPAC, 21+.

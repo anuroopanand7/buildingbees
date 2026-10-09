@@ -109,6 +109,7 @@
     <textarea id="prd" placeholder="Paste a PRD, feature brief or user story. the AI turns it into Users, Flows, Screens, CTAs and APIs, then asks about everything the spec leaves out."></textarea>
     <button class="btn primary" id="buildBtn">Build graph</button>
     <label class="file">or upload a PDF / .md file<input type="file" id="file" accept=".pdf,.md,.txt"></label>
+    <button class="btn" id="exampleBtn">Try an example spec</button>
     <button class="btn" id="sampleBtn">Clear board</button>
     <div class="msg" id="msg"></div>
     <div class="stats" id="stats"></div>
@@ -327,6 +328,10 @@ $("file").onchange = (e) => {
   const fd = new FormData(); fd.append("file", f);
   ingest(() => api(`/api/ingest-file?${eq()}`, { method: "POST", body: fd }), `${ENGINE_COPY[S.engine][0]} is reading ${f.name}`);
   e.target.value = "";
+};
+$("exampleBtn").onclick = async () => {
+  try { $("prd").value = await (await fetch("/examples/food-delivery-prd.md")).text(); say("Example loaded. Press Build graph."); }
+  catch (err) { say("Could not load the example.", true); }
 };
 $("sampleBtn").onclick = () => ingest(() => api("/api/reset", { method: "POST" }), "Clearing");
 
