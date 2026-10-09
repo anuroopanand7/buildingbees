@@ -69,6 +69,19 @@
   .chip { font-size: 11px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); background: none; color: var(--text); }
   .score { font-size: 28px; font-weight: 700; }
   .reasons { font-size: 12px; color: var(--muted); padding-left: 16px; margin: 6px 0 14px; }
+  .gate { position: fixed; inset: 0; background: rgba(5,6,8,.92); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .gate[hidden] { display: none; }
+  .gate-box { max-width: 720px; width: 100%; }
+  .gate h1 { font-size: 26px; margin: 0 0 6px; }
+  .gate p { color: var(--muted); margin: 0 0 20px; }
+  .engines { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .engine { text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; color: var(--text); }
+  .engine:hover { border-color: var(--accent); }
+  .engine b { display: block; font-size: 17px; margin-bottom: 4px; }
+  .engine small { display: block; color: var(--muted); margin-bottom: 10px; }
+  .engine .mono { color: var(--muted); }
+  .chip-engine { background: none; border: 1px solid var(--line); color: var(--text); border-radius: 999px; padding: 4px 10px; font-size: 12px; }
+  @media (max-width: 640px) { .engines { grid-template-columns: 1fr; } }
   @media (max-width: 1100px) {
     main { grid-template-columns: 1fr; height: auto; }
     aside.left, aside.right { border: none; border-bottom: 1px solid var(--line); }
@@ -80,15 +93,23 @@
 <header>
   <div class="logo"><div class="hex"></div>BuildingBees</div>
   <div class="product" id="product"></div>
-  <div class="pill" id="status">Checking Gemini...</div>
+  <div class="pill" id="status">Checking engine...</div>
+  <button class="chip-engine" id="switchEngine">Switch engine</button>
 </header>
+<div class="gate" id="gate">
+  <div class="gate-box">
+    <h1>Choose your AI engine</h1>
+    <p>BuildingBees runs every spec read and every Socratic question on one engine. Pick one to continue.</p>
+    <div class="engines" id="engineCards"></div>
+  </div>
+</div>
 <main>
   <aside class="left">
     <h2>1. Bring your spec</h2>
-    <textarea id="prd" placeholder="Paste a PRD, feature brief or user story. Gemini turns it into Users, Flows, Screens, CTAs and APIs, then asks about everything the spec leaves out."></textarea>
-    <button class="btn primary" id="buildBtn">Build graph with Gemini</button>
+    <textarea id="prd" placeholder="Paste a PRD, feature brief or user story. the AI turns it into Users, Flows, Screens, CTAs and APIs, then asks about everything the spec leaves out."></textarea>
+    <button class="btn primary" id="buildBtn">Build graph</button>
     <label class="file">or upload a PDF / .md file<input type="file" id="file" accept=".pdf,.md,.txt"></label>
-    <button class="btn" id="sampleBtn">Load PCOS checkout sample</button>
+    <button class="btn" id="sampleBtn">Clear board</button>
     <div class="msg" id="msg"></div>
     <div class="stats" id="stats"></div>
   </aside>
@@ -107,7 +128,14 @@
 <script>
 const LAYERS = ["USER", "FLOW", "SCREEN", "CTA", "API"];
 const LABEL = { USER: "Users", FLOW: "Flows", SCREEN: "Screens", CTA: "CTAs", API: "APIs" };
-let S = { nodes: {}, fwd: {}, rev: {}, screens: {}, gemini: false, selected: null };
+let S = { nodes: {}, fwd: {}, rev: {}, screens: {}, engines: {}, engine: null, selected: null };
+try { S.engine = localStorage.getItem("bb_engine"); } catch (e) {}
+const ENGINE_COPY = {
+  gemini: ["Google Gemini", "Google AI Builder Cup track. Reads PDFs natively."],
+  nvidia: ["NVIDIA Nemotron", "Nebius x NVIDIA track. Runs on Nebius Token Factory."],
+};
+const eq = () => `engine=${encodeURIComponent(S.engine)}`;
+const engineReady = () => !!(S.engine && S.engines[S.engine] && S.engines[S.engine].enabled);
 
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -119,7 +147,7 @@ async function api(path, opts = {}) {
   return body;
 }
 function say(text, err = false) { $("msg").textContent = text; $("msg").className = "msg" + (err ? " err" : ""); }
-function busy(on) { ["buildBtn", "sampleBtn"].forEach((id) => ($(id).disabled = on)); }
+function busy(on) { $("sampleBtn").disabled = on; $("buildBtn").disabled = on || !engineReady(); }
 
 async function load() {
   const [g, screens, status] = await Promise.all([api("/api/graph"), api("/api/screens"), api("/api/status")]);
@@ -130,11 +158,10 @@ async function load() {
     (S.rev[e.target] ||= []).push(e.source);
   });
   screens.forEach((r) => (S.screens[r.screen_id] = r));
-  S.gemini = status.gemini.enabled;
+  S.engines = status.engines;
+  if (S.engine && !S.engines[S.engine]) S.engine = null;
   $("product").textContent = status.product_name;
-  const pill = $("status");
-  pill.className = "pill " + (S.gemini ? "on" : "off");
-  pill.textContent = S.gemini ? `Gemini connected: ${status.gemini.model}` : "Gemini not connected (add GEMINI_API_KEY)";
+  renderEngine();
   if (S.selected && !S.nodes[S.selected]) S.selected = null;
   render();
 }
@@ -237,7 +264,7 @@ function renderInspector() {
   const qhtml = qs.map((q) => {
     const done = q.question_status !== "OPEN";
     return `<div class="q ${done ? "done" : q.is_blocking ? "" : "nb"}">
-      <div class="meta">${esc(q.category)} · ${q.is_blocking ? "Blocking" : "Non-blocking"} · for ${esc(q.assigned_to)}${q.metadata?.source === "gemini" ? " · asked by Gemini" : ""}</div>
+      <div class="meta">${esc(q.category)} · ${q.is_blocking ? "Blocking" : "Non-blocking"} · for ${esc(q.assigned_to)}${q.metadata?.source ? ` · asked by ${esc(q.metadata.source)}` : ""}</div>
       <div>${esc(q.question_text)}</div>
       ${done ? `<div class="meta" style="margin-top:6px;color:var(--ok)">Answer: ${esc(q.answer_text)}</div>` : `
         ${q.suggested_options?.length ? `<div class="chips">${q.suggested_options.map((o) => `<button class="chip" data-q="${esc(q.id)}" data-opt="${esc(o)}">${esc(o)}</button>`).join("")}</div>` : ""}
@@ -253,7 +280,7 @@ function renderInspector() {
     ${readiness}
     <h2>Questions (${qs.length})</h2>
     ${qhtml}
-    ${canAsk ? `<button class="btn primary" id="askBtn" ${S.gemini ? "" : "disabled title='Connect Gemini first'"}>Ask Gemini what this node is missing</button>` : ""}
+    ${canAsk ? `<button class="btn primary" id="askBtn" ${engineReady() ? "" : "disabled title='Connect the engine first'"}>Ask ${esc(ENGINE_COPY[S.engine]?.[0] || "AI")} what this node is missing</button>` : ""}
     <div class="msg" id="imsg"></div>`;
 }
 
@@ -274,11 +301,11 @@ document.addEventListener("click", async (e) => {
   }
   if (e.target.dataset.opt) return answer(e.target.dataset.q, e.target.dataset.opt).catch((err) => say(err.message, true));
   if (e.target.id === "askBtn") {
-    e.target.disabled = true; e.target.textContent = "Gemini is reading the spec...";
+    e.target.disabled = true; e.target.textContent = "Reading the spec...";
     try {
-      const res = await api(`/api/nodes/${encodeURIComponent(S.selected)}/interrogate`, { method: "POST" });
+      const res = await api(`/api/nodes/${encodeURIComponent(S.selected)}/interrogate?${eq()}`, { method: "POST" });
       await load();
-      $("imsg").textContent = `Gemini added ${res.added.length} question(s).`;
+      $("imsg").textContent = `${ENGINE_COPY[S.engine][0]} added ${res.added.length} question(s).`;
     } catch (err) { renderInspector(); $("imsg").textContent = err.message; $("imsg").className = "msg err"; }
   }
 });
@@ -288,20 +315,41 @@ document.addEventListener("keydown", (e) => {
 
 async function ingest(promise, label) {
   busy(true); say(`${label}... this can take 20 to 60 seconds.`);
-  try { await promise(); S.selected = null; await load(); say("Graph built. Red badges are what your spec leaves out."); }
+  try { await promise(); S.selected = null; await load(); say(label === "Clearing" ? "Board cleared." : "Graph built. Red badges are what your spec leaves out."); }
   catch (err) { say(err.message, true); }
   finally { busy(false); }
 }
-$("buildBtn").onclick = () => ingest(() => api("/api/ingest-prd", {
+$("buildBtn").onclick = () => ingest(() => api(`/api/ingest-prd?${eq()}`, {
   method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prd_markdown: $("prd").value }),
-}), "Gemini is reading your spec");
+}), `${ENGINE_COPY[S.engine][0]} is reading your spec`);
 $("file").onchange = (e) => {
   const f = e.target.files[0]; if (!f) return;
   const fd = new FormData(); fd.append("file", f);
-  ingest(() => api("/api/ingest-file", { method: "POST", body: fd }), `Gemini is reading ${f.name}`);
+  ingest(() => api(`/api/ingest-file?${eq()}`, { method: "POST", body: fd }), `${ENGINE_COPY[S.engine][0]} is reading ${f.name}`);
   e.target.value = "";
 };
-$("sampleBtn").onclick = () => ingest(() => api("/api/reset", { method: "POST" }), "Loading sample");
+$("sampleBtn").onclick = () => ingest(() => api("/api/reset", { method: "POST" }), "Clearing");
+
+function renderEngine() {
+  $("gate").hidden = !!S.engine;
+  $("engineCards").innerHTML = Object.entries(ENGINE_COPY).map(([k, [name, blurb]]) => {
+    const e = S.engines[k] || {};
+    return `<button class="engine" data-engine="${k}"><b>${name}</b><small>${blurb}</small>
+      <span class="mono">${e.enabled ? `Connected · ${esc(e.model)}` : "Key not added yet"}</span></button>`;
+  }).join("");
+  const e = S.engines[S.engine];
+  const pill = $("status");
+  pill.className = "pill " + (e && e.enabled ? "on" : "off");
+  pill.textContent = !S.engine ? "No engine chosen" : e && e.enabled ? `${ENGINE_COPY[S.engine][0]}: ${e.model}` : `${ENGINE_COPY[S.engine][0]} not connected (add its key to .env)`;
+  $("buildBtn").disabled = !engineReady();
+}
+$("engineCards").onclick = (ev) => {
+  const b = ev.target.closest("[data-engine]"); if (!b) return;
+  S.engine = b.dataset.engine;
+  try { localStorage.setItem("bb_engine", S.engine); } catch (e) {}
+  renderEngine(); renderInspector();
+};
+$("switchEngine").onclick = () => { S.engine = null; renderEngine(); };
 
 load().catch((err) => say(err.message, true));
 </script>
