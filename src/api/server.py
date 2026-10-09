@@ -14,6 +14,14 @@ import datetime
 import json
 import os
 
+# Load KEY=value lines from a local .env (never committed) before adapters read the environment.
+_ENV = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
+if os.path.exists(_ENV):
+    for _line in open(_ENV):
+        if "=" in _line and not _line.lstrip().startswith("#"):
+            _k, _v = _line.strip().split("=", 1)
+            os.environ.setdefault(_k.strip(), _v.strip().strip('"'))
+
 from src.core.graph import BuildingBeesEngine
 from src.core.schema import (
     NodeStatus,
