@@ -3,7 +3,7 @@
 from fastapi.testclient import TestClient
 
 from src.adapters.spec_prompts import (
-    SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
+    FlowsExtract, XFlowPlan, SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
 )
 from src.api import server
 from src.core.ingest import build_graph_from_extract
@@ -30,6 +30,16 @@ EXTRACT = SpecExtract(
 )
 
 
+FLOWS = FlowsExtract(
+    product_name="Tiny Shop",
+    users=[XUser(id="U_BUYER", title="Buyer", description="Buys things")],
+    flows=[XFlowPlan(id="F_BUY", title="Buy", goal="Purchase", user_id="U_BUYER",
+                     steps=["Open cart", "Pay", "See confirmation"])],
+    questions=[XQuestion(target_id="F_BUY", category="PM", question="Is guest checkout allowed?",
+                         is_blocking=True, suggested_options=["Yes", "No, sign-in required"])],
+)
+
+
 def test_extract_builds_connected_graph():
     g = build_graph_from_extract(EXTRACT)
     assert g.product_name == "Tiny Shop"
@@ -46,7 +56,13 @@ class FakeGemini:
     enabled = True
     model = "fake"
 
+    last_brief = ""
+
+    def extract_flows(self, text="", pdf_bytes=None):
+        return FLOWS
+
     def extract_spec(self, text="", pdf_bytes=None):
+        FakeGemini.last_brief = text
         return EXTRACT
 
     def interrogate(self, node_id, context_json, asked):
@@ -58,7 +74,17 @@ def test_ingest_interrogate_resolve_flow(monkeypatch):
     monkeypatch.setitem(server.engines, "gemini", FakeGemini())
     c = TestClient(server.app)
     try:
-        assert c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "a shop"}).json()["total_nodes"] > 0
+        first = c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "a shop"}).json()
+        assert first["stage"] == "flows" and not any(n["layer"] == "SCREEN" for n in first["nodes"])
+        flow_q = next(n for n in first["nodes"] if n["layer"] == "QUESTION")
+        c.post(f"/api/questions/{flow_q['id']}/resolve", json={"answer_text": "No, sign-in required"})
+        second = c.post("/api/expand?engine=gemini").json()
+        assert second["stage"] == "screens"
+        assert "Is guest checkout allowed? => No, sign-in required" in FakeGemini.last_brief
+        kept = next(n for n in second["nodes"] if n["id"] == flow_q["id"])
+        assert kept["answer_text"] == "No, sign-in required"  # the decision travels with the board
+        flow = next(n for n in second["nodes"] if n["id"] == "F_BUY")
+        assert flow["metadata"]["steps"] == ["Open cart", "Pay", "See confirmation"]
         assert c.post("/api/nodes/CTA_PAY/interrogate?engine=gemini").json()["added"][0]["question_text"] == "Double tap on Pay?"
         screens = {s["screen_id"]: s for s in c.get("/api/screens").json()}
         assert screens["W01_CART"]["is_build_ready"] is False
@@ -99,7 +125,9 @@ def test_boards_are_per_visitor_and_restorable(monkeypatch):
     c = TestClient(server.app)
     a, b = {"X-Board": "judge-a"}, {"X-Board": "judge-b"}
     c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=a)
+    c.post("/api/expand?engine=gemini", headers=a)
     saved = c.get("/api/graph", headers=a).json()
+    assert saved["spec_text"] == "shop"
     assert saved["total_nodes"] > 0 and saved["product_name"] == "Tiny Shop"
     assert c.get("/api/graph", headers=b).json()["total_nodes"] == 0  # B never sees A's board
 

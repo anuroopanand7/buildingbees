@@ -2,7 +2,7 @@
 
 from typing import Iterable
 
-from src.adapters.spec_prompts import SpecExtract, XQuestion
+from src.adapters.spec_prompts import FlowsExtract, SpecExtract, XQuestion
 from src.core.graph import BuildingBeesEngine
 from src.core.schema import (
     APINode, BeeType, CTANode, FlowNode, QuestionCategory, QuestionNode,
@@ -87,5 +87,20 @@ def build_graph_from_extract(x: SpecExtract, source: str = "ai") -> BuildingBees
             if api_id in g.nodes:
                 g.add_edge(c.id, api_id)
 
+    add_questions(g, x.questions, source)
+    return g
+
+
+def build_flows_graph(x: FlowsExtract, source: str = "ai") -> BuildingBeesEngine:
+    """Stage one: users and flows only, with the questions to settle before any screen is drawn."""
+    g = BuildingBeesEngine()
+    g.product_name = x.product_name
+    for u in x.users:
+        g.add_node(UserNode(id=u.id, title=u.title, description=u.description,
+                            flow_ids=[f.id for f in x.flows if f.user_id == u.id]))
+    for f in x.flows:
+        g.add_node(FlowNode(id=f.id, title=f.title, goal=f.goal, metadata={"steps": f.steps}))
+        if f.user_id in g.nodes:
+            g.add_edge(f.user_id, f.id)
     add_questions(g, x.questions, source)
     return g

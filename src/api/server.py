@@ -40,7 +40,8 @@ from src.core.schema import (
 from src.core.question_engine import SocraticQuestionEngine
 from src.adapters.gemini_adapter import GoogleGeminiAdapter
 from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
-from src.core.ingest import add_questions, build_graph_from_extract
+from src.adapters.nvidia_adapter import pdf_to_text
+from src.core.ingest import add_questions, build_flows_graph, build_graph_from_extract
 
 app = FastAPI(
     title="BuildingBees API",
@@ -133,6 +134,9 @@ def get_graph_state() -> Dict[str, Any]:
         "nodes": nodes_serialized,
         "edges": edges,
         "product_name": getattr(graph, "product_name", ""),
+        "spec_text": getattr(graph, "spec_text", ""),
+        # Stage one agrees the flows; screens are only drawn after that.
+        "stage": "screens" if any(n.layer.value == "SCREEN" for n in graph.nodes.values()) else "flows",
         "total_nodes": len(graph.nodes),
         "total_edges": len(edges)
     }
@@ -224,6 +228,7 @@ LAYER_CLASSES = {c.model_fields["layer"].default.value: c for c in
 
 class RestoreRequest(BaseModel):
     product_name: str = ""
+    spec_text: str = ""
     nodes: List[Dict[str, Any]]
     edges: List[Dict[str, str]]
 
@@ -233,6 +238,7 @@ def restore_board(payload: RestoreRequest) -> Dict[str, Any]:
     """Rebuilds a board from the copy the browser kept (after the server slept)."""
     g = BuildingBeesEngine()
     g.product_name = payload.product_name
+    g.spec_text = payload.spec_text[:SPEC_LIMIT]
     for n in payload.nodes[:2000]:
         cls = LAYER_CLASSES.get(n.get("layer"))
         if cls:
@@ -254,33 +260,76 @@ def _engine(name: str):
     return eng
 
 
+SPEC_LIMIT = 60_000
+
+
+def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None) -> Dict[str, Any]:
+    """Stage one: flows and the questions about them. No screens are drawn yet."""
+    try:
+        g = build_flows_graph(eng.extract_flows(text=text, pdf_bytes=pdf_bytes), eng.label)
+        g.spec_text = (text or pdf_to_text(pdf_bytes))[:SPEC_LIMIT]
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"{eng.label} could not read the spec: {e}")
+    _set_graph(g)
+    return get_graph_state()
+
+
 @app.post("/api/ingest-prd")
 def ingest_prd(payload: IngestPRDRequest, engine: str) -> Dict[str, Any]:
-    """The chosen engine turns pasted PRD text into a fresh typed graph, with blocking questions."""
+    """Pasted spec or idea in, user flows and flow-level questions out."""
     eng = _engine(engine)
     if not payload.prd_markdown.strip():
         raise HTTPException(status_code=400, detail="PRD text is empty")
-    try:
-        _set_graph(build_graph_from_extract(eng.extract_spec(text=payload.prd_markdown), eng.label))
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"{eng.label} ingest failed: {e}")
-    return get_graph_state()
+    return _start_board(eng, text=payload.prd_markdown)
 
 
 @app.post("/api/ingest-file")
 async def ingest_file(engine: str, file: UploadFile = File(...)) -> Dict[str, Any]:
-    """The chosen engine reads an uploaded PDF or text/markdown file into a fresh graph."""
+    """Uploaded PDF or text/markdown in, user flows and flow-level questions out."""
     eng = _engine(engine)
     data = await file.read()
     if len(data) > 20 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="File is over 20 MB")
-    is_pdf = data[:4] == b"%PDF"
+    if data[:4] == b"%PDF":
+        return _start_board(eng, pdf_bytes=data)
+    return _start_board(eng, text=data.decode("utf-8", errors="ignore"))
+
+
+@app.post("/api/expand")
+def expand_to_screens(engine: str) -> Dict[str, Any]:
+    """Stage two: draw screens, buttons and APIs from the agreed flows and the decisions made so far."""
+    eng = _engine(engine)
+    old = _board()
+    flows = [n for n in old.nodes.values() if n.layer.value == "FLOW"]
+    if not flows:
+        raise HTTPException(status_code=400, detail="There are no flows to draw screens for yet")
+    users = [n for n in old.nodes.values() if n.layer.value == "USER"]
+    asked = [n for n in old.nodes.values() if isinstance(n, QuestionNode)]
+    decisions = [q for q in asked if q.question_status == QuestionStatus.ANSWERED]
+    brief = "\n".join([
+        getattr(old, "spec_text", ""),
+        "\nAGREED USERS AND FLOWS (keep exactly these ids, and give every screen one of these flow ids):",
+        json.dumps({
+            "users": [{"id": u.id, "title": u.title} for u in users],
+            "flows": [{"id": f.id, "title": f.title, "goal": f.goal, "steps": f.metadata.get("steps", []),
+                       "user_id": next(iter(old.reverse_edges.get(f.id, [])), "")} for f in flows],
+        }),
+        "\nDECISIONS THE PRODUCT OWNER HAS ALREADY MADE (part of the spec now, do not ask these again):",
+        "\n".join(f"- {q.question_text} => {q.answer_text}" for q in decisions) or "(none yet)",
+    ])
     try:
-        extract = (eng.extract_spec(pdf_bytes=data) if is_pdf
-                   else eng.extract_spec(text=data.decode("utf-8", errors="ignore")))
-        _set_graph(build_graph_from_extract(extract, eng.label))
+        g = build_graph_from_extract(eng.extract_spec(text=brief[:SPEC_LIMIT + 8000]), eng.label)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"{eng.label} ingest failed: {e}")
+        raise HTTPException(status_code=502, detail=f"{eng.label} could not draw the screens: {e}")
+    g.spec_text = getattr(old, "spec_text", "")
+    for f in flows:  # the steps the user agreed to stay on the flow
+        if f.id in g.nodes:
+            g.nodes[f.id].metadata["steps"] = f.metadata.get("steps", [])
+    for q in asked:  # every earlier question and its answer travels with the board
+        if q.target_node_id in g.nodes:
+            g.add_node(q)
+            g.add_edge(q.target_node_id, q.id)
+    _set_graph(g)
     return get_graph_state()
 
 

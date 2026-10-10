@@ -66,6 +66,21 @@ class SpecExtract(BaseModel):
     questions: List[XQuestion]
 
 
+class XFlowPlan(BaseModel):
+    id: str
+    title: str
+    goal: str
+    user_id: str
+    steps: List[str]
+
+
+class FlowsExtract(BaseModel):
+    product_name: str
+    users: List[XUser]
+    flows: List[XFlowPlan]
+    questions: List[XQuestion]
+
+
 class QuestionList(BaseModel):
     questions: List[XQuestion]
 
@@ -84,6 +99,21 @@ Rules:
 - Keep it to the 1-3 most important flows and at most 12 screens.
 
 SPEC:
+"""
+
+FLOWS_PROMPT = """You are BuildingBees, a senior product manager. A founder has given you a spec or a rough idea.
+Do NOT design screens, buttons or APIs yet. First agree the user flows.
+
+1. List the users (1-3) and the user flows (1-4). Use short UPPER_SNAKE ids (USER_PATIENT, FLOW_CREATE_VIDEO).
+2. For each flow write 3-7 plain-language steps: what the user does and what the product does in reply.
+   Only include steps the input supports. Do not invent features.
+3. Then ask what a senior PM would need answered before anyone draws a screen: exactly who the user is,
+   what they bring in, what they get out, what is in and out of scope, what happens when it goes wrong,
+   how we know it worked. Ask 4-8 questions, most important first. Target each at the flow id or user id
+   it is about. Give 2-4 short suggested answers for each. Mark it blocking if the flow cannot be designed
+   without the answer. Assumption is not approval: when the input is silent, ask, do not decide.
+
+INPUT:
 """
 
 INTERROGATE_PROMPT = """You are the BuildingBees Socratic Question Engine. Assumption is not approval.

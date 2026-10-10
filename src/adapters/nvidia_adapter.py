@@ -15,7 +15,9 @@ from typing import List, Optional
 import httpx
 
 from src.adapters.gemini_adapter import EngineNotConfigured
-from src.adapters.spec_prompts import INGEST_PROMPT, INTERROGATE_PROMPT, QuestionList, SpecExtract, XQuestion
+from src.adapters.spec_prompts import (
+    FLOWS_PROMPT, FlowsExtract, INGEST_PROMPT, INTERROGATE_PROMPT, QuestionList, SpecExtract, XQuestion,
+)
 
 DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1"
 DEFAULT_MODEL = "nvidia/llama-3.3-nemotron-super-49b-v1"
@@ -84,6 +86,11 @@ class NvidiaNemotronAdapter:
         if pdf_bytes:
             text = pdf_to_text(pdf_bytes)
         return self._generate(INGEST_PROMPT + text[:60000], SpecExtract)
+
+    def extract_flows(self, text: str = "", pdf_bytes: Optional[bytes] = None) -> FlowsExtract:
+        if pdf_bytes:
+            text = pdf_to_text(pdf_bytes)
+        return self._generate(FLOWS_PROMPT + text[:60000], FlowsExtract)
 
     def interrogate(self, node_id: str, context_json: str, asked: List[str]) -> List[XQuestion]:
         prompt = INTERROGATE_PROMPT.format(
