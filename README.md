@@ -23,9 +23,11 @@ Live demo: https://buildingbees-853213660594.asia-south1.run.app
 
 4. **Every answer is read.** A vague answer ("everyone", "whatever is normal") gets one sharper follow-up and changes nothing. A clear answer rewrites the board: steps are added, changed or removed, a new flow appears if you asked for one, and the bee says what it did. You can change any answer; the bee takes back what the first one did.
 5. **Draw the screens.** The agreed flows and every decision become screens with wireframes, buttons, and the APIs each button calls. The bees then ask again, screen by screen, and answers fill in the missing details (a timeout, a vendor, an empty state).
-6. **Take the Brief.** One document with the flows, screens, every decision and what is still open. Copy it, download it, print it, or give your coding agent the link. Anything not decided is printed as `NOT DECIDED`, so the builder asks instead of assuming.
+6. **Take the Brief.** One document with the flows, screens, every decision and what is still open. Copy it, download it, print it, or give your coding agent the link. It is a starting point an engineer or agent can work from, not a full technical design. Anything not decided is printed as `NOT DECIDED`, so the builder asks instead of assuming.
 
-A screen is "ready to build" only when it has no open blocking question and no missing detail.
+A screen is "ready to build" only when it has no open blocking question, its loading and error states are decided, every API it calls has a timeout, and every button that calls an API says where a failure leads.
+
+Values nobody stated are removed: if the engine fills in a vendor or a timeout that appears nowhere in what you wrote or answered, it is blanked and asked about.
 
 ## Engines
 
@@ -80,6 +82,7 @@ Every call takes the board id in an `X-Board` header or a `?board=` query parame
 | POST | `/api/questions/{id}/resolve` | Record an answer |
 | POST | `/api/questions/{id}/react?engine=` | The bee reads the answer: follow up, or update the board |
 | POST | `/api/questions/{id}/reopen` | Change an answer |
+| POST | `/api/questions/accept-defaults` | Take the first suggestion for every routine detail still open |
 | POST | `/api/expand?engine=` | Draw screens from the agreed flows and decisions |
 | POST | `/api/nodes/{id}/interrogate?engine=` | Look for more gaps on one screen, button or API |
 | GET | `/api/graph`, `/api/screens` | The board and each screen's readiness |

@@ -40,7 +40,7 @@ def build_brief(g: BuildingBeesEngine) -> str:
             f"{count(len(still_open), 'question')} open.")
     add("")
     add(f"A tool that draws from one prompt would have guessed {count(len(questions), 'thing')} here. "
-        f"This brief asked about each of them instead.")
+        f"BuildingBees asked instead: {len(decided)} decided, {len(still_open)} still open.")
     add("")
 
     add("## Who it is for")
@@ -68,20 +68,37 @@ def build_brief(g: BuildingBeesEngine) -> str:
             if elements:
                 add("- On screen, top to bottom: " + "; ".join(f"{e['kind']} \"{e['label']}\"" for e in elements))
             add(f"- Loading: {_or_open(s.states.loading)}")
-            add(f"- Empty: {_or_open(s.states.empty)}")
+            if s.states.empty:
+                add(f"- Empty: {s.states.empty}")
             add(f"- Error: {_or_open(s.states.error)}")
             for cta_id in sorted(g.forward_edges.get(s.id, [])):
                 c = g.nodes.get(cta_id)
                 if not c or c.layer.value != "CTA":
                     continue
-                add(f"- Button **{c.label}**: on success go to {_or_open(title(c.target_screen_on_success) if c.target_screen_on_success else '')}, "
-                    f"on failure {_or_open(title(c.target_screen_on_failure) if c.target_screen_on_failure else '')}")
+                calls_api = any(getattr(g.nodes.get(i), "layer", None) and g.nodes[i].layer.value == "API"
+                                for i in g.forward_edges.get(c.id, []))
+                line = f"- Button **{c.label}**"
+                if c.target_screen_on_success:
+                    line += f": goes to {title(c.target_screen_on_success)}"
+                if calls_api:  # only a button that calls something can fail
+                    line += f"; on failure {_or_open(title(c.target_screen_on_failure) if c.target_screen_on_failure else '')}"
+                add(line)
                 for api_id in sorted(g.forward_edges.get(c.id, [])):
                     a = g.nodes.get(api_id)
                     if a and a.layer.value == "API":
-                        add(f"  - calls `{a.method} {a.path}` (service: {_or_open(a.service)}, vendor: {_or_open(a.vendor)}, "
-                            f"timeout: {_or_open(a.timeout_ms)} ms)")
+                        add(f"  - calls `{a.method} {a.path}` (service: {a.service or 'not named'}, "
+                            f"vendor: {a.vendor or 'none chosen'}, timeout: {_or_open(a.timeout_ms)} ms)")
+                        sends, returns = a.inputs_schema.get("fields"), a.outputs_schema.get("fields")
+                        if sends or returns:
+                            add(f"    sends: {', '.join(sends or []) or 'nothing'}; returns: {', '.join(returns or []) or 'nothing'}")
             add("")
+
+    entities = getattr(g, "entities", [])
+    if entities:
+        add("## Data (proposed from the flows and decisions; confirm before building)")
+        for e in entities:
+            add(f"- **{e['name']}**: {', '.join(e.get('fields', []))}")
+        add("")
 
     add("## Decisions")
     if not decided:

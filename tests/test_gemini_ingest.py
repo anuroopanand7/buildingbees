@@ -254,7 +254,8 @@ def test_brief_states_decisions_and_gaps(monkeypatch):
     assert "1. Open cart" in brief and "### Cart" in brief
     assert "**Is guest checkout allowed?** No, sign-in required" in brief and "Queen Bee" in brief
     assert "BLOCKS THE BUILD: What if the gateway times out?" in brief
-    assert "timeout: NOT DECIDED ms" in brief and "Empty: NOT DECIDED" in brief
+    assert "timeout: NOT DECIDED ms" in brief and "vendor: none chosen" in brief
+    assert "Empty: NOT DECIDED" not in brief  # an empty state is only printed when one was decided
     assert "\u2014" not in brief
 
 
@@ -329,3 +330,58 @@ def test_accept_defaults_fills_details_but_never_answers_a_bee(monkeypatch):
     out = c.post("/api/questions/accept-defaults", headers=h).json()
     assert out == {"applied": 1, "changed": ["API_PAY"]}
     assert g.nodes["API_PAY"].timeout_ms == 3000
+
+
+def test_values_nobody_stated_are_stripped():
+    from src.core.ingest import strip_guesses
+    g = build_graph_from_extract(EXTRACT)
+    api = g.nodes["API_PAY"]
+    api.vendor, api.timeout_ms = "SendGrid", 4000
+    assert strip_guesses(g, "we take card payments") == ["API_PAY"]
+    assert api.vendor is None and api.timeout_ms == 0
+    api.vendor, api.timeout_ms = "Stripe", 5000
+    assert strip_guesses(g, "Pay with Stripe. Wait 5 seconds, no retry.") == []
+    assert api.vendor == "Stripe" and api.timeout_ms == 5000
+
+
+def test_vague_answer_without_follow_up_is_asked_again(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", Reactor())
+    c, h = TestClient(server.app), {"X-Board": "reactor-deadend"}
+    q = _answered_flow_question(c, h, "whatever is normal")
+    Reactor.reaction = Reaction(is_vague=True, note="One more question.", follow_up=[], flow_updates=[],
+                                user_updates=[], field_updates=[])
+    c.post(f"/api/questions/{q['id']}/react?engine=gemini", headers=h)
+    again = next(n for n in c.get("/api/graph", headers=h).json()["nodes"] if n["id"] == q["id"])
+    assert again["question_status"] == "OPEN" and again["answer_text"] is None
+
+
+def test_answer_can_bring_in_a_new_user_with_their_own_flow(monkeypatch):
+    from src.adapters.spec_prompts import XUserUpdate
+    monkeypatch.setitem(server.engines, "gemini", Reactor())
+    c, h = TestClient(server.app), {"X-Board": "reactor-newuser"}
+    q = _answered_flow_question(c, h, "Staff can refund an order")
+    Reactor.reaction = Reaction(
+        is_vague=False, note="Added staff.", follow_up=[], field_updates=[],
+        user_updates=[XUserUpdate(user_id="U_STAFF", title="Shop staff", description="Handles refunds")],
+        flow_updates=[XFlowUpdate(flow_id="F_REFUND", title="Refund an order", goal="Refund", user_id="U_STAFF",
+                                  steps=["Open the order", "Refund it"])],
+    )
+    c.post(f"/api/questions/{q['id']}/react?engine=gemini", headers=h)
+    g = c.get("/api/graph", headers=h).json()
+    assert {"source": "U_STAFF", "target": "F_REFUND"} in g["edges"]
+    assert next(n for n in g["nodes"] if n["id"] == "U_STAFF")["flow_ids"] == ["F_REFUND"]
+
+
+def test_changed_answer_after_screens_asks_for_a_redraw(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", Reactor())
+    c, h = TestClient(server.app), {"X-Board": "reactor-redraw"}
+    q = _answered_flow_question(c, h, "Email")
+    c.post("/api/expand?engine=gemini", headers=h)
+    assert c.get("/api/graph", headers=h).json()["needs_redraw"] is False
+    c.post(f"/api/questions/{q['id']}/reopen", headers=h)
+    c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "SMS only"}, headers=h)
+    Reactor.reaction = Reaction(is_vague=False, note="ok", follow_up=[], flow_updates=[], user_updates=[], field_updates=[])
+    c.post(f"/api/questions/{q['id']}/react?engine=gemini", headers=h)
+    assert c.get("/api/graph", headers=h).json()["needs_redraw"] is True
+    c.post("/api/expand?engine=gemini", headers=h)
+    assert c.get("/api/graph", headers=h).json()["needs_redraw"] is False

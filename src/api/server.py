@@ -5,7 +5,6 @@ Socratic Question Engine, and Dual Hackathon Track Adapters.
 """
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel
@@ -13,6 +12,7 @@ from typing import Dict, Any, List, Optional
 import datetime
 import json
 import os
+import time
 from collections import OrderedDict
 from contextvars import ContextVar
 
@@ -43,7 +43,7 @@ from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.adapters.nvidia_adapter import pdf_to_text
 from src.adapters.spec_prompts import REACT_PROMPT
 from src.core.brief import build_brief
-from src.core.ingest import add_gap_questions, add_questions, apply_gap_default, build_flows_graph, build_graph_from_extract
+from src.core.ingest import add_gap_questions, add_questions, apply_gap_default, strip_guesses, build_flows_graph, build_graph_from_extract
 
 app = FastAPI(
     title="BuildingBees API",
@@ -62,14 +62,6 @@ def serve_index():
     return {"message": "BuildingBees API is running"}
 
 
-# Enable CORS for local development and canvas UI
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # One board per visitor, keyed by the X-Board header the web app sends.
 # shortcut: boards live in memory and vanish when Cloud Run scales to zero; the browser keeps a
@@ -138,8 +130,10 @@ def get_graph_state() -> Dict[str, Any]:
         "edges": edges,
         "product_name": getattr(graph, "product_name", ""),
         "spec_text": getattr(graph, "spec_text", ""),
+        "entities": getattr(graph, "entities", []),
         # Stage one agrees the flows; screens are only drawn after that.
         "stage": "screens" if any(n.layer.value == "SCREEN" for n in graph.nodes.values()) else "flows",
+        "needs_redraw": bool(getattr(graph, "needs_redraw", False)),
         "total_nodes": len(graph.nodes),
         "total_edges": len(edges)
     }
@@ -201,6 +195,10 @@ def _apply_reaction(g: BuildingBeesEngine, r) -> List[str]:
     """Writes a bee's changes onto the board. Unknown ids and fields are ignored, never guessed."""
     changed: List[str] = []
     drawn = any(n.layer.value == "SCREEN" for n in g.nodes.values())
+    for uu in r.user_updates:  # someone new the founder has just named (a librarian, an admin)
+        if uu.user_id not in g.nodes and uu.title and not drawn:
+            g.add_node(UserNode(id=uu.user_id, title=uu.title, description=uu.description))
+            changed.append(uu.user_id)
     users = [n.id for n in g.nodes.values() if n.layer.value == "USER"]
     for fu in r.flow_updates:
         f = g.nodes.get(fu.flow_id)
@@ -210,15 +208,19 @@ def _apply_reaction(g: BuildingBeesEngine, r) -> List[str]:
             owner = fu.user_id if fu.user_id in users else (users[0] if users else None)
             if owner:
                 g.add_edge(owner, f.id)
+                g.nodes[owner].flow_ids.append(f.id)
             changed.append(f.id)
             continue
         if f and f.layer.value == "FLOW" and fu.steps:
             f.title, f.goal = fu.title or f.title, fu.goal or f.goal
-            f.metadata["was"] = f.metadata.get("steps", [])  # so the board can show what this answer changed
+            before = f.metadata.get("steps", [])
+            f.metadata["was"] = before  # so the board can show what this answer changed
             f.metadata["steps"] = fu.steps
-            for q in g.get_questions_for_node(f.id):  # step numbers no longer line up
-                if q.question_status == QuestionStatus.OPEN:
-                    q.metadata["step"] = 0
+            for q in g.get_questions_for_node(f.id):  # keep each open question on its step if that step survived
+                k = int(q.metadata.get("step") or 0)
+                if q.question_status == QuestionStatus.OPEN and k:
+                    text = before[k - 1] if k <= len(before) else None
+                    q.metadata["step"] = fu.steps.index(text) + 1 if text in fu.steps else 0
             changed.append(f.id)
     for uu in r.user_updates:
         u = g.nodes.get(uu.user_id)
@@ -289,7 +291,12 @@ def react_to_answer(question_id: str, engine: str) -> Dict[str, Any]:
     changed = [] if r.is_vague else _apply_reaction(g, r)
     for f in r.follow_up[:1]:
         f.target_id, f.category = q.target_node_id, q.category.value  # the bee that asked follows up
-    added = add_questions(g, r.follow_up[:1], eng.label)
+    added = add_questions(g, r.follow_up[:1], eng.label, dedupe=False)  # a follow-up may echo its question
+    if r.is_vague and not added:
+        # No sharper question came back, so the original must not disappear: ask it again.
+        q.question_status, q.answer_text, q.answered_at = QuestionStatus.OPEN, None, None
+    if stage == "screens" and q.metadata.get("previous_answer") and not r.is_vague:
+        g.needs_redraw = True  # a decision changed after the screens were drawn; field edits cannot fix structure
     if stage == "screens":
         add_gap_questions(g)  # anything the answer left unfilled gets asked
     q.metadata["note"] = r.note[:300]
@@ -372,6 +379,7 @@ LAYER_CLASSES = {c.model_fields["layer"].default.value: c for c in
 class RestoreRequest(BaseModel):
     product_name: str = ""
     spec_text: str = ""
+    entities: List[Dict[str, Any]] = []
     nodes: List[Dict[str, Any]]
     edges: List[Dict[str, str]]
 
@@ -382,6 +390,7 @@ def restore_board(payload: RestoreRequest) -> Dict[str, Any]:
     g = BuildingBeesEngine()
     g.product_name = payload.product_name
     g.spec_text = payload.spec_text[:SPEC_LIMIT]
+    g.entities = payload.entities[:50]
     for n in payload.nodes[:2000]:
         cls = LAYER_CLASSES.get(n.get("layer"))
         if cls:
@@ -393,6 +402,12 @@ def restore_board(payload: RestoreRequest) -> Dict[str, Any]:
     return get_graph_state()
 
 
+# shortcut: one in-memory counter protects the shared model key from a runaway client; move to a real
+# rate limiter if this ever runs on more than one instance.
+MODEL_CALLS_PER_MINUTE = 40
+_recent_calls: List[float] = []
+
+
 def _engine(name: str):
     """Every AI call names its engine; the hackathon rules require each track to run on its sponsor's models."""
     eng = engines.get(name)
@@ -400,6 +415,11 @@ def _engine(name: str):
         raise HTTPException(status_code=400, detail=f"Unknown engine '{name}'. Choose 'gemini' or 'nvidia'.")
     if not eng.enabled:
         raise HTTPException(status_code=503, detail=f"{eng.label} is not configured. Add its API key to .env and restart.")
+    now = time.time()
+    _recent_calls[:] = [t for t in _recent_calls if now - t < 60]
+    if len(_recent_calls) >= MODEL_CALLS_PER_MINUTE:
+        raise HTTPException(status_code=429, detail="The bees are busy right now. Give them a minute and try again.")
+    _recent_calls.append(now)
     return eng
 
 
@@ -465,6 +485,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"{eng.label} could not draw the screens: {e}")
     g.spec_text = getattr(old, "spec_text", "")
+    strip_guesses(g, g.spec_text + " " + " ".join(q.answer_text or "" for q in decisions))
     for f in flows:  # the steps the user agreed to stay on the flow
         if f.id in g.nodes:
             g.nodes[f.id].metadata["steps"] = f.metadata.get("steps", [])

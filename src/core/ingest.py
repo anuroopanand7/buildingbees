@@ -43,10 +43,11 @@ def _already_asked(engine: BuildingBeesEngine, text: str) -> bool:
     return False
 
 
-def add_questions(engine: BuildingBeesEngine, questions: Iterable[XQuestion], source: str = "ai") -> list:
+def add_questions(engine: BuildingBeesEngine, questions: Iterable[XQuestion], source: str = "ai",
+                  dedupe: bool = True) -> list:
     added = []
     for q in questions:
-        if q.target_id not in engine.nodes or _already_asked(engine, q.question):
+        if q.target_id not in engine.nodes or (dedupe and _already_asked(engine, q.question)):
             continue
         try:
             cat = QuestionCategory(q.category.upper())
@@ -72,7 +73,8 @@ def add_questions(engine: BuildingBeesEngine, questions: Iterable[XQuestion], so
 
 def build_graph_from_extract(x: SpecExtract, source: str = "ai") -> BuildingBeesEngine:
     g = BuildingBeesEngine()
-    g.product_name = x.product_name
+    g.product_name = clean_name(x.product_name)
+    g.entities = [e.model_dump() for e in x.entities]
 
     for u in x.users:
         g.add_node(UserNode(id=u.id, title=u.title, description=u.description,
@@ -95,6 +97,7 @@ def build_graph_from_extract(x: SpecExtract, source: str = "ai") -> BuildingBees
     for a in x.apis:
         g.add_node(APINode(id=a.id, title=f"{a.method} {a.path}", method=a.method, path=a.path,
                            service=a.service, vendor=a.vendor or None, timeout_ms=a.timeout_ms,
+                           inputs_schema={"fields": a.request_fields}, outputs_schema={"fields": a.response_fields},
                            calling_screen_ids=[c.screen_id for c in x.ctas if a.id in c.api_ids]))
     for c in x.ctas:
         g.add_node(CTANode(id=c.id, title=c.label, label=c.label, parent_screen_id=c.screen_id,
@@ -111,10 +114,34 @@ def build_graph_from_extract(x: SpecExtract, source: str = "ai") -> BuildingBees
     return g
 
 
+def clean_name(name: str) -> str:
+    """The product is the founder's, not ours: the engine sometimes prefixes our own name."""
+    return name.replace("BuildingBees", "").strip(" :-") or "Untitled product"
+
+
+def strip_guesses(g: BuildingBeesEngine, said: str) -> list:
+    """Removes values the engine filled in that nobody stated: a vendor or a timeout is kept only if it can be
+    found in what the founder wrote or answered. Blanking them lets the gap questions ask instead."""
+    said = said.lower()
+    blanked = []
+    for n in g.nodes.values():
+        if n.layer.value != "API":
+            continue
+        if n.vendor and n.vendor.lower() not in said:
+            n.vendor = None
+            blanked.append(n.id)
+        seconds = n.timeout_ms / 1000
+        stated = {str(n.timeout_ms), f"{seconds:g} second", f"{seconds:g}s", f"{seconds:g} s "}
+        if n.timeout_ms and not any(t in said for t in stated):
+            n.timeout_ms = 0
+            blanked.append(n.id)
+    return list(dict.fromkeys(blanked))
+
+
 def build_flows_graph(x: FlowsExtract, source: str = "ai") -> BuildingBeesEngine:
     """Stage one: users and flows only, with the questions to settle before any screen is drawn."""
     g = BuildingBeesEngine()
-    g.product_name = x.product_name
+    g.product_name = clean_name(x.product_name)
     for u in x.users:
         g.add_node(UserNode(id=u.id, title=u.title, description=u.description,
                             flow_ids=[f.id for f in x.flows if f.user_id == u.id]))
@@ -167,8 +194,9 @@ def apply_gap_default(g: BuildingBeesEngine, q: QuestionNode) -> bool:
     choice = q.suggested_options[0]
     if n.layer.value == "SCREEN":
         loading, _, error = choice.partition(", and ")
+        error = error or choice
         n.states.loading = n.states.loading or loading
-        n.states.error = n.states.error or (error or choice)
+        n.states.error = n.states.error or (error[:1].upper() + error[1:])
     elif n.layer.value == "API":
         n.timeout_ms = int("".join(ch for ch in choice.split(" ")[0] if ch.isdigit()) or 3) * 1000
     elif n.layer.value == "CTA":

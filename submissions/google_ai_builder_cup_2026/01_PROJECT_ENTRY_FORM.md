@@ -19,7 +19,7 @@ AI can now turn one sentence into screens, diagrams or code. The catch is that o
 
 BuildingBees works the way a good product team does. You say what you want to build. It draws the user flows first, with no screens. Then six bees, each owning one aspect of the product (scope, design, frontend, backend, edge cases, compliance), ask what the idea leaves out, one question at a time. Every answer is read by Gemini: a vague answer gets a sharper follow-up, a clear one redraws the board in front of you. Only when the flows are agreed are the screens drawn, with wireframes, buttons and the APIs behind them, and the bees ask again.
 
-The result is a brief that records every decision and marks everything still undecided, ready to hand to engineers or a coding agent.
+The result is a brief that records every decision and marks everything still undecided, as the starting point for engineers or a coding agent.
 
 ## The problem
 
@@ -36,7 +36,7 @@ The result is a brief that records every decision and marks everything still und
 5. **Screens.** The agreed flows and decisions become screens with wireframes, buttons and API calls. The bees ask again, screen by screen.
 6. **The Brief.** One document with every flow, screen and decision, plus what is still open. Undecided fields are printed as NOT DECIDED.
 
-A screen is "ready to build" only when it has no open blocking question and no missing detail.
+A screen is "ready to build" only when it has no open blocking question, its loading and error states are decided, every API it calls has a timeout, and every button that calls an API says where a failure leads. A vendor or timeout the engine fills in that nobody stated is removed and asked about.
 
 ## Google technology in use
 
@@ -52,13 +52,13 @@ A screen is "ready to build" only when it has no open blocking question and no m
 
 | Real and tested | Not built |
 |---|---|
-| Flows-first mapping, six bees, follow-ups on vague answers, live board updates, screens with wireframes, readiness, changing an answer, the Brief (copy, download, print, agent link), 20 automated tests, live on Cloud Run | Accounts, shared editing, durable storage (boards live in memory; the browser restores them), integrations with ticketing tools |
+| Flows-first mapping, six bees, follow-ups on vague answers, live board updates, screens with wireframes, readiness, changing an answer, the Brief (copy, download, print, agent link), an automated test suite, live on Cloud Run | Accounts, shared editing, durable storage (boards live in memory; the browser restores them), integrations with ticketing tools |
 
 The six bees are roles inside one model call, not six separate agents.
 
 ## Why it can scale
 
-The questions a product team needs answered are the same in Hyderabad, Singapore and Sydney. BuildingBees needs no setup, works from two lines of text, and produces a brief any engineer or coding agent can build from.
+The questions a product team needs answered are the same in Hyderabad, Singapore and Sydney. BuildingBees needs no setup, works from two lines of text, and produces a brief an engineer or coding agent can start from.
 
 ## Team and eligibility
 

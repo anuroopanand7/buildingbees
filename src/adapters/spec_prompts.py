@@ -52,6 +52,13 @@ class XAPI(BaseModel):
     service: str
     vendor: str
     timeout_ms: int
+    request_fields: List[str] = []   # what the app sends
+    response_fields: List[str] = []  # what comes back
+
+
+class XEntity(BaseModel):
+    name: str
+    fields: List[str]
 
 
 class XQuestion(BaseModel):
@@ -71,6 +78,7 @@ class SpecExtract(BaseModel):
     ctas: List[XCTA]
     apis: List[XAPI]
     questions: List[XQuestion]
+    entities: List[XEntity] = []  # the things the product stores
 
 
 class XFlowPlan(BaseModel):
@@ -133,7 +141,12 @@ Rules:
   label is the real wording the person would see ("Pick a time", "Your mobile number", "Confirm booking").
   Every button on the screen appears as a button element with the same label as its CTA.
 - Every CTA lists the APIs it calls and where it goes on success and on failure (a screen id, or "" if unknown).
-- If the spec leaves a timeout unstated, use timeout_ms 0. If vendor is unknown use "".
+- For every API list request_fields (what the app sends) and response_fields (what comes back), as plain
+  field names. List "entities": the things the product has to store (Booking, Customer), each with its
+  field names. Include only what the flows, screens and decisions imply.
+- Never fill in a vendor, a timeout, a limit or a price that the spec and the decisions do not state.
+  Unstated timeout is timeout_ms 0. Unstated vendor is "". They will be asked about, not guessed.
+- product_name is a short name for the founder's product. Never put "BuildingBees" in it.
 - Assumption is not approval: never invent business rules. Wherever the spec is silent on something an
   engineer would need (failure paths, timeouts, retries, empty states, validation, permissions), add a question
   targeted at the exact node id. Mark it blocking if code cannot be written safely without the answer.
@@ -165,8 +178,10 @@ Do NOT design screens, buttons or APIs yet. First agree the user flows.
    usually have one (cancelling, rescheduling, signing in, refunds, an admin or staff side, notifications).
    If you think such a flow is needed, do NOT draw it: ask whether it is wanted, as a PM question on the
    nearest existing flow. Assumption is not approval.
-   Every user you list must own at least one flow. If someone only appears inside another user's flow
-   (staff, a courier, an admin), do not list them as a user; mention them in the steps.
+   Every person the input says does something ("librarians can cancel a reservation") is a user with a flow
+   for exactly that. Every user you list must own at least one flow. Someone who only appears inside
+   another user's flow, and is not said to do anything themselves, is not a user; mention them in the steps.
+   product_name is a short name for the founder's product. Never put "BuildingBees" in it.
 3. Then ask what a senior PM would need answered before anyone draws a screen: exactly who the user is,
    what they bring in, what they get out, what is in and out of scope, what happens when it goes wrong,
    how we know it worked. Ask 4-8 questions, most important first. Target each at the flow id or user id
@@ -227,7 +242,9 @@ B. Otherwise set is_vague false and apply the decision to the board. Change only
      list of steps (add, reword, reorder or remove steps). If the answer changes who a user is, return it in
      user_updates. Keep every existing id exactly as given. If the founder has now asked for a flow that is
      not on the board (for example they said yes, customers can cancel), add it to flow_updates with a new
-     UPPER_SNAKE flow_id, its steps, and the user_id of the user it belongs to.
+     UPPER_SNAKE flow_id, its steps, and the user_id of the user it belongs to. If that flow belongs to
+     someone who is not on the board yet (staff, an admin), also add them to user_updates with a new
+     UPPER_SNAKE user_id, and use that user_id on the flow.
      Something the user does at a different moment from this flow (cancelling, rescheduling, checking
      history, getting a refund) is its own new flow. Never squeeze it in as a step of the flow it is not part of.
    - Screens (the board is at the screens stage): return field_updates as (node_id, field, value) using only

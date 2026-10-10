@@ -144,6 +144,8 @@
   @media (prefers-reduced-motion: reduce) { .changed { animation: none; outline: 2px solid var(--ok); } }
   .flow-head h3 button { background: none; border: none; padding: 0; font: inherit; text-align: left; }
   .flow.focus .flow-head h3 { box-shadow: 0 2px 0 var(--accent); }
+  .redraw { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; background: var(--warn-soft); color: var(--warn); border-radius: var(--r-card); padding: 12px 16px; margin-bottom: 20px; font-size: 14px; }
+  .redraw span { flex: 1; min-width: 240px; }
   .stage-note { font-size: 13px; color: var(--muted); margin: 0 0 20px; max-width: 70ch; }
   .arrow { flex: none; width: 36px; height: 120px; display: flex; align-items: center; justify-content: center; color: var(--line-strong); font-size: 18px; }
   .scr { flex: none; width: 264px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-card); padding: 14px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
@@ -377,8 +379,8 @@ async function load() {
     catch (e) { store.set("bb_graph", ""); }
     finally { restoring = false; }
   }
-  if (!LINKED) store.set("bb_graph", g.total_nodes ? JSON.stringify({ product_name: g.product_name, spec_text: g.spec_text, nodes: g.nodes, edges: g.edges }) : "");
-  S.stage = g.stage;
+  if (!LINKED) store.set("bb_graph", g.total_nodes ? JSON.stringify({ product_name: g.product_name, spec_text: g.spec_text, entities: g.entities, nodes: g.nodes, edges: g.edges }) : "");
+  S.stage = g.stage; S.needsRedraw = g.needs_redraw;
   S.nodes = {}; S.fwd = {}; S.rev = {}; S.screens = {};
   g.nodes.forEach((n) => (S.nodes[n.id] = n));
   g.edges.forEach((e) => {
@@ -501,7 +503,8 @@ function renderMap() {
   if (loose.length) rows.push({ title: "Other screens", who: "", goal: "", ids: loose });
   const focusStep = Number(pmQueue()[0]?.metadata?.step || 0);
   const note = S.stage === "flows" ? '<p class="stage-note">These are the user flows I read from your input. No screens are drawn yet: answer the questions on the left first, so the screens are built on your decisions and not on my guesses.</p>' : "";
-  $("flows").innerHTML = note + rows.map((f) => `<div class="flow ${f.id && ((PM.focus === f.id && !focusStep) || S.selected === f.id) ? "focus" : ""}">
+  const redraw = S.needsRedraw ? '<div class="redraw" role="status"><span>You changed a decision after the screens were drawn, so some screens no longer match it.</span><button class="btn primary" id="drawBtn">Redraw the screens</button></div>' : "";
+  $("flows").innerHTML = redraw + note + rows.map((f) => `<div class="flow ${f.id && ((PM.focus === f.id && !focusStep) || S.selected === f.id) ? "focus" : ""}">
     <div class="flow-head"><h3>${f.id ? `<button data-id="${esc(f.id)}">${esc(f.title)}</button>` : esc(f.title)}</h3>${f.who ? `<span class="who">for ${esc(f.who)}</span>` : ""}</div>
     ${f.ids.length
       ? `<div class="flow-row">${f.ids.map(screenCard).join('<div class="arrow" aria-hidden="true"><i class="ph ph-arrow-right"></i></div>')}</div>`
@@ -624,7 +627,7 @@ const FIELDS = {
   FLOW: [["goal", "Goal"], ["metadata.steps", "Steps"]],
   SCREEN: [["description", "Purpose"], ["states.loading", "Loading state"], ["states.empty", "Empty state"], ["states.error", "Error state"]],
   CTA: [["apis_called", "Calls"], ["target_screen_on_success", "On success"], ["target_screen_on_failure", "On failure"], ["max_retries", "Max retries"]],
-  API: [["method", "Method"], ["path", "Path"], ["service", "Service"], ["vendor", "Vendor"], ["timeout_ms", "Timeout (ms)"]],
+  API: [["method", "Method"], ["path", "Path"], ["service", "Service"], ["vendor", "Vendor"], ["timeout_ms", "Timeout (ms)"], ["inputs_schema.fields", "Sends"], ["outputs_schema.fields", "Returns"]],
 };
 const KIND = { USER: "User", FLOW: "Flow", SCREEN: "Screen", CTA: "Button", API: "API" };
 const pick = (o, path) => path.split(".").reduce((v, k) => (v == null ? v : v[k]), o);
