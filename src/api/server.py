@@ -100,7 +100,8 @@ graph = _BoardProxy()
 
 @app.middleware("http")
 async def _select_board(request, call_next):
-    _board_id.set((request.headers.get("x-board") or "default")[:64])
+    # The web app sends a header; a coding agent given a link uses ?board=.
+    _board_id.set((request.headers.get("x-board") or request.query_params.get("board") or "default")[:64])
     return await call_next(request)
 engines = {e.key: e for e in (GoogleGeminiAdapter(), NvidiaNemotronAdapter())}
 

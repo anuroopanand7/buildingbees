@@ -20,6 +20,11 @@ class XFlow(BaseModel):
     user_id: str
 
 
+class XElement(BaseModel):
+    kind: str  # heading | text | input | button | list | image | choice | note
+    label: str
+
+
 class XScreen(BaseModel):
     id: str
     title: str
@@ -28,6 +33,7 @@ class XScreen(BaseModel):
     loading_state: str
     empty_state: str
     error_state: str
+    elements: List[XElement] = []  # top to bottom, what the person sees: the wireframe
 
 
 class XCTA(BaseModel):
@@ -122,6 +128,10 @@ typed dependency graph: User -> Flow -> Screen -> CTA -> API.
 Rules:
 - Use short UPPER_SNAKE ids (e.g. W01_LOGIN, CTA_W01_SUBMIT, API_AUTH_LOGIN). Every reference must point to an id you defined.
 - Every screen needs loading, empty and error states. If the spec does not say, write "UNSPECIFIED".
+- Every screen lists its "elements" top to bottom, 4 to 8 of them, so it can be sketched as a wireframe.
+  kind is one of: heading, text, input, choice (a set of options to pick from), list, image, button, note.
+  label is the real wording the person would see ("Pick a time", "Your mobile number", "Confirm booking").
+  Every button on the screen appears as a button element with the same label as its CTA.
 - Every CTA lists the APIs it calls and where it goes on success and on failure (a screen id, or "" if unknown).
 - If the spec leaves a timeout unstated, use timeout_ms 0. If vendor is unknown use "".
 - Assumption is not approval: never invent business rules. Wherever the spec is silent on something an

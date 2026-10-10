@@ -51,7 +51,15 @@
 
   /* Start screen: one prompt, nothing else competing. */
   #start { min-height: calc(100dvh - 56px); display: grid; align-content: center; padding: 40px clamp(20px, 10vw, 160px); background-image: radial-gradient(var(--line-strong) 1px, transparent 1px); background-size: 22px 22px; }
-  .start-inner { max-width: 760px; }
+  .start-inner { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: clamp(32px, 6vw, 96px); align-items: center; max-width: 1280px; }
+  .team { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 22px 24px; }
+  .team h2 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+  .team p { margin: 0 0 14px; font-size: 14px; color: var(--muted); }
+  .team ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+  .team li { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; }
+  .team li b { display: block; font-weight: 600; }
+  .team li span span { color: var(--muted); }
+  .team li .bee { width: 34px; height: 34px; font-size: 17px; }
   #start h1 { font-size: clamp(34px, 4.4vw, 56px); line-height: 1.04; letter-spacing: -.035em; margin: 0 0 14px; font-weight: 600; }
   #start p.lead { font-size: 18px; color: var(--muted); max-width: 52ch; margin: 0 0 28px; }
   .composer { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 20px; box-shadow: var(--shadow); padding: 16px; }
@@ -124,7 +132,7 @@
   .flow-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
   .flow-head h3 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
   .flow-head .who { font-size: 13px; font-weight: 400; margin: 0; color: var(--muted); }
-  .flow-row { display: flex; align-items: stretch; gap: 0; }
+  .flow-row { display: flex; align-items: flex-start; gap: 0; }
   .steps { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .step { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; font-size: 14px; max-width: 260px; }
   .steps .ph { color: var(--line-strong); }
@@ -135,8 +143,8 @@
   .flow-head h3 button { background: none; border: none; padding: 0; font: inherit; text-align: left; }
   .flow.focus .flow-head h3 { box-shadow: 0 2px 0 var(--accent); }
   .stage-note { font-size: 13px; color: var(--muted); margin: 0 0 20px; max-width: 70ch; }
-  .arrow { flex: none; width: 36px; display: flex; align-items: center; justify-content: center; color: var(--line-strong); font-size: 18px; }
-  .scr { flex: none; width: 250px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-card); padding: 14px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+  .arrow { flex: none; width: 36px; height: 120px; display: flex; align-items: center; justify-content: center; color: var(--line-strong); font-size: 18px; }
+  .scr { flex: none; width: 264px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-card); padding: 14px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
   .scr:hover { border-color: var(--line-strong); }
   .scr.focus, .cta.focus, .api.focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); background: var(--focus); }
   .scr h4 { margin: 0 0 8px; font-size: 15px; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
@@ -152,6 +160,29 @@
   .api { max-width: 100%; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 2px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
   .api:hover { color: var(--text); border-color: var(--line-strong); }
   .no-ctas { font-size: 12px; color: var(--muted); }
+
+  /* Wireframes: a low-fidelity sketch of each screen, drawn from the elements the engine lists. */
+  .wf { border: 1px solid var(--line-strong); border-radius: 18px; background: var(--panel); padding: 16px 14px; display: grid; gap: 10px; max-width: 300px; }
+  .wf-heading { font-weight: 600; font-size: 15px; }
+  .wf-text { font-size: 13px; color: var(--muted); }
+  .wf-note { font-size: 12px; color: var(--muted); border-left: 2px solid var(--line-strong); padding-left: 8px; }
+  .wf-input { border: 1px solid var(--line-strong); border-radius: 8px; padding: 8px 10px; font-size: 13px; color: var(--muted); }
+  .wf-choice { display: flex; gap: 6px; flex-wrap: wrap; }
+  .wf-choice span { border: 1px solid var(--line-strong); border-radius: 999px; padding: 4px 10px; font-size: 12px; }
+  .wf-list { display: grid; gap: 6px; font-size: 13px; }
+  .wf-list i { display: block; height: 26px; border-radius: 6px; background: var(--fill); }
+  .wf-image { height: 76px; border-radius: 8px; background: var(--fill); display: grid; place-items: center; font-size: 12px; color: var(--muted); }
+  .wf-button { background: var(--ink); color: var(--on-ink); border-radius: 999px; padding: 8px 12px; font-size: 13px; font-weight: 500; text-align: center; }
+  .wf.small { max-width: none; border-radius: 12px; padding: 12px; gap: 7px; margin: 10px 0 12px; background: var(--bg); border-color: var(--line); }
+  .wf.small .wf-heading { font-size: 13px; }
+  .wf.small .wf-text, .wf.small .wf-list, .wf.small .wf-input { font-size: 11px; }
+  .wf.small .wf-note { font-size: 10px; }
+  .wf.small .wf-input { padding: 5px 8px; }
+  .wf.small .wf-choice span { font-size: 10px; padding: 2px 7px; }
+  .wf.small .wf-list i { height: 14px; }
+  .wf.small .wf-image { height: 40px; font-size: 10px; }
+  .wf.small .wf-button { font-size: 11px; padding: 5px 10px; }
+  .card-bees { display: inline-flex; gap: 2px; vertical-align: middle; margin-left: 6px; }
 
   /* Details: slides over the map when a node is opened. */
   #details { position: absolute; top: 0; right: 0; bottom: 0; width: min(400px, 100%); background: var(--panel); border-left: 1px solid var(--line); box-shadow: var(--shadow); overflow: auto; padding: 18px 20px 28px; z-index: 5; }
@@ -199,7 +230,12 @@
   .working-card span { display: block; color: var(--muted); font-size: 13px; margin-top: 4px; }
 
   @media (max-width: 900px) {
-    #work { grid-template-columns: 1fr; height: auto; }
+    #work { grid-template-columns: minmax(0, 1fr); height: auto; }
+    #pm, #map { min-width: 0; }
+    #thread { flex: none; }
+    #start { padding: 24px 16px; }
+    header { gap: 8px; padding: 0 12px; }
+    #product, #engineBtn { display: none; }
     #pm { border-right: none; border-bottom: 1px solid var(--line); }
     #thread { max-height: 30dvh; }
     #map { padding: 20px 16px 40px; }
@@ -207,8 +243,10 @@
     .arrow { width: auto; height: 28px; transform: rotate(90deg); }
     .scr { width: 100%; }
     #details { position: fixed; top: 56px; }
-    .meter .track { display: none; }
+    .meter { display: none !important; }
+    .logo { margin-right: auto; }
     .composer-foot .btn.primary { margin-left: 0; width: 100%; }
+    .start-inner { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -224,6 +262,7 @@
 
 <main id="start" hidden>
   <div class="start-inner">
+   <div>
     <h1>What are we building?</h1>
     <p class="lead">Give me a spec or a rough idea. I map the product, then ask you about everything it leaves out, before anyone writes code.</p>
     <div class="composer">
@@ -242,6 +281,12 @@
       <button class="btn ghost" data-idea="An app for flatmates to split bills and see who owes whom.">Split bills with flatmates</button>
     </div>
     <div class="start-note"><button class="link" id="exampleBtn">Or load a full example spec (food delivery)</button><span id="msg" role="status" aria-live="polite"></span></div>
+   </div>
+   <aside class="team" aria-label="The bees who will ask you questions">
+    <h2>Six bees will question your idea</h2>
+    <p>Each one owns a part of the product. They ask, you decide, and the board changes with every answer.</p>
+    <ul id="crew"></ul>
+   </aside>
   </div>
 </main>
 
@@ -261,6 +306,7 @@
   <div class="brief-sheet">
     <div class="brief-bar"><b>Product brief</b>
       <button class="btn" id="briefCopy"><i class="ph ph-copy" aria-hidden="true"></i>Copy</button>
+      <button class="btn" id="briefAgent" title="A link your coding agent can read"><i class="ph ph-robot" aria-hidden="true"></i>Copy agent link</button>
       <button class="btn" id="briefDownload"><i class="ph ph-download-simple" aria-hidden="true"></i>Download .md</button>
       <button class="btn" id="briefPrint"><i class="ph ph-printer" aria-hidden="true"></i>Print or save as PDF</button>
       <button class="icon-btn" id="briefClose" aria-label="Close brief"><i class="ph ph-x" aria-hidden="true"></i></button>
@@ -277,12 +323,12 @@
 const ENGINE_COPY = { gemini: "Google Gemini", nvidia: "NVIDIA Nemotron" };
 // One bee per aspect of the product. The engine labels every question with the bee that asks it.
 const BEES = {
-  PM: ["Queen Bee", "product and scope", "ph-crown-simple"],
-  DESIGN: ["Design Bee", "experience", "ph-palette"],
-  FRONTEND: ["Frontend Bee", "screens and states", "ph-browser"],
-  BACKEND: ["Backend Bee", "data and integrations", "ph-database"],
-  TESTER: ["Test Bee", "edge cases", "ph-bug"],
-  COMPLIANCE: ["Compliance Bee", "privacy and rules", "ph-shield-check"],
+  PM: ["Queen Bee", "product and scope", "ph-crown-simple", "Who is this for, and what is out of scope?"],
+  DESIGN: ["Design Bee", "experience", "ph-palette", "What does the person see first?"],
+  FRONTEND: ["Frontend Bee", "screens and states", "ph-browser", "What shows while it loads, or when it is empty?"],
+  BACKEND: ["Backend Bee", "data and integrations", "ph-database", "Which services does it talk to, and what if one is slow?"],
+  TESTER: ["Test Bee", "edge cases", "ph-bug", "What happens when two people do this at once?"],
+  COMPLIANCE: ["Compliance Bee", "privacy and rules", "ph-shield-check", "What data do we keep, and are we allowed to?"],
 };
 const bee = (cat) => BEES[cat] || BEES.PM;
 const beeIcon = (cat, sm) => `<span class="bee ${sm ? "sm" : ""}" aria-hidden="true"><i class="ph ${bee(cat)[2]}"></i></span>`;
@@ -298,7 +344,8 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
 };
 // Each browser gets its own board; the server keys boards by this id.
-let BOARD = store.get("bb_board");
+const LINKED = new URLSearchParams(location.search).get("board");
+let BOARD = LINKED || store.get("bb_board");
 if (!BOARD) { BOARD = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2)); store.set("bb_board", BOARD); }
 S.engine = store.get("bb_engine");
 
@@ -316,7 +363,7 @@ function say(text, err = false) { $("msg").textContent = text; $("msg").classNam
 let restoring = false;
 async function load() {
   let [g, screens, status] = await Promise.all([api("/api/graph"), api("/api/screens"), api("/api/status")]);
-  const cached = store.get("bb_graph");
+  const cached = LINKED ? "" : store.get("bb_graph"); // a linked board belongs to someone else: never overwrite it from this browser's copy
   if (!g.total_nodes && cached && !restoring) {
     // The server slept and lost this board; put back the copy this browser kept.
     restoring = true;
@@ -324,7 +371,7 @@ async function load() {
     catch (e) { store.set("bb_graph", ""); }
     finally { restoring = false; }
   }
-  store.set("bb_graph", g.total_nodes ? JSON.stringify({ product_name: g.product_name, spec_text: g.spec_text, nodes: g.nodes, edges: g.edges }) : "");
+  if (!LINKED) store.set("bb_graph", g.total_nodes ? JSON.stringify({ product_name: g.product_name, spec_text: g.spec_text, nodes: g.nodes, edges: g.edges }) : "");
   S.stage = g.stage;
   S.nodes = {}; S.fwd = {}; S.rev = {}; S.screens = {};
   g.nodes.forEach((n) => (S.nodes[n.id] = n));
@@ -373,7 +420,7 @@ function render() {
   renderMap(); renderPM(); renderDetails();
 
   // Bring the node the PM is asking about into view, once per question.
-  if (PM.focus && PM.focus !== PM.lastFocus) {
+  if (PM.focus && PM.focus !== PM.lastFocus && matchMedia("(min-width: 901px)").matches) {
     document.querySelector("#flows .focus")?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
   }
   PM.lastFocus = PM.focus;
@@ -394,6 +441,23 @@ function renderEngine() {
 
 // ---------- map ----------
 const hit = (id) => (PM.changed.has(id) ? "changed" : "");
+const WF_KINDS = ["heading", "text", "input", "choice", "list", "image", "button", "note"];
+const wfKind = (k) => (WF_KINDS.includes(k) ? k : "text");
+function wireframe(els, small) {
+  return `<div class="wf ${small ? "small" : ""}"${small ? ' aria-hidden="true"' : ""}>${els.slice(0, small ? 7 : 12).map((e) => {
+    const k = wfKind(e.kind), t = esc(e.label);
+    if (k === "choice") return `<div class="wf-choice">${e.label.split(/\s*[\/|,]\s*/).slice(0, 4).map((o) => `<span>${esc(o)}</span>`).join("")}</div>`;
+    if (k === "list") return `<div class="wf-list">${t}<i></i><i></i></div>`;
+    return `<div class="wf-${k}">${t}</div>`;
+  }).join("")}</div>`;
+}
+// The bees still waiting on something in this screen's branch.
+function branchBees(id) {
+  const ids = new Set([id]);
+  (S.fwd[id] || []).forEach((c) => { ids.add(c); (S.fwd[c] || []).forEach((a) => ids.add(a)); });
+  const cats = [...new Set(openQuestions().filter((q) => ids.has(q.target_node_id)).map((q) => q.category))];
+  return cats.length ? `<span class="card-bees" title="${esc(cats.map((c) => bee(c)[0]).join(", "))} still have questions here">${cats.map((c) => beeIcon(c, true)).join("")}</span>` : "";
+}
 function screenCard(id) {
   const n = S.nodes[id];
   const r = S.screens[id];
@@ -403,7 +467,8 @@ function screenCard(id) {
     : '<span class="tag soft">Details missing</span>';
   const ctas = (S.fwd[id] || []).map((c) => S.nodes[c]).filter((c) => c && c.layer === "CTA");
   return `<article class="scr ${PM.focus === id || S.selected === id ? "focus" : ""} ${hit(id)}" data-id="${esc(id)}" tabindex="0">
-    <h4>${esc(n.title)}</h4>${state}
+    <h4>${esc(n.title)}</h4>${state}${branchBees(id)}
+    ${n.metadata?.elements?.length ? wireframe(n.metadata.elements, true) : ""}
     ${r ? `<div class="bar"><i style="width:${Math.max(4, r.readiness_score * 100)}%;background:${color(r.readiness_score)}"></i></div>` : ""}
     ${ctas.length ? `<ul class="ctas">${ctas.map((c) => {
       const apis = (S.fwd[c.id] || []).map((a) => S.nodes[a]).filter((a) => a && a.layer === "API");
@@ -473,7 +538,7 @@ function renderPM() {
   if (PM.bee && !open.some((q) => q.category === PM.bee)) PM.bee = null;
   $("hive").innerHTML = Object.keys(BEES).filter((c) => all.some((q) => q.category === c)).map((c) => {
     const n = open.filter((q) => q.category === c).length;
-    return `<button data-bee="${c}" aria-pressed="${PM.bee === c}" ${n ? "" : "disabled"} title="${esc(bee(c)[1])}">${beeIcon(c, true)}${esc(bee(c)[0])}${n ? `<span class="n">${n}</span>` : '<i class="ph ph-check" aria-hidden="true"></i>'}</button>`;
+    return `<button data-bee="${c}" aria-pressed="${PM.bee === c}" ${n ? "" : "disabled"} title="${esc(bee(c)[0])}: ${esc(bee(c)[1])}" aria-label="${esc(bee(c)[0])}, ${n} open">${beeIcon(c, true)}${esc(bee(c)[0].replace(" Bee", ""))}${n ? `<span class="n">${n}</span>` : '<i class="ph ph-check" aria-hidden="true"></i>'}</button>`;
   }).join("");
 
   const thread = $("thread");
@@ -565,6 +630,7 @@ function renderDetails() {
     <div class="details-top"><span class="about">${KIND[n.layer] || ""}</span><button class="icon-btn" id="closeDetails" aria-label="Close details"><i class="ph ph-x" aria-hidden="true"></i></button></div>
     <h3>${esc(n.label || n.title)}</h3>
     <div class="mono muted">${esc(n.id)}</div>
+    ${n.layer === "SCREEN" && n.metadata?.elements?.length ? `<div class="h" style="margin-top:14px">Wireframe</div>${wireframe(n.metadata.elements)}` : ""}
     <dl class="kv">${rows}</dl>
     ${r ? `<div class="h">Screen readiness</div>
       <div class="summary-num" style="font-size:30px;color:${color(r.readiness_score)}">${Math.round(r.readiness_score * 100)}%</div>
@@ -602,7 +668,7 @@ async function answer(qid, text) {
   } catch (err) { PM.error = err.message; }
   PM.reacting = "";
   await load();
-  document.querySelector("#flows .changed")?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  if (matchMedia("(min-width: 901px)").matches) document.querySelector("#flows .changed")?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
 }
 const fail = (err) => { PM.error = err.message; alert(err.message); };
 
@@ -716,6 +782,11 @@ $("briefCopy").onclick = async () => {
   try { await navigator.clipboard.writeText(briefText); $("briefCopy").lastChild.textContent = "Copied"; setTimeout(() => ($("briefCopy").lastChild.textContent = "Copy"), 1500); }
   catch (err) { alert("Copy was blocked by the browser. Use Download instead."); }
 };
+$("briefAgent").onclick = async () => {
+  const url = `${location.origin}/api/brief?board=${encodeURIComponent(BOARD)}`;
+  try { await navigator.clipboard.writeText(`Build from this product brief. Ask me about anything marked NOT DECIDED or listed under Still open, do not assume: ${url}`); $("briefAgent").lastChild.textContent = "Copied"; setTimeout(() => ($("briefAgent").lastChild.textContent = "Copy agent link"), 1500); }
+  catch (err) { prompt("Copy this link for your coding agent:", url); }
+};
 $("briefDownload").onclick = () => {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([briefText], { type: "text/markdown" }));
@@ -736,6 +807,7 @@ $("engineBtn").onclick = () => {
   S.engine = keys[(keys.indexOf(S.engine) + 1) % keys.length]; store.set("bb_engine", S.engine); renderEngine();
 };
 
+$("crew").innerHTML = Object.entries(BEES).map(([c, [name, , , asks]]) => `<li>${beeIcon(c)}<span><b>${name}</b><span>${asks}</span></span></li>`).join("");
 $("prd").value = store.get("bb_spec") || "";
 load().catch((err) => { $("start").hidden = false; say(err.message, true); });
 </script>

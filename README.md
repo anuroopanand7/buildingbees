@@ -48,7 +48,6 @@ Open http://localhost:8000. Run the tests with `.venv/bin/python -m pytest -q`.
 | `src/core/ingest.py` | Turns engine output into graph nodes and questions |
 | `src/adapters/` | Gemini and Nemotron adapters, shared prompts and schemas |
 | `src/api/server.py` | FastAPI app and REST endpoints |
-| `src/mcp/server.py` | MCP server so coding agents can read the graph and post questions |
 | `web/index.html` | The web app |
 
 ## API

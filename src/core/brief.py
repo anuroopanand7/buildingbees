@@ -61,6 +61,9 @@ def build_brief(g: BuildingBeesEngine) -> str:
             add(f"### {s.title} ({'ready to build' if r.is_build_ready else 'not ready'})")
             if s.description:
                 add(s.description)
+            elements = s.metadata.get("elements", [])
+            if elements:
+                add("- On screen, top to bottom: " + "; ".join(f"{e['kind']} \"{e['label']}\"" for e in elements))
             add(f"- Loading: {_or_open(s.states.loading)}")
             add(f"- Empty: {_or_open(s.states.empty)}")
             add(f"- Error: {_or_open(s.states.error)}")
