@@ -192,10 +192,13 @@ def test_clear_answer_updates_the_board(monkeypatch):
         is_vague=False, note="Got it, I added a sign-in step.", follow_up=[], user_updates=[], field_updates=[],
         flow_updates=[XFlowUpdate(flow_id="F_BUY", title="Buy", goal="Purchase",
                                   steps=["Sign in", "Open cart", "Pay", "See confirmation"]),
-                      XFlowUpdate(flow_id="F_GHOST", title="x", goal="x", steps=["x"])],
+                      XFlowUpdate(flow_id="F_CANCEL", title="Cancel an order", goal="Undo", user_id="U_BUYER",
+                                  steps=["Open orders", "Cancel"])],
     )
     out = c.post(f"/api/questions/{q['id']}/react?engine=gemini", headers=h).json()
-    assert out["changed"] == ["F_BUY"] and not out["is_vague"]  # unknown flow ignored
+    assert out["changed"] == ["F_BUY", "F_CANCEL"] and not out["is_vague"]  # a flow the founder asked for is added
+    edges = c.get("/api/graph", headers=h).json()["edges"]
+    assert {"source": "U_BUYER", "target": "F_CANCEL"} in edges
     nodes = {n["id"]: n for n in c.get("/api/graph", headers=h).json()["nodes"]}
     assert nodes["F_BUY"]["metadata"]["steps"][0] == "Sign in"
     assert nodes[q["id"]]["metadata"]["note"] == "Got it, I added a sign-in step."

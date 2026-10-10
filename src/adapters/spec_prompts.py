@@ -87,6 +87,7 @@ class XFlowUpdate(BaseModel):
     title: str
     goal: str
     steps: List[str]
+    user_id: str = ""  # only needed when the flow is new
 
 
 class XUserUpdate(BaseModel):
@@ -148,7 +149,10 @@ Do NOT design screens, buttons or APIs yet. First agree the user flows.
 
 1. List the users (1-3) and the user flows (1-4). Use short UPPER_SNAKE ids (USER_PATIENT, FLOW_CREATE_VIDEO).
 2. For each flow write 3-7 plain-language steps: what the user does and what the product does in reply.
-   Only include steps the input supports. Do not invent features.
+   Only draw flows and steps the input actually asks for. Do not add a flow because products like this
+   usually have one (cancelling, rescheduling, signing in, refunds, an admin or staff side, notifications).
+   If you think such a flow is needed, do NOT draw it: ask about it instead ("Should customers be able to
+   cancel a booking themselves?") as a PM question on the nearest existing flow. Assumption is not approval.
 3. Then ask what a senior PM would need answered before anyone draws a screen: exactly who the user is,
    what they bring in, what they get out, what is in and out of scope, what happens when it goes wrong,
    how we know it worked. Ask 4-8 questions, most important first. Target each at the flow id or user id
@@ -207,7 +211,9 @@ A. If the answer is vague, evasive or too broad to build from ("everyone", "all 
 B. Otherwise set is_vague false and apply the decision to the board. Change only what the answer implies.
    - Flows (the board is at the flows stage): return every flow that changes in flow_updates with its full new
      list of steps (add, reword, reorder or remove steps). If the answer changes who a user is, return it in
-     user_updates. Keep every id exactly as given.
+     user_updates. Keep every existing id exactly as given. If the founder has now asked for a flow that is
+     not on the board (for example they said yes, customers can cancel), add it to flow_updates with a new
+     UPPER_SNAKE flow_id, its steps, and the user_id of the user it belongs to.
    - Screens (the board is at the screens stage): return field_updates as (node_id, field, value) using only
      these fields. SCREEN: description, states.loading, states.empty, states.error. CTA: label,
      target_screen_on_success, target_screen_on_failure, error_display_type, max_retries. API: method, path,

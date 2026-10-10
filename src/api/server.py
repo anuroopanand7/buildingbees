@@ -198,8 +198,18 @@ EDITABLE = {
 def _apply_reaction(g: BuildingBeesEngine, r) -> List[str]:
     """Writes a bee's changes onto the board. Unknown ids and fields are ignored, never guessed."""
     changed: List[str] = []
+    drawn = any(n.layer.value == "SCREEN" for n in g.nodes.values())
+    users = [n.id for n in g.nodes.values() if n.layer.value == "USER"]
     for fu in r.flow_updates:
         f = g.nodes.get(fu.flow_id)
+        if f is None and fu.steps and fu.title and not drawn:
+            # A flow the founder has just asked for. Only while flows are still being agreed.
+            f = g.add_node(FlowNode(id=fu.flow_id, title=fu.title, goal=fu.goal, metadata={"steps": fu.steps}))
+            owner = fu.user_id if fu.user_id in users else (users[0] if users else None)
+            if owner:
+                g.add_edge(owner, f.id)
+            changed.append(f.id)
+            continue
         if f and f.layer.value == "FLOW" and fu.steps:
             f.title, f.goal = fu.title or f.title, fu.goal or f.goal
             f.metadata["steps"] = fu.steps
