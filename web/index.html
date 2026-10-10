@@ -65,6 +65,8 @@
   .seg button[aria-pressed="true"] { background: var(--panel); color: var(--text); box-shadow: 0 1px 3px rgba(17, 17, 16, .12); }
   .seg button:disabled { opacity: .45; }
   .file-btn input { display: none; }
+  .ideas { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 18px; font-size: 13px; }
+  .ideas .btn { min-height: 34px; padding: 0 14px; font-size: 13px; background: var(--panel); }
   .start-note { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-top: 16px; font-size: 13px; color: var(--muted); min-height: 22px; }
   .err { color: var(--bad); }
 
@@ -210,7 +212,13 @@
         <button class="btn primary" id="buildBtn">Map it<i class="ph ph-arrow-right" aria-hidden="true"></i></button>
       </div>
     </div>
-    <div class="start-note"><button class="link" id="exampleBtn">Try an example spec</button><span id="msg" role="status" aria-live="polite"></span></div>
+    <div class="ideas" id="ideas" aria-label="Starter ideas">
+      <span class="muted">Or start from a simple idea:</span>
+      <button class="btn ghost" data-idea="An app to book a haircut at my local salon.">Book a haircut</button>
+      <button class="btn ghost" data-idea="A to-do list app where I can share a list with my family.">Shared to-do list</button>
+      <button class="btn ghost" data-idea="An app for flatmates to split bills and see who owes whom.">Split bills with flatmates</button>
+    </div>
+    <div class="start-note"><button class="link" id="exampleBtn">Or load a full example spec (food delivery)</button><span id="msg" role="status" aria-live="polite"></span></div>
   </div>
 </main>
 
@@ -566,6 +574,7 @@ const fail = (err) => { PM.error = err.message; alert(err.message); };
 document.addEventListener("click", (e) => {
   const t = e.target.closest("button, [data-id]");
   if (!t) return;
+  if (t.dataset.idea) { $("prd").value = t.dataset.idea; say("Idea added. Press Map it."); return $("prd").focus(); }
   if (t.dataset.engine) { S.engine = t.dataset.engine; store.set("bb_engine", S.engine); say(""); return renderEngine(); }
   if (t.dataset.opt) return answer(t.dataset.q, t.dataset.opt).catch(fail);
   if (t.dataset.skip) { PM.skipped.add(t.dataset.skip); return render(); }
