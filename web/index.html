@@ -87,6 +87,19 @@
   @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
   .working b { display: block; font-size: 15px; }
   .working span { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .pm-q { font-size: 17px; line-height: 1.4; font-weight: 600; letter-spacing: -.01em; margin: 6px 0 12px; }
+  .pm-about { font-size: 12px; color: var(--muted); }
+  .pm-about button, .linkbtn { background: none; border: none; padding: 0; color: var(--text); text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; font-size: 12px; }
+  .pm-progress { height: 4px; background: var(--fill); border-radius: 4px; margin: 0 0 16px; overflow: hidden; }
+  .pm-progress i { display: block; height: 100%; background: var(--text); transition: width .3s; }
+  .pm-chips { display: grid; gap: 8px; margin-bottom: 10px; }
+  .pm-chips .chip { font-size: 13px; padding: 10px 14px; border-radius: 12px; }
+  .pm-input { width: 100%; background: var(--panel); color: var(--text); border: 1px solid var(--line-strong); border-radius: 12px; padding: 10px 12px; font: inherit; }
+  .pm-row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 999px; background: var(--bad-soft); color: var(--bad); }
+  .tag.nb { background: var(--warn-soft); color: var(--warn); }
+  .pm-list { list-style: none; padding: 0; margin: 8px 0 16px; font-size: 13px; }
+  .pm-list li { padding: 8px 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; }
   .gate { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
   .gate[hidden] { display: none; }
   .gate-box { max-width: 720px; width: 100%; }
@@ -143,8 +156,7 @@
   </section>
 
   <aside class="right" id="inspector">
-    <h2>Inspector</h2>
-    <div class="empty">Select any node. Agents may not build a screen until every blocking question in its branch is answered: assumption is not approval.</div>
+    <h2>Your product manager</h2>
   </aside>
 </main>
 
@@ -152,6 +164,10 @@
 const LAYERS = ["USER", "FLOW", "SCREEN", "CTA", "API"];
 const LABEL = { USER: "Users", FLOW: "Flows", SCREEN: "Screens", CTA: "CTAs", API: "APIs" };
 let S = { nodes: {}, fwd: {}, rev: {}, screens: {}, engines: {}, engine: null, selected: null };
+// The product manager: it asks one question at a time and digs for more on its own.
+const MAX_ROUNDS = 3; // shortcut: caps automatic deep-dives per board to protect the free model quota
+let PM = { skipped: new Set(), asked: new Set(), rounds: 0, thinking: "", error: "", focus: null };
+const resetPM = () => { PM = { skipped: new Set(), asked: new Set(), rounds: 0, thinking: "", error: "", focus: null }; };
 try { S.engine = localStorage.getItem("bb_engine"); } catch (e) {}
 const ENGINE_COPY = {
   gemini: ["Google Gemini", "Google AI Builder Cup track. Reads PDFs natively."],
@@ -232,7 +248,9 @@ function color(score) { return score >= 0.8 ? "var(--ok)" : score > 0 ? "var(--w
 
 function render() {
   const all = Object.values(S.nodes);
-  const rel = S.selected ? related(S.selected) : null;
+  PM.focus = S.selected ? null : (pmQueue()[0]?.target_node_id || null);
+  const focus = S.selected || PM.focus;
+  const rel = focus ? related(focus) : null;
 
   const crumbs = ['<button data-id="">All</button>'];
   if (S.selected) {
@@ -252,7 +270,7 @@ function render() {
     const cards = items.map((n) => {
       const ob = openBlocking(n.id);
       const r = layer === "SCREEN" ? S.screens[n.id] : null;
-      const cls = ["node", n.id === S.selected ? "sel" : "", rel && !rel.has(n.id) ? "dim" : ""].join(" ");
+      const cls = ["node", n.id === focus ? "sel" : "", rel && !rel.has(n.id) ? "dim" : ""].join(" ");
       return `<div class="${cls}" data-id="${esc(n.id)}">
         <div class="t">${esc(n.layer === "CTA" ? `"${n.label}"` : n.title)}</div>
         <div class="id mono">${esc(n.id)}</div>
@@ -287,7 +305,7 @@ const pick = (o, path) => path.split(".").reduce((v, k) => (v == null ? v : v[k]
 function renderInspector() {
   const el = $("inspector");
   const n = S.nodes[S.selected];
-  if (!n) return;
+  if (!n) return renderInterview(el);
   const rows = (FIELDS[n.layer] || []).map(([path, label]) => {
     let v = pick(n, path);
     if (Array.isArray(v)) v = v.join(", ");
@@ -313,16 +331,84 @@ function renderInspector() {
     </div>`;
   }).join("") || '<div class="empty">No questions on this node yet.</div>';
 
-  const canAsk = ["SCREEN", "CTA", "API", "FLOW"].includes(n.layer);
-  el.innerHTML = `<h2>${esc(n.layer)}</h2>
+  el.innerHTML = `<button class="linkbtn" id="backBtn" style="margin-bottom:14px">Back to your product manager</button>
+    <h2>${esc(n.layer)}</h2>
     <div style="font-weight:600;font-size:16px">${esc(n.title)}</div>
     <div class="mono" style="color:var(--muted);margin-bottom:12px">${esc(n.id)}</div>
     <dl class="kv">${rows}</dl>
     ${readiness}
     <h2>Questions (${qs.length})</h2>
     ${qhtml}
-    ${canAsk ? `<button class="btn primary" id="askBtn" ${engineReady() ? "" : "disabled title='Connect the engine first'"}>Ask ${esc(ENGINE_COPY[S.engine]?.[0] || "AI")} what this node is missing</button>` : ""}
     <div class="msg" id="imsg"></div>`;
+}
+
+const openQuestions = () => Object.values(S.nodes).filter((n) => n.layer === "QUESTION" && n.question_status === "OPEN");
+const pmQueue = () => openQuestions().filter((q) => !PM.skipped.has(q.id)).sort((a, b) => (b.is_blocking - a.is_blocking));
+
+// Next node worth a deeper look: buttons first (they tie screens to APIs), then APIs, then screens,
+// and always inside a branch that is not ready yet before one that is.
+function pmNextTarget() {
+  const rank = { CTA: 0, API: 1, SCREEN: 2 };
+  return Object.values(S.nodes)
+    .filter((n) => n.layer in rank && !PM.asked.has(n.id))
+    .sort((a, b) => {
+      const ra = S.screens[screenOf(a.id)]?.is_build_ready ? 1 : 0, rb = S.screens[screenOf(b.id)]?.is_build_ready ? 1 : 0;
+      return ra - rb || rank[a.layer] - rank[b.layer];
+    })[0] || null;
+}
+
+async function pmDigDeeper() {
+  const target = pmNextTarget();
+  if (!target || PM.thinking) return;
+  PM.thinking = target.title; PM.error = ""; PM.asked.add(target.id); PM.rounds++;
+  renderInspector();
+  try {
+    const res = await api(`/api/nodes/${encodeURIComponent(target.id)}/interrogate?${eq()}`, { method: "POST" });
+    if (!res.added.length && PM.rounds < MAX_ROUNDS) { PM.thinking = ""; return pmDigDeeper(); }
+  } catch (err) { PM.error = err.message; PM.rounds = MAX_ROUNDS; }
+  PM.thinking = "";
+  await load();
+}
+
+function renderInterview(el) {
+  const total = Object.values(S.nodes).filter((n) => n.layer === "QUESTION").length;
+  const open = openQuestions();
+  const q = pmQueue()[0];
+  const head = '<h2>Your product manager</h2>';
+  if (!Object.keys(S.nodes).length) {
+    el.innerHTML = head + '<div class="empty">Give me a spec or even a rough idea on the left. I will map it, then ask you about everything it leaves out, one question at a time.</div>';
+    return;
+  }
+  if (PM.thinking) {
+    el.innerHTML = head + `<div class="working-card" style="margin-top:24px"><div class="spinner"></div><b>Looking deeper</b><span>Checking "${esc(PM.thinking)}" for gaps...</span></div>`;
+    return;
+  }
+  if (q) {
+    const t = S.nodes[q.target_node_id];
+    const done = total - open.length;
+    el.innerHTML = head + `
+      <div class="pm-progress"><i style="width:${total ? (done / total) * 100 : 0}%"></i></div>
+      <div class="pm-about">Question ${done + 1} of ${total} · about <button data-id="${esc(q.target_node_id)}" class="pm-open">${esc(t ? t.title : q.target_node_id)}</button></div>
+      <div class="pm-q">${esc(q.question_text)}</div>
+      <div style="margin-bottom:12px"><span class="tag ${q.is_blocking ? "" : "nb"}">${q.is_blocking ? "Blocks the build" : "Good to know"}</span></div>
+      ${q.suggested_options?.length ? `<div class="pm-chips">${q.suggested_options.map((o) => `<button class="chip" data-q="${esc(q.id)}" data-opt="${esc(o)}">${esc(o)}</button>`).join("")}</div>` : ""}
+      <input class="pm-input" placeholder="Or type your own decision and press Enter" data-answer="${esc(q.id)}">
+      <div class="pm-row"><button class="linkbtn" data-skip="${esc(q.id)}">Not sure, park it</button><span class="pm-about">${open.length - 1} more waiting</span></div>`;
+    return;
+  }
+  // Nothing left to ask right now: look for more on its own, up to the cap.
+  if (PM.rounds < MAX_ROUNDS && engineReady() && pmNextTarget()) { pmDigDeeper(); return; }
+
+  const screens = Object.values(S.screens);
+  const ready = screens.filter((r) => r.is_build_ready);
+  const notReady = screens.filter((r) => !r.is_build_ready);
+  el.innerHTML = head + `
+    <div class="score" style="color:${ready.length === screens.length ? "var(--ok)" : "var(--text)"}">${ready.length} of ${screens.length}</div>
+    <div class="pm-about" style="margin-bottom:12px">screens are ready to build</div>
+    ${PM.error ? `<div class="msg err">${esc(PM.error)}</div>` : ""}
+    ${notReady.length ? `<h2>Still need answers</h2><ul class="pm-list">${notReady.map((r) => `<li><button class="linkbtn pm-open" data-id="${esc(r.screen_id)}">${esc(S.nodes[r.screen_id]?.title || r.screen_id)}</button><span class="pm-about">${Math.round(r.readiness_score * 100)}%</span></li>`).join("")}</ul>` : '<div class="empty">Every blocking question is answered. This spec is safe to hand to engineers or coding agents.</div>'}
+    ${PM.skipped.size ? `<button class="btn" id="pmParked">Review ${PM.skipped.size} parked question${PM.skipped.size > 1 ? "s" : ""}</button>` : ""}
+    ${pmNextTarget() && engineReady() ? '<button class="btn primary" id="pmMore">Keep going, look for more gaps</button>' : ""}`;
 }
 
 async function answer(qid, text) {
@@ -335,20 +421,15 @@ async function answer(qid, text) {
 
 document.addEventListener("click", async (e) => {
   const node = e.target.closest("[data-id]");
-  if (node && (node.classList.contains("node") || node.closest("#crumbs"))) {
+  if (node && (node.classList.contains("node") || node.classList.contains("pm-open") || node.closest("#crumbs"))) {
     S.selected = node.dataset.id || null;
-    if (!S.selected) $("inspector").innerHTML = '<h2>Inspector</h2><div class="empty">Select any node.</div>';
     return render();
   }
+  if (e.target.id === "backBtn") { S.selected = null; return render(); }
+  if (e.target.dataset.skip) { PM.skipped.add(e.target.dataset.skip); return render(); }
+  if (e.target.id === "pmParked") { PM.skipped.clear(); return render(); }
+  if (e.target.id === "pmMore") { PM.rounds = 0; return pmDigDeeper(); }
   if (e.target.dataset.opt) return answer(e.target.dataset.q, e.target.dataset.opt).catch((err) => say(err.message, true));
-  if (e.target.id === "askBtn") {
-    e.target.disabled = true; e.target.textContent = "Reading the spec...";
-    try {
-      const res = await api(`/api/nodes/${encodeURIComponent(S.selected)}/interrogate?${eq()}`, { method: "POST" });
-      await load();
-      $("imsg").textContent = `${ENGINE_COPY[S.engine][0]} added ${res.added.length} question(s).`;
-    } catch (err) { renderInspector(); $("imsg").textContent = err.message; $("imsg").className = "msg err"; }
-  }
 });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && e.target.dataset.answer) answer(e.target.dataset.answer, e.target.value).catch((err) => say(err.message, true));
@@ -372,7 +453,7 @@ function working(title) {
 
 async function ingest(promise, label) {
   busy(true); say(""); working(label);
-  try { await promise(); S.selected = null; await load(); say(label === "Clearing" ? "Board cleared." : "Graph built. Red badges are what your spec leaves out."); }
+  try { await promise(); S.selected = null; resetPM(); await load(); say(label === "Clearing" ? "Board cleared." : "Map built. Your product manager has questions for you, on the right."); }
   catch (err) { say(err.message, true); }
   finally { busy(false); working(""); }
 }
