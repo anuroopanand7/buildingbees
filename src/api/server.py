@@ -183,6 +183,18 @@ def resolve_question(question_id: str, payload: QuestionResolveRequest) -> Dict[
     }
 
 
+@app.post("/api/questions/{question_id}/reopen")
+def reopen_question(question_id: str) -> Dict[str, Any]:
+    """Lets the user change their mind: the answer is cleared and the question is asked again."""
+    node = graph.get_node(question_id)
+    if not node or not isinstance(node, QuestionNode):
+        raise HTTPException(status_code=404, detail=f"Question '{question_id}' not found")
+    node.question_status = QuestionStatus.OPEN
+    node.answer_text = None
+    node.answered_at = None
+    return {"status": "REOPENED", "question_id": question_id}
+
+
 @app.post("/api/questions")
 def post_question(payload: PostQuestionRequest) -> Dict[str, Any]:
     """Manually or agentically posts a blocking question to a node."""

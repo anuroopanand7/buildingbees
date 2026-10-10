@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
 <title>BuildingBees</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -10,21 +11,13 @@
 <style>
   /* Tokens. Honey is the brand hue: the mark and the node in focus only. Status colours are fixed. */
   :root {
+    color-scheme: light;
     --bg: #f7f7f5; --panel: #ffffff; --line: #e6e5e1; --line-strong: #cfcdc7; --fill: #efeeea;
     --text: #111110; --muted: #64635f; --ink: #111110; --on-ink: #ffffff;
     --accent: #f5b301; --focus: #fff6d6;
     --ok: #12805c; --ok-soft: #e4f4ed; --warn: #a55505; --warn-soft: #fdf0dc; --bad: #c0301e; --bad-soft: #fdebe8;
     --r-card: 14px; --r-input: 12px;
     --shadow: 0 8px 28px rgba(17, 17, 16, .07);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0f0f0e; --panel: #181817; --line: #2a2a28; --line-strong: #3b3b38; --fill: #232321;
-      --text: #ededeb; --muted: #a3a29c; --ink: #ededeb; --on-ink: #111110;
-      --focus: #3a3210;
-      --ok: #4cc79a; --ok-soft: #12261f; --warn: #e6a04c; --warn-soft: #2b2010; --bad: #f0766a; --bad-soft: #2e1512;
-      --shadow: 0 8px 28px rgba(0, 0, 0, .4);
-    }
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -83,14 +76,29 @@
   .pm-head .sub { font-size: 13px; color: var(--muted); }
   .progress { height: 4px; background: var(--fill); border-radius: 4px; overflow: hidden; margin-top: 10px; }
   .progress i { display: block; height: 100%; background: var(--ink); transition: width .3s; }
-  #thread { flex: 1; overflow: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+  #thread { flex: 1; overflow: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; }
+  .hive { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .hive button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 10px 4px 5px; font-size: 12px; font-weight: 500; }
+  .hive button[aria-pressed="true"] { border-color: var(--text); background: var(--fill); }
+  .hive button:disabled { opacity: .45; }
+  .hive .n { color: var(--bad); font-weight: 600; }
+  .bee { flex: none; width: 30px; height: 30px; display: grid; place-items: center; background: var(--accent); color: #2b1f00; font-size: 15px; clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%); }
+  .bee.sm { width: 20px; height: 20px; font-size: 11px; }
+  .msg-row { display: flex; gap: 10px; align-items: flex-start; }
+  .msg-body { min-width: 0; }
+  .who { font-size: 12px; font-weight: 600; margin-bottom: 3px; }
+  .who span { font-weight: 400; color: var(--muted); }
+  .bubble { background: var(--fill); border-radius: 4px 14px 14px 14px; padding: 9px 13px; font-size: 14px; }
+  .mine { align-self: flex-end; max-width: 86%; text-align: right; }
+  .mine .bubble { display: inline-block; text-align: left; background: var(--ink); color: var(--on-ink); border-radius: 14px 14px 4px 14px; }
+  .mine .link { font-size: 12px; color: var(--muted); margin-top: 3px; }
   .past { font-size: 13px; }
   .past .q { color: var(--muted); }
   .past .a { display: inline-flex; gap: 6px; align-items: baseline; margin-top: 4px; padding: 6px 12px; border-radius: 12px; background: var(--fill); }
   .past .a i { color: var(--ok); }
   #ask { border-top: 1px solid var(--line); padding: 18px 20px 20px; }
   .about { font-size: 13px; color: var(--muted); }
-  .question { font-size: 18px; line-height: 1.35; font-weight: 600; letter-spacing: -.012em; margin: 6px 0 10px; }
+  .question { font-size: 17px; line-height: 1.4; font-weight: 600; letter-spacing: -.01em; margin: 2px 0 10px; }
   .tag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; padding: 2px 9px; border-radius: 999px; background: var(--bad-soft); color: var(--bad); }
   .tag.soft { background: var(--warn-soft); color: var(--warn); }
   .tag.good { background: var(--ok-soft); color: var(--ok); }
@@ -113,7 +121,7 @@
   .flow { margin-bottom: 32px; }
   .flow-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
   .flow-head h3 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
-  .flow-head .who { font-size: 13px; color: var(--muted); }
+  .flow-head .who { font-size: 13px; font-weight: 400; margin: 0; color: var(--muted); }
   .flow-row { display: flex; align-items: stretch; gap: 0; }
   .steps { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .step { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; font-size: 14px; max-width: 260px; }
@@ -203,8 +211,8 @@
 </main>
 
 <main id="work" hidden>
-  <aside id="pm" aria-label="Your product manager">
-    <div class="pm-head"><h2>Your product manager</h2><div class="sub" id="pmSub"></div><div class="progress"><i id="pmBar"></i></div></div>
+  <aside id="pm" aria-label="Your product team">
+    <div class="pm-head"><h2>Your product team</h2><div class="sub" id="pmSub"></div><div class="progress"><i id="pmBar"></i></div><div class="hive" id="hive" role="group" aria-label="Filter questions by bee"></div></div>
     <div id="thread"></div>
     <div id="ask" aria-live="polite"></div>
   </aside>
@@ -220,10 +228,21 @@
 
 <script>
 const ENGINE_COPY = { gemini: "Google Gemini", nvidia: "NVIDIA Nemotron" };
+// One bee per aspect of the product. The engine labels every question with the bee that asks it.
+const BEES = {
+  PM: ["Queen Bee", "product and scope", "ph-crown-simple"],
+  DESIGN: ["Design Bee", "experience", "ph-palette"],
+  FRONTEND: ["Frontend Bee", "screens and states", "ph-browser"],
+  BACKEND: ["Backend Bee", "data and integrations", "ph-database"],
+  TESTER: ["Test Bee", "edge cases", "ph-bug"],
+  COMPLIANCE: ["Compliance Bee", "privacy and rules", "ph-shield-check"],
+};
+const bee = (cat) => BEES[cat] || BEES.PM;
+const beeIcon = (cat, sm) => `<span class="bee ${sm ? "sm" : ""}" aria-hidden="true"><i class="ph ${bee(cat)[2]}"></i></span>`;
 const MAX_ROUNDS = 3; // shortcut: caps automatic deep-dives per board to protect the free model quota
 let S = { nodes: {}, fwd: {}, rev: {}, screens: {}, engines: {}, engine: null, selected: null };
-let PM = { skipped: new Set(), asked: new Set(), rounds: 0, thinking: "", error: "", focus: null, lastFocus: null };
-const resetPM = () => { PM = { skipped: new Set(), asked: new Set(), rounds: 0, thinking: "", error: "", focus: null, lastFocus: null }; };
+let PM = { skipped: new Set(), asked: new Set(), rounds: 0, thinking: "", error: "", focus: null, lastFocus: null, bee: null };
+const resetPM = () => { PM = { skipped: new Set(), asked: new Set(), rounds: 0, thinking: "", error: "", focus: null, lastFocus: null, bee: null }; };
 
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -278,7 +297,8 @@ const byLayer = (layer) => Object.values(S.nodes).filter((n) => n.layer === laye
 const questionsFor = (id) => byLayer("QUESTION").filter((q) => q.target_node_id === id);
 const openQuestions = () => byLayer("QUESTION").filter((q) => q.question_status === "OPEN");
 const openBlocking = (id) => questionsFor(id).filter((q) => q.question_status === "OPEN" && q.is_blocking).length;
-const pmQueue = () => openQuestions().filter((q) => !PM.skipped.has(q.id)).sort((a, b) => b.is_blocking - a.is_blocking);
+const pmQueue = () => openQuestions().filter((q) => !PM.skipped.has(q.id) && (!PM.bee || q.category === PM.bee))
+  .sort((a, b) => (b.id === PM.front) - (a.id === PM.front) || b.is_blocking - a.is_blocking); // a reopened answer is asked again first
 const color = (score) => (score >= 0.8 ? "var(--ok)" : score > 0 ? "var(--warn)" : "var(--bad)");
 
 function screenOf(id) {
@@ -400,26 +420,37 @@ function renderPM() {
   $("pmSub").textContent = all.length ? `${done.length} of ${all.length} questions answered` : "No questions yet";
   $("pmBar").style.width = `${all.length ? (done.length / all.length) * 100 : 0}%`;
 
+  // The hive: who has questions waiting. Click a bee to hear only from that one.
+  if (PM.bee && !open.some((q) => q.category === PM.bee)) PM.bee = null;
+  $("hive").innerHTML = Object.keys(BEES).filter((c) => all.some((q) => q.category === c)).map((c) => {
+    const n = open.filter((q) => q.category === c).length;
+    return `<button data-bee="${c}" aria-pressed="${PM.bee === c}" ${n ? "" : "disabled"} title="${esc(bee(c)[1])}">${beeIcon(c, true)}${esc(bee(c)[0])}${n ? `<span class="n">${n}</span>` : '<i class="ph ph-check" aria-hidden="true"></i>'}</button>`;
+  }).join("");
+
   const thread = $("thread");
-  thread.innerHTML = done.map((q) => `<div class="past"><div class="q">${esc(q.question_text)}</div><div class="a"><i class="ph ph-check" aria-hidden="true"></i><span>${esc(q.answer_text)}</span></div></div>`).join("")
-    || '<div class="muted" style="font-size:13px">I have read your spec and drawn the map on the right. Answer below and I will keep track of every decision here.</div>';
+  const hello = `<div class="msg-row">${beeIcon("PM")}<div class="msg-body"><div class="who">Queen Bee <span>product and scope</span></div><div class="bubble">${S.stage === "flows"
+    ? "Hi, we are your product team. We read your idea and sketched the flows on the right. Before anyone draws a screen, each of us has a few questions."
+    : "The screens are drawn from your decisions. Now we go through them one by one."}</div></div></div>`;
+  thread.innerHTML = hello + done.map((q) => `
+    <div class="msg-row">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(bee(q.category)[0])}</div><div class="bubble">${esc(q.question_text)}</div></div></div>
+    <div class="mine"><div class="bubble">${esc(q.answer_text)}</div><div><button class="link" data-reopen="${esc(q.id)}">Change</button></div></div>`).join("");
   thread.scrollTop = thread.scrollHeight;
 
   const ask = $("ask");
   const q = pmQueue()[0];
   if (PM.thinking) {
-    ask.innerHTML = `<div class="thinking"><div class="spinner"></div><div><b>Looking deeper</b><div class="about">Checking "${esc(PM.thinking)}" for gaps...</div></div></div>`;
+    ask.innerHTML = `<div class="thinking"><div class="spinner"></div><div><b>The bees are looking deeper</b><div class="about">Checking "${esc(PM.thinking)}" for gaps...</div></div></div>`;
     return;
   }
   if (q) {
     const t = S.nodes[q.target_node_id];
     ask.innerHTML = `
-      <div class="about">About <button class="link open" data-id="${esc(q.target_node_id)}">${esc(t ? (t.label || t.title) : q.target_node_id)}</button></div>
+      <div class="msg-row" style="margin-bottom:8px">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(bee(q.category)[0])} <span>asks about <button class="link open" data-id="${esc(q.target_node_id)}">${esc(t ? (t.label || t.title) : q.target_node_id)}</button></span></div></div></div>
       <div class="question">${esc(q.question_text)}</div>
       <span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Blocks the build" : "Good to know"}</span>
       ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o) => `<button class="option" data-q="${esc(q.id)}" data-opt="${esc(o)}">${esc(o)}</button>`).join("")}</div>` : '<div style="height:12px"></div>'}
-      <div class="field"><label for="own">Or write your own decision</label><input id="own" data-answer="${esc(q.id)}" placeholder="Type it and press Enter" autocomplete="off"></div>
-      <div class="ask-foot"><button class="link" data-skip="${esc(q.id)}">Not sure, park it</button><span class="muted">${open.length - 1} more waiting</span></div>
+      <div class="field"><label for="own">Or answer in your own words</label><input id="own" data-answer="${esc(q.id)}" placeholder="Type your answer and press Enter" autocomplete="off"></div>
+      <div class="ask-foot"><button class="link" data-skip="${esc(q.id)}">Not sure yet, ask me later</button><span class="muted">${open.length - 1} more waiting</span></div>
       ${S.stage === "flows" ? '<div class="ask-foot"><button class="link" id="drawBtn">Skip ahead and draw the screens</button></div>' : ""}`;
     return;
   }
@@ -513,6 +544,11 @@ document.addEventListener("click", (e) => {
   if (t.dataset.engine) { S.engine = t.dataset.engine; store.set("bb_engine", S.engine); say(""); return renderEngine(); }
   if (t.dataset.opt) return answer(t.dataset.q, t.dataset.opt).catch(fail);
   if (t.dataset.skip) { PM.skipped.add(t.dataset.skip); return render(); }
+  if (t.dataset.bee) { PM.bee = PM.bee === t.dataset.bee ? null : t.dataset.bee; return render(); }
+  if (t.dataset.reopen) {
+    PM.skipped.delete(t.dataset.reopen); PM.front = t.dataset.reopen; PM.bee = null;
+    return api(`/api/questions/${encodeURIComponent(t.dataset.reopen)}/reopen`, { method: "POST" }).then(load).catch(fail);
+  }
   if (t.id === "closeDetails") { S.selected = null; return render(); }
   if (t.id === "pmParked") { PM.skipped.clear(); return render(); }
   if (t.id === "pmMore") { PM.rounds = 0; return pmDigDeeper(); }

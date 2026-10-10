@@ -155,3 +155,15 @@ def test_gemini_falls_back_when_model_is_overloaded():
     a._client = type("C", (), {"models": Models()})()
     assert a.extract_spec(text="shop").product_name == "Tiny Shop"
     assert calls == ["primary", FALLBACK_MODELS[0]]
+
+
+def test_answer_can_be_changed(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", FakeGemini())
+    c = TestClient(server.app)
+    h = {"X-Board": "changer"}
+    first = c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h).json()
+    q = next(n for n in first["nodes"] if n["layer"] == "QUESTION")
+    c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "Yes"}, headers=h)
+    assert c.post(f"/api/questions/{q['id']}/reopen", headers=h).status_code == 200
+    again = next(n for n in c.get("/api/graph", headers=h).json()["nodes"] if n["id"] == q["id"])
+    assert again["question_status"] == "OPEN" and again["answer_text"] is None

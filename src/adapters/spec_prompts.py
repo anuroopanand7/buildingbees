@@ -98,6 +98,17 @@ Rules:
   targeted at the exact node id. Mark it blocking if code cannot be written safely without the answer.
 - Keep it to the 1-3 most important flows and at most 12 screens.
 
+THE HIVE. Every question is asked by one bee. Set "category" to exactly one of:
+- PM: who the user is, the goal, what is in and out of scope, how success is measured
+- DESIGN: what the experience should feel like, what the user sees first, wording, accessibility
+- FRONTEND: screen states, validation, what is kept when something fails, device and offline behaviour
+- BACKEND: data, integrations, vendors, timeouts, retries, limits, cost
+- TESTER: edge cases, abuse, what happens when it goes wrong, how we know it works
+- COMPLIANCE: privacy, consent, medical, legal or money rules, who is liable
+Spread the questions across at least four different bees when the input allows it.
+Write each question the way a friendly colleague would ask it out loud: one short sentence, plain words,
+no ids, no jargon the founder would not use. Suggested answers are short plain phrases.
+
 SPEC:
 """
 
@@ -113,6 +124,17 @@ Do NOT design screens, buttons or APIs yet. First agree the user flows.
    it is about. Give 2-4 short suggested answers for each. Mark it blocking if the flow cannot be designed
    without the answer. Assumption is not approval: when the input is silent, ask, do not decide.
 
+THE HIVE. Every question is asked by one bee. Set "category" to exactly one of:
+- PM: who the user is, the goal, what is in and out of scope, how success is measured
+- DESIGN: what the experience should feel like, what the user sees first, wording, accessibility
+- FRONTEND: screen states, validation, what is kept when something fails, device and offline behaviour
+- BACKEND: data, integrations, vendors, timeouts, retries, limits, cost
+- TESTER: edge cases, abuse, what happens when it goes wrong, how we know it works
+- COMPLIANCE: privacy, consent, medical, legal or money rules, who is liable
+Spread the questions across at least four different bees when the input allows it.
+Write each question the way a friendly colleague would ask it out loud: one short sentence, plain words,
+no ids, no jargon the founder would not use. Suggested answers are short plain phrases.
+
 INPUT:
 """
 
@@ -121,6 +143,17 @@ Review this one spec node and its neighbours. List 2-4 questions an engineer wou
 if they built it today: missing failure paths, timeouts, retries, idempotency, empty/error states,
 validation, race conditions. Do not repeat the already-asked questions. Target every question at
 node id "{node_id}". Mark blocking only if code cannot be written safely without the answer.
+
+THE HIVE. Every question is asked by one bee. Set "category" to exactly one of:
+- PM: who the user is, the goal, what is in and out of scope, how success is measured
+- DESIGN: what the experience should feel like, what the user sees first, wording, accessibility
+- FRONTEND: screen states, validation, what is kept when something fails, device and offline behaviour
+- BACKEND: data, integrations, vendors, timeouts, retries, limits, cost
+- TESTER: edge cases, abuse, what happens when it goes wrong, how we know it works
+- COMPLIANCE: privacy, consent, medical, legal or money rules, who is liable
+Spread the questions across at least four different bees when the input allows it.
+Write each question the way a friendly colleague would ask it out loud: one short sentence, plain words,
+no ids, no jargon the founder would not use. Suggested answers are short plain phrases.
 
 NODE AND NEIGHBOURS (JSON):
 {context}
