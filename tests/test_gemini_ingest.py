@@ -3,7 +3,7 @@
 from fastapi.testclient import TestClient
 
 from src.adapters.spec_prompts import (
-    FlowsExtract, XFlowPlan, SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
+    FlowsExtract, Reaction, XFieldUpdate, XFlowPlan, XFlowUpdate, SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
 )
 from src.api import server
 from src.core.ingest import build_graph_from_extract
@@ -167,3 +167,72 @@ def test_answer_can_be_changed(monkeypatch):
     assert c.post(f"/api/questions/{q['id']}/reopen", headers=h).status_code == 200
     again = next(n for n in c.get("/api/graph", headers=h).json()["nodes"] if n["id"] == q["id"])
     assert again["question_status"] == "OPEN" and again["answer_text"] is None
+
+
+class Reactor(FakeGemini):
+    reaction = None
+
+    def react(self, prompt):
+        Reactor.prompt = prompt
+        return Reactor.reaction
+
+
+def _answered_flow_question(c, h, text):
+    first = c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h).json()
+    q = next(n for n in first["nodes"] if n["layer"] == "QUESTION")
+    c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": text}, headers=h)
+    return q
+
+
+def test_clear_answer_updates_the_board(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", Reactor())
+    c, h = TestClient(server.app), {"X-Board": "reactor-clear"}
+    q = _answered_flow_question(c, h, "No, sign-in required")
+    Reactor.reaction = Reaction(
+        is_vague=False, note="Got it, I added a sign-in step.", follow_up=[], user_updates=[], field_updates=[],
+        flow_updates=[XFlowUpdate(flow_id="F_BUY", title="Buy", goal="Purchase",
+                                  steps=["Sign in", "Open cart", "Pay", "See confirmation"]),
+                      XFlowUpdate(flow_id="F_GHOST", title="x", goal="x", steps=["x"])],
+    )
+    out = c.post(f"/api/questions/{q['id']}/react?engine=gemini", headers=h).json()
+    assert out["changed"] == ["F_BUY"] and not out["is_vague"]  # unknown flow ignored
+    nodes = {n["id"]: n for n in c.get("/api/graph", headers=h).json()["nodes"]}
+    assert nodes["F_BUY"]["metadata"]["steps"][0] == "Sign in"
+    assert nodes[q["id"]]["metadata"]["note"] == "Got it, I added a sign-in step."
+    assert "No, sign-in required" in Reactor.prompt
+
+
+def test_vague_answer_gets_a_follow_up_and_changes_nothing(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", Reactor())
+    c, h = TestClient(server.app), {"X-Board": "reactor-vague"}
+    q = _answered_flow_question(c, h, "everyone")
+    Reactor.reaction = Reaction(
+        is_vague=True, note="That is still broad for me, so one more question.", user_updates=[], field_updates=[],
+        flow_updates=[XFlowUpdate(flow_id="F_BUY", title="Buy", goal="Purchase", steps=["Should not apply"])],
+        follow_up=[XQuestion(target_id="WRONG", category="PM", question="Which one buyer needs this most?",
+                             is_blocking=True, suggested_options=["Students", "Parents"])],
+    )
+    out = c.post(f"/api/questions/{q['id']}/react?engine=gemini", headers=h).json()
+    assert out["is_vague"] and out["changed"] == [] and len(out["follow_up"]) == 1
+    nodes = {n["id"]: n for n in c.get("/api/graph", headers=h).json()["nodes"]}
+    assert nodes["F_BUY"]["metadata"]["steps"] == ["Open cart", "Pay", "See confirmation"]
+    assert nodes[out["follow_up"][0]]["target_node_id"] == q["target_node_id"]  # pinned to the same node
+
+
+def test_screen_stage_answer_edits_only_allowed_fields(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", Reactor())
+    c, h = TestClient(server.app), {"X-Board": "reactor-fields"}
+    c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h)
+    second = c.post("/api/expand?engine=gemini", headers=h).json()
+    q = next(n for n in second["nodes"] if n["layer"] == "QUESTION" and n["target_node_id"] == "API_PAY")
+    c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "5 seconds, retry once"}, headers=h)
+    Reactor.reaction = Reaction(
+        is_vague=False, note="Set the timeout.", follow_up=[], flow_updates=[], user_updates=[],
+        field_updates=[XFieldUpdate(node_id="API_PAY", field="timeout_ms", value="5000"),
+                       XFieldUpdate(node_id="API_PAY", field="id", value="HACKED"),
+                       XFieldUpdate(node_id="W01_CART", field="states.empty", value="Show an empty cart message")],
+    )
+    out = c.post(f"/api/questions/{q['id']}/react?engine=gemini", headers=h).json()
+    assert out["changed"] == ["API_PAY", "W01_CART"]
+    nodes = {n["id"]: n for n in c.get("/api/graph", headers=h).json()["nodes"]}
+    assert nodes["API_PAY"]["timeout_ms"] == 5000 and nodes["W01_CART"]["states"]["empty"].startswith("Show")

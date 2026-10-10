@@ -126,6 +126,10 @@
   .steps { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .step { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; font-size: 14px; max-width: 260px; }
   .steps .ph { color: var(--line-strong); }
+  .step.focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); background: var(--focus); }
+  .changed { animation: changed 2.4s ease-out 1; }
+  @keyframes changed { 0%, 35% { box-shadow: 0 0 0 3px var(--ok); background: var(--ok-soft); } 100% { box-shadow: 0 0 0 0 transparent; } }
+  @media (prefers-reduced-motion: reduce) { .changed { animation: none; outline: 2px solid var(--ok); } }
   .flow-head h3 button { background: none; border: none; padding: 0; font: inherit; text-align: left; }
   .flow.focus .flow-head h3 { box-shadow: 0 2px 0 var(--accent); }
   .stage-note { font-size: 13px; color: var(--muted); margin: 0 0 20px; max-width: 70ch; }
@@ -241,8 +245,8 @@ const bee = (cat) => BEES[cat] || BEES.PM;
 const beeIcon = (cat, sm) => `<span class="bee ${sm ? "sm" : ""}" aria-hidden="true"><i class="ph ${bee(cat)[2]}"></i></span>`;
 const MAX_ROUNDS = 3; // shortcut: caps automatic deep-dives per board to protect the free model quota
 let S = { nodes: {}, fwd: {}, rev: {}, screens: {}, engines: {}, engine: null, selected: null };
-let PM = { skipped: new Set(), asked: new Set(), rounds: 0, thinking: "", error: "", focus: null, lastFocus: null, bee: null };
-const resetPM = () => { PM = { skipped: new Set(), asked: new Set(), rounds: 0, thinking: "", error: "", focus: null, lastFocus: null, bee: null }; };
+let PM = { skipped: new Set(), asked: new Set(), rounds: 0, thinking: "", error: "", focus: null, lastFocus: null, bee: null, front: null, reacting: "", changed: new Set() };
+const resetPM = () => { PM = { skipped: new Set(), asked: new Set(), rounds: 0, thinking: "", error: "", focus: null, lastFocus: null, bee: null, front: null, reacting: "", changed: new Set() }; };
 
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -346,6 +350,7 @@ function renderEngine() {
 }
 
 // ---------- map ----------
+const hit = (id) => (PM.changed.has(id) ? "changed" : "");
 function screenCard(id) {
   const n = S.nodes[id];
   const r = S.screens[id];
@@ -354,13 +359,13 @@ function screenCard(id) {
     : open ? `<span class="tag"><i class="ph ph-warning" aria-hidden="true"></i>${open} open question${open > 1 ? "s" : ""}</span>`
     : '<span class="tag soft">Details missing</span>';
   const ctas = (S.fwd[id] || []).map((c) => S.nodes[c]).filter((c) => c && c.layer === "CTA");
-  return `<article class="scr ${PM.focus === id || S.selected === id ? "focus" : ""}" data-id="${esc(id)}" tabindex="0">
+  return `<article class="scr ${PM.focus === id || S.selected === id ? "focus" : ""} ${hit(id)}" data-id="${esc(id)}" tabindex="0">
     <h4>${esc(n.title)}</h4>${state}
     ${r ? `<div class="bar"><i style="width:${Math.max(4, r.readiness_score * 100)}%;background:${color(r.readiness_score)}"></i></div>` : ""}
     ${ctas.length ? `<ul class="ctas">${ctas.map((c) => {
       const apis = (S.fwd[c.id] || []).map((a) => S.nodes[a]).filter((a) => a && a.layer === "API");
       const cnt = openBlocking(c.id) + apis.reduce((t, a) => t + openBlocking(a.id), 0);
-      return `<li class="cta ${PM.focus === c.id || S.selected === c.id ? "focus" : ""}" data-id="${esc(c.id)}" tabindex="0">
+      return `<li class="cta ${PM.focus === c.id || S.selected === c.id ? "focus" : ""} ${hit(c.id) || apis.map((a) => hit(a.id)).find(Boolean) || ""}" data-id="${esc(c.id)}" tabindex="0">
         <div class="cta-top"><span class="cta-label">${esc(c.label || c.title)}</span>${cnt ? `<span class="count" title="Open blocking questions">${cnt}</span>` : ""}</div>
         ${apis.length ? `<div class="apis">${apis.map((a) => `<button class="api mono ${PM.focus === a.id || S.selected === a.id ? "focus" : ""}" data-id="${esc(a.id)}">${esc(a.method)} ${esc(a.path)}</button>`).join("")}</div>` : ""}
       </li>`;
@@ -378,12 +383,13 @@ function renderMap() {
   });
   const loose = byLayer("SCREEN").map((s) => s.id).filter((i) => !placed.has(i));
   if (loose.length) rows.push({ title: "Other screens", who: "", goal: "", ids: loose });
+  const focusStep = Number(pmQueue()[0]?.metadata?.step || 0);
   const note = S.stage === "flows" ? '<p class="stage-note">These are the user flows I read from your input. No screens are drawn yet: answer the questions on the left first, so the screens are built on your decisions and not on my guesses.</p>' : "";
-  $("flows").innerHTML = note + rows.map((f) => `<div class="flow ${f.id && (PM.focus === f.id || S.selected === f.id) ? "focus" : ""}">
+  $("flows").innerHTML = note + rows.map((f) => `<div class="flow ${f.id && ((PM.focus === f.id && !focusStep) || S.selected === f.id) ? "focus" : ""}">
     <div class="flow-head"><h3>${f.id ? `<button data-id="${esc(f.id)}">${esc(f.title)}</button>` : esc(f.title)}</h3>${f.who ? `<span class="who">for ${esc(f.who)}</span>` : ""}</div>
     ${f.ids.length
       ? `<div class="flow-row">${f.ids.map(screenCard).join('<div class="arrow" aria-hidden="true"><i class="ph ph-arrow-right"></i></div>')}</div>`
-      : `<div class="steps">${f.steps.map((t) => `<div class="step">${esc(t)}</div>`).join('<i class="ph ph-arrow-right" aria-hidden="true"></i>') || '<span class="muted">No steps yet.</span>'}</div>`}
+      : `<div class="steps">${f.steps.map((t, i) => `<div class="step ${PM.focus === f.id && focusStep === i + 1 ? "focus" : ""} ${hit(f.id)}">${esc(t)}</div>`).join('<i class="ph ph-arrow-right" aria-hidden="true"></i>') || '<span class="muted">No steps yet.</span>'}</div>`}
   </div>`).join("");
 }
 
@@ -433,11 +439,16 @@ function renderPM() {
     : "The screens are drawn from your decisions. Now we go through them one by one."}</div></div></div>`;
   thread.innerHTML = hello + done.map((q) => `
     <div class="msg-row">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(bee(q.category)[0])}</div><div class="bubble">${esc(q.question_text)}</div></div></div>
-    <div class="mine"><div class="bubble">${esc(q.answer_text)}</div><div><button class="link" data-reopen="${esc(q.id)}">Change</button></div></div>`).join("");
-  thread.scrollTop = thread.scrollHeight;
+    <div class="mine"><div class="bubble">${esc(q.answer_text)}</div><div><button class="link" data-reopen="${esc(q.id)}">Change</button></div></div>
+    ${q.metadata?.note ? `<div class="msg-row">${beeIcon(q.category)}<div class="msg-body"><div class="bubble">${esc(q.metadata.note)}</div></div></div>` : ""}`).join("");
+  requestAnimationFrame(() => { thread.scrollTop = thread.scrollHeight; });
 
   const ask = $("ask");
   const q = pmQueue()[0];
+  if (PM.reacting) {
+    ask.innerHTML = `<div class="thinking"><div class="spinner"></div><div><b>${esc(PM.reacting)} is reading your answer</b><div class="about">Updating the board if it changes anything...</div></div></div>`;
+    return;
+  }
   if (PM.thinking) {
     ask.innerHTML = `<div class="thinking"><div class="spinner"></div><div><b>The bees are looking deeper</b><div class="about">Checking "${esc(PM.thinking)}" for gaps...</div></div></div>`;
     return;
@@ -530,11 +541,25 @@ function renderDetails() {
 
 // ---------- actions ----------
 async function answer(qid, text) {
-  if (!text.trim()) return;
+  if (!text.trim() || PM.reacting) return;
+  const q = S.nodes[qid];
   await api(`/api/questions/${encodeURIComponent(qid)}/resolve`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answer_text: text }),
   });
+  PM.changed = new Set(); PM.front = null;
+  if (!engineReady()) return load();
+  // The answer is saved. Now the bee that asked reads it: a vague one gets a follow-up, a clear one changes the board.
+  PM.reacting = bee(q?.category)[0];
+  if (q) { q.question_status = "ANSWERED"; q.answer_text = text; }
+  render();
+  try {
+    const r = await api(`/api/questions/${encodeURIComponent(qid)}/react?${eq()}`, { method: "POST" });
+    PM.changed = new Set(r.changed);
+    PM.front = r.follow_up[0] || null;
+  } catch (err) { PM.error = err.message; }
+  PM.reacting = "";
   await load();
+  document.querySelector("#flows .changed")?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
 }
 const fail = (err) => { PM.error = err.message; alert(err.message); };
 

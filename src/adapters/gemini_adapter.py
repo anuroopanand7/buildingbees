@@ -9,7 +9,7 @@ import os
 from typing import List, Optional
 
 from src.adapters.spec_prompts import (  # noqa: F401  (re-exported for callers)
-    FLOWS_PROMPT, FlowsExtract, INGEST_PROMPT, INTERROGATE_PROMPT, QuestionList, SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
+    FLOWS_PROMPT, FlowsExtract, INGEST_PROMPT, INTERROGATE_PROMPT, QuestionList, Reaction, SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
 )
 
 DEFAULT_MODEL = "gemini-3.5-flash"
@@ -74,6 +74,9 @@ class GoogleGeminiAdapter:
             from google.genai import types
             contents.append(types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"))
         return self._generate(contents, FlowsExtract)
+
+    def react(self, prompt: str) -> Reaction:
+        return self._generate([prompt], Reaction)
 
     def interrogate(self, node_id: str, context_json: str, asked: List[str]) -> List[XQuestion]:
         prompt = INTERROGATE_PROMPT.format(

@@ -54,6 +54,7 @@ class XQuestion(BaseModel):
     question: str
     is_blocking: bool
     suggested_options: List[str]
+    step: int = 0  # 1-based step of the flow this is about; 0 = the whole flow, user, screen or API
 
 
 class SpecExtract(BaseModel):
@@ -79,6 +80,35 @@ class FlowsExtract(BaseModel):
     users: List[XUser]
     flows: List[XFlowPlan]
     questions: List[XQuestion]
+
+
+class XFlowUpdate(BaseModel):
+    flow_id: str
+    title: str
+    goal: str
+    steps: List[str]
+
+
+class XUserUpdate(BaseModel):
+    user_id: str
+    title: str
+    description: str
+
+
+class XFieldUpdate(BaseModel):
+    node_id: str
+    field: str
+    value: str
+
+
+class Reaction(BaseModel):
+    """What a bee does with one answer: push back if it is vague, otherwise change the board."""
+    is_vague: bool
+    note: str
+    follow_up: List[XQuestion]
+    flow_updates: List[XFlowUpdate]
+    user_updates: List[XUserUpdate]
+    field_updates: List[XFieldUpdate]
 
 
 class QuestionList(BaseModel):
@@ -108,6 +138,7 @@ THE HIVE. Every question is asked by one bee. Set "category" to exactly one of:
 Spread the questions across at least four different bees when the input allows it.
 Write each question the way a friendly colleague would ask it out loud: one short sentence, plain words,
 no ids, no jargon the founder would not use. Suggested answers are short plain phrases.
+If a question is about one step of a flow, set "step" to that step's number (1 = the first step); otherwise 0.
 
 SPEC:
 """
@@ -134,6 +165,7 @@ THE HIVE. Every question is asked by one bee. Set "category" to exactly one of:
 Spread the questions across at least four different bees when the input allows it.
 Write each question the way a friendly colleague would ask it out loud: one short sentence, plain words,
 no ids, no jargon the founder would not use. Suggested answers are short plain phrases.
+If a question is about one step of a flow, set "step" to that step's number (1 = the first step); otherwise 0.
 
 INPUT:
 """
@@ -154,10 +186,51 @@ THE HIVE. Every question is asked by one bee. Set "category" to exactly one of:
 Spread the questions across at least four different bees when the input allows it.
 Write each question the way a friendly colleague would ask it out loud: one short sentence, plain words,
 no ids, no jargon the founder would not use. Suggested answers are short plain phrases.
+If a question is about one step of a flow, set "step" to that step's number (1 = the first step); otherwise 0.
 
 NODE AND NEIGHBOURS (JSON):
 {context}
 
 ALREADY ASKED:
 {asked}
+"""
+
+
+REACT_PROMPT = """You are a bee on the BuildingBees product team. The founder has just answered one of your questions.
+Decide what to do with the answer.
+
+A. If the answer is vague, evasive or too broad to build from ("everyone", "all of them", "later", "not sure",
+   "make it good", a restated question), set is_vague true, change nothing on the board, and ask exactly ONE
+   sharper follow-up in follow_up: same category, same target_id and step, 2-4 concrete suggested answers,
+   is_blocking true. Be warm about it. Example: "everyone" becomes "Pick the one person who needs this most".
+
+B. Otherwise set is_vague false and apply the decision to the board. Change only what the answer implies.
+   - Flows (the board is at the flows stage): return every flow that changes in flow_updates with its full new
+     list of steps (add, reword, reorder or remove steps). If the answer changes who a user is, return it in
+     user_updates. Keep every id exactly as given.
+   - Screens (the board is at the screens stage): return field_updates as (node_id, field, value) using only
+     these fields. SCREEN: description, states.loading, states.empty, states.error. CTA: label,
+     target_screen_on_success, target_screen_on_failure, error_display_type, max_retries. API: method, path,
+     service, vendor, timeout_ms, cache_ttl_seconds, idempotency_required. Numbers and true/false go in as text.
+   - Leave follow_up empty unless the answer itself opens a new gap that blocks the build; then ask ONE question.
+   Never invent a business rule the founder did not state.
+
+note: one short friendly sentence, in the first person, saying what you did ("Got it, I added a pharmacist
+review step before the video goes out." or "That is still a bit broad for me, so one more question.").
+Follow-up questions follow the same rules as always: one short spoken sentence, plain words, no ids.
+Leave any list you do not need empty.
+
+STAGE: {stage}
+
+THE BOARD (JSON):
+{board}
+
+DECISIONS SO FAR:
+{decisions}
+
+THE QUESTION ({category}, about {target}{step}):
+{question}
+
+THE FOUNDER'S ANSWER:
+{answer}
 """

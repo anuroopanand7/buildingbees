@@ -41,6 +41,7 @@ from src.core.question_engine import SocraticQuestionEngine
 from src.adapters.gemini_adapter import GoogleGeminiAdapter
 from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.adapters.nvidia_adapter import pdf_to_text
+from src.adapters.spec_prompts import REACT_PROMPT
 from src.core.ingest import add_questions, build_flows_graph, build_graph_from_extract
 
 app = FastAPI(
@@ -181,6 +182,101 @@ def resolve_question(question_id: str, payload: QuestionResolveRequest) -> Dict[
         "target_node_id": node.target_node_id,
         "answer_text": node.answer_text
     }
+
+
+# Fields a bee may change on a drawn node after an answer, and how to read the text it sends.
+_BOOL = lambda v: str(v).strip().lower() in ("true", "yes", "1")  # noqa: E731
+EDITABLE = {
+    "SCREEN": {"description": str, "states.loading": str, "states.empty": str, "states.error": str},
+    "CTA": {"label": str, "target_screen_on_success": str, "target_screen_on_failure": str,
+            "error_display_type": str, "max_retries": int},
+    "API": {"method": str, "path": str, "service": str, "vendor": str, "timeout_ms": int,
+            "cache_ttl_seconds": int, "idempotency_required": _BOOL},
+}
+
+
+def _apply_reaction(g: BuildingBeesEngine, r) -> List[str]:
+    """Writes a bee's changes onto the board. Unknown ids and fields are ignored, never guessed."""
+    changed: List[str] = []
+    for fu in r.flow_updates:
+        f = g.nodes.get(fu.flow_id)
+        if f and f.layer.value == "FLOW" and fu.steps:
+            f.title, f.goal = fu.title or f.title, fu.goal or f.goal
+            f.metadata["steps"] = fu.steps
+            for q in g.get_questions_for_node(f.id):  # step numbers no longer line up
+                if q.question_status == QuestionStatus.OPEN:
+                    q.metadata["step"] = 0
+            changed.append(f.id)
+    for uu in r.user_updates:
+        u = g.nodes.get(uu.user_id)
+        if u and u.layer.value == "USER":
+            u.title, u.description = uu.title or u.title, uu.description or u.description
+            changed.append(u.id)
+    for x in r.field_updates:
+        n = g.nodes.get(x.node_id)
+        cast = EDITABLE.get(n.layer.value, {}).get(x.field) if n else None
+        if not cast:
+            continue
+        try:
+            value = cast(x.value)
+        except (TypeError, ValueError):
+            continue
+        owner, _, leaf = x.field.rpartition(".")
+        setattr(getattr(n, owner) if owner else n, leaf, value)
+        if x.field == "label":
+            n.title = value
+        changed.append(n.id)
+    return list(dict.fromkeys(changed))
+
+
+@app.post("/api/questions/{question_id}/react")
+def react_to_answer(question_id: str, engine: str) -> Dict[str, Any]:
+    """A bee reads the answer: it asks a sharper follow-up if the answer is vague, otherwise it updates the board."""
+    eng = _engine(engine)
+    g = _board()
+    q = g.get_node(question_id)
+    if not q or not isinstance(q, QuestionNode) or q.question_status != QuestionStatus.ANSWERED:
+        raise HTTPException(status_code=404, detail="No answered question with that id")
+    target = g.get_node(q.target_node_id)
+    stage = "screens" if any(n.layer.value == "SCREEN" for n in g.nodes.values()) else "flows"
+    if stage == "flows":
+        board = {
+            "users": [{"id": n.id, "title": n.title, "description": n.description}
+                      for n in g.nodes.values() if n.layer.value == "USER"],
+            "flows": [{"id": n.id, "title": n.title, "goal": n.goal, "steps": n.metadata.get("steps", []),
+                       "user_id": next(iter(g.reverse_edges.get(n.id, [])), "")}
+                      for n in g.nodes.values() if n.layer.value == "FLOW"],
+        }
+    else:
+        near = g.forward_edges.get(q.target_node_id, set()) | g.reverse_edges.get(q.target_node_id, set())
+        board = {
+            "target": target.model_dump() if target else {},
+            "neighbours": [g.nodes[i].model_dump() for i in near
+                           if i in g.nodes and g.nodes[i].layer.value != "QUESTION"],
+            "screens": [{"id": n.id, "title": n.title} for n in g.nodes.values() if n.layer.value == "SCREEN"],
+        }
+    decisions = "\n".join(
+        f"- {d.question_text} => {d.answer_text}" for d in g.nodes.values()
+        if isinstance(d, QuestionNode) and d.question_status == QuestionStatus.ANSWERED and d.id != q.id
+    ) or "(none)"
+    step = int(q.metadata.get("step") or 0)
+    prompt = REACT_PROMPT.format(
+        stage=stage, board=json.dumps(board, default=str)[:14000], decisions=decisions[:4000],
+        category=q.category.value, target=(target.title if target else q.target_node_id),
+        step=f", step {step}" if step else "", question=q.question_text, answer=q.answer_text,
+    )
+    try:
+        r = eng.react(prompt)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"{eng.label} could not process the answer: {e}")
+
+    changed = [] if r.is_vague else _apply_reaction(g, r)
+    for f in r.follow_up[:1]:
+        f.target_id, f.category = q.target_node_id, f.category or q.category.value
+    added = add_questions(g, r.follow_up[:1], eng.label)
+    q.metadata["note"] = r.note[:300]
+    return {"is_vague": r.is_vague, "note": q.metadata["note"], "changed": changed,
+            "follow_up": [a.id for a in added]}
 
 
 @app.post("/api/questions/{question_id}/reopen")
