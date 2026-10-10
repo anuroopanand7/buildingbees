@@ -50,8 +50,11 @@
   header .btn { min-height: 34px; padding: 0 14px; font-size: 13px; }
 
   /* Start screen: one prompt, nothing else competing. */
-  #start { min-height: calc(100dvh - 56px); display: grid; align-content: center; padding: 40px clamp(20px, 10vw, 160px); background-image: radial-gradient(var(--line-strong) 1px, transparent 1px); background-size: 22px 22px; }
+  #start { min-height: calc(100dvh - 56px); padding: clamp(40px, 9vh, 96px) clamp(20px, 10vw, 160px) 40px; background-image: radial-gradient(var(--line-strong) 1px, transparent 1px); background-size: 22px 22px; }
   .start-inner { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: clamp(32px, 6vw, 96px); align-items: center; max-width: 1280px; }
+  .proof { max-width: 1280px; margin: 56px 0 24px; }
+  .proof img { display: block; width: 100%; height: auto; border: 1px solid var(--line-strong); border-radius: 16px; box-shadow: var(--shadow); }
+  .proof figcaption { font-size: 13px; color: var(--muted); margin-top: 10px; }
   .team { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 22px 24px; }
   .team h2 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
   .team p { margin: 0 0 14px; font-size: 14px; color: var(--muted); }
@@ -294,6 +297,10 @@
     <ul id="crew"></ul>
    </aside>
   </div>
+  <figure class="proof">
+    <img src="/examples/board.png" width="1440" height="900" loading="lazy" alt="A BuildingBees board for a salon booking app: the bees' questions on the left, and five screens with wireframes, buttons and API calls on the right.">
+    <figcaption>A real board, partway through. It started from one line: "an app to book a haircut at my local salon".</figcaption>
+  </figure>
 </main>
 
 <main id="work" hidden>
