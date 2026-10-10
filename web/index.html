@@ -169,6 +169,28 @@
   .dq .meta { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
   .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; border: none; background: var(--fill); font-size: 16px; }
 
+  /* The Brief: the board as a document. Prints cleanly, so "Save as PDF" works from the browser. */
+  #brief { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--text) 35%, transparent); display: grid; place-items: center; padding: 24px; }
+  .brief-sheet { background: var(--panel); border-radius: 18px; box-shadow: var(--shadow); width: min(820px, 100%); max-height: 100%; display: flex; flex-direction: column; }
+  .brief-bar { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .brief-bar b { margin-right: auto; }
+  .brief-bar .btn { min-height: 34px; padding: 0 14px; font-size: 13px; }
+  #briefBody { overflow: auto; padding: 8px 32px 32px; font-size: 14px; line-height: 1.6; }
+  #briefBody h1 { font-size: 26px; letter-spacing: -.02em; margin: 20px 0 8px; }
+  #briefBody h2 { font-size: 17px; margin: 26px 0 8px; padding-top: 14px; border-top: 1px solid var(--line); }
+  #briefBody h3 { font-size: 15px; margin: 16px 0 4px; }
+  #briefBody ul, #briefBody ol { margin: 4px 0; padding-left: 22px; }
+  #briefBody li ul { margin: 2px 0; }
+  #briefBody code { font-family: "Geist Mono", ui-monospace, monospace; font-size: 12px; background: var(--fill); padding: 1px 5px; border-radius: 5px; }
+  #briefBody em { color: var(--muted); font-style: normal; font-size: 13px; }
+  @media print {
+    body > *:not(#brief) { display: none !important; }
+    #brief { position: static; background: none; padding: 0; display: block; }
+    .brief-sheet { box-shadow: none; max-height: none; width: auto; }
+    .brief-bar { display: none; }
+    #briefBody { overflow: visible; padding: 0; }
+  }
+
   /* Working overlay: shown for every slow call, with what is happening and how long it has taken. */
   #working { position: fixed; inset: 56px 0 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 88%, transparent); z-index: 20; }
   .working-card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: 26px 30px; min-width: 300px; text-align: center; }
@@ -196,6 +218,7 @@
   <div id="product"></div>
   <div class="meter" id="meter" hidden><span id="meterText"></span><div class="track"><i id="meterBar"></i></div></div>
   <button class="btn" id="engineBtn" hidden></button>
+  <button class="btn" id="briefBtn" hidden><i class="ph ph-file-text" aria-hidden="true"></i>Brief</button>
   <button class="btn ghost" id="newBtn" hidden><i class="ph ph-plus" aria-hidden="true"></i>New spec</button>
 </header>
 
@@ -233,6 +256,18 @@
     <aside id="details" hidden aria-label="Details"></aside>
   </section>
 </main>
+
+<div id="brief" hidden role="dialog" aria-modal="true" aria-label="Product brief">
+  <div class="brief-sheet">
+    <div class="brief-bar"><b>Product brief</b>
+      <button class="btn" id="briefCopy"><i class="ph ph-copy" aria-hidden="true"></i>Copy</button>
+      <button class="btn" id="briefDownload"><i class="ph ph-download-simple" aria-hidden="true"></i>Download .md</button>
+      <button class="btn" id="briefPrint"><i class="ph ph-printer" aria-hidden="true"></i>Print or save as PDF</button>
+      <button class="icon-btn" id="briefClose" aria-label="Close brief"><i class="ph ph-x" aria-hidden="true"></i></button>
+    </div>
+    <div id="briefBody"></div>
+  </div>
+</div>
 
 <div id="working" hidden role="status" aria-live="polite">
   <div class="working-card"><div class="spinner"></div><b id="workingTitle"></b><span id="workingStep"></span><span class="mono" id="workingTime"></span></div>
@@ -325,7 +360,7 @@ function screenOf(id) {
 function render() {
   const has = Object.keys(S.nodes).length > 0;
   $("start").hidden = has; $("work").hidden = !has;
-  $("newBtn").hidden = !has; $("meter").hidden = !has;
+  $("newBtn").hidden = !has; $("meter").hidden = !has; $("briefBtn").hidden = !has;
   renderEngine();
   if (!has) return;
 
@@ -592,6 +627,7 @@ document.addEventListener("click", (e) => {
 document.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && e.target.dataset.answer) answer(e.target.dataset.answer, e.target.value).catch(fail);
   else if (e.key === "Enter" && e.target.matches(".scr, .cta")) { S.selected = e.target.dataset.id; render(); }
+  else if (e.key === "Escape" && !$("brief").hidden) { $("brief").hidden = true; }
   else if (e.key === "Escape" && S.selected) { S.selected = null; render(); }
 });
 
@@ -642,6 +678,52 @@ $("exampleBtn").onclick = async () => {
   try { $("prd").value = await (await fetch("/examples/food-delivery-prd.md")).text(); say("Example loaded. Press Map it."); }
   catch (err) { say("Could not load the example.", true); }
 };
+// ---------- brief ----------
+// Just enough Markdown for the brief the server writes: headings, lists (one nested level), bold, code, italics.
+function mdToHtml(md) {
+  const inline = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`(.+?)`/g, "<code>$1</code>").replace(/(^|\s)_(.+?)_(?=$|\s|[.,])/g, "$1<em>$2</em>");
+  let html = "", list = "", sub = false;
+  const close = () => { if (sub) { html += "</ul>"; sub = false; } if (list) { html += `</${list}>`; list = ""; } };
+  for (const line of md.split("\n")) {
+    let m;
+    if ((m = line.match(/^(#{1,3}) (.*)/))) { close(); html += `<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`; }
+    else if ((m = line.match(/^  - (.*)/))) { if (!sub) { html += "<ul>"; sub = true; } html += `<li>${inline(m[1])}</li>`; }
+    else if ((m = line.match(/^(-|\d+\.) (.*)/))) {
+      const kind = m[1] === "-" ? "ul" : "ol";
+      if (sub) { html += "</ul>"; sub = false; }
+      if (list !== kind) { close(); html += `<${kind}>`; list = kind; }
+      html += `<li>${inline(m[2])}</li>`;
+    }
+    else if (line.trim()) { close(); html += `<p>${inline(line)}</p>`; }
+    else close();
+  }
+  close();
+  return html;
+}
+let briefText = "";
+$("briefBtn").onclick = async () => {
+  try {
+    const res = await fetch("/api/brief", { headers: { "X-Board": BOARD } });
+    if (!res.ok) throw new Error("Could not build the brief.");
+    briefText = await res.text();
+    $("briefBody").innerHTML = mdToHtml(briefText);
+    $("brief").hidden = false; $("briefClose").focus();
+  } catch (err) { alert(err.message); }
+};
+$("briefClose").onclick = () => { $("brief").hidden = true; };
+$("brief").onclick = (e) => { if (e.target.id === "brief") $("brief").hidden = true; };
+$("briefCopy").onclick = async () => {
+  try { await navigator.clipboard.writeText(briefText); $("briefCopy").lastChild.textContent = "Copied"; setTimeout(() => ($("briefCopy").lastChild.textContent = "Copy"), 1500); }
+  catch (err) { alert("Copy was blocked by the browser. Use Download instead."); }
+};
+$("briefDownload").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([briefText], { type: "text/markdown" }));
+  a.download = (($("product").textContent || "product").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") || "product") + "-brief.md";
+  a.click(); URL.revokeObjectURL(a.href);
+};
+$("briefPrint").onclick = () => window.print();
+
 $("newBtn").onclick = async () => {
   if (!confirm("Start a new spec? This clears the current map and its answers.")) return;
   try { await api("/api/reset", { method: "POST" }); resetPM(); S.selected = null; await load(); $("prd").focus(); }

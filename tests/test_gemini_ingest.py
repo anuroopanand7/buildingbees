@@ -239,3 +239,20 @@ def test_screen_stage_answer_edits_only_allowed_fields(monkeypatch):
     assert out["changed"] == ["API_PAY", "W01_CART"]
     nodes = {n["id"]: n for n in c.get("/api/graph", headers=h).json()["nodes"]}
     assert nodes["API_PAY"]["timeout_ms"] == 5000 and nodes["W01_CART"]["states"]["empty"].startswith("Show")
+
+
+def test_brief_states_decisions_and_gaps(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", FakeGemini())
+    c, h = TestClient(server.app), {"X-Board": "briefer"}
+    assert c.get("/api/brief", headers=h).status_code == 404
+    first = c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h).json()
+    q = next(n for n in first["nodes"] if n["layer"] == "QUESTION")
+    c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "No, sign-in required"}, headers=h)
+    c.post("/api/expand?engine=gemini", headers=h)
+    brief = c.get("/api/brief", headers=h).text
+    assert brief.startswith("# Tiny Shop: product brief")
+    assert "1. Open cart" in brief and "### Cart" in brief
+    assert "**Is guest checkout allowed?** No, sign-in required" in brief and "Queen Bee" in brief
+    assert "BLOCKS THE BUILD: What if the gateway times out?" in brief
+    assert "timeout: NOT DECIDED ms" in brief and "Empty: NOT DECIDED" in brief
+    assert "\u2014" not in brief

@@ -7,7 +7,7 @@ Socratic Question Engine, and Dual Hackathon Track Adapters.
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import datetime
@@ -42,6 +42,7 @@ from src.adapters.gemini_adapter import GoogleGeminiAdapter
 from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.adapters.nvidia_adapter import pdf_to_text
 from src.adapters.spec_prompts import REACT_PROMPT
+from src.core.brief import build_brief
 from src.core.ingest import add_questions, build_flows_graph, build_graph_from_extract
 
 app = FastAPI(
@@ -478,6 +479,14 @@ def list_screen_readiness() -> List[Dict[str, Any]]:
     """Readiness for every screen branch, for the dashboard."""
     return [graph.evaluate_branch_readiness(n.id).model_dump()
             for n in graph.nodes.values() if n.layer.value == "SCREEN"]
+
+
+@app.get("/api/brief", response_class=PlainTextResponse)
+def get_brief() -> str:
+    """The whole board as one Markdown brief: flows, screens, every decision, and what is still open."""
+    if not graph.nodes:
+        raise HTTPException(status_code=404, detail="There is nothing on the board yet")
+    return build_brief(_board())
 
 
 @app.post("/api/reset")
