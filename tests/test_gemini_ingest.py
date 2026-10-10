@@ -311,3 +311,21 @@ def test_gap_questions_make_ready_reachable():
         if getattr(q, "question_status", None):
             q.question_status = "ANSWERED"
     assert g.evaluate_branch_readiness("W01_CART").is_build_ready and add_gap_questions(g) == []
+
+
+def test_accept_defaults_fills_details_but_never_answers_a_bee(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", FakeGemini())
+    c, h = TestClient(server.app), {"X-Board": "defaults"}
+    c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h)
+    c.post("/api/expand?engine=gemini", headers=h)
+    g = server.boards["defaults"]
+    bee_q = g.get_questions_for_node("API_PAY")[0]
+    assert c.post("/api/questions/accept-defaults", headers=h).json()["applied"] == 0  # only a bee question is open
+    assert bee_q.question_status == "OPEN"  # and a bee's question is never answered for the founder
+
+    bee_q.question_status = "ANSWERED"  # the founder answers it without giving a timeout
+    from src.core.ingest import add_gap_questions
+    assert [q.target_node_id for q in add_gap_questions(g)] == ["API_PAY"]
+    out = c.post("/api/questions/accept-defaults", headers=h).json()
+    assert out == {"applied": 1, "changed": ["API_PAY"]}
+    assert g.nodes["API_PAY"].timeout_ms == 3000

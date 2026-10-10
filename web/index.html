@@ -569,6 +569,7 @@ function renderPM() {
   }
   if (q) {
     const t = S.nodes[q.target_node_id];
+    const details = open.filter((o) => o.metadata?.source === "BuildingBees").length; // routine gaps, not a bee's question
     ask.innerHTML = `
       <div class="msg-row" style="margin-bottom:8px">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(bee(q.category)[0])} <span>asks about <button class="link open" data-id="${esc(q.target_node_id)}">${esc(t ? (t.label || t.title) : q.target_node_id)}</button></span></div></div></div>
       <div class="question">${esc(q.question_text)}</div>
@@ -576,7 +577,8 @@ function renderPM() {
       ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o) => `<button class="option" data-q="${esc(q.id)}" data-opt="${esc(o)}">${esc(o)}</button>`).join("")}</div>` : '<div style="height:12px"></div>'}
       <div class="field"><label for="own">Or answer in your own words</label><input id="own" data-answer="${esc(q.id)}" placeholder="Type your answer and press Enter" autocomplete="off"></div>
       <div class="ask-foot"><button class="link" data-skip="${esc(q.id)}">Not sure yet, ask me later</button><span class="muted">${open.length - 1} more waiting</span></div>
-      ${S.stage === "flows" ? '<div class="ask-foot"><button class="link" id="drawBtn">Skip ahead and draw the screens</button></div>' : ""}`;
+      ${S.stage === "flows" ? '<div class="ask-foot"><button class="link" id="drawBtn">Skip ahead and draw the screens</button></div>' : ""}
+      ${details > 1 && q.metadata?.source === "BuildingBees" ? `<div class="ask-foot"><button class="btn" id="defaultsBtn" style="width:100%">Use the first suggestion for all ${details} remaining details</button></div>` : ""}`;
     return;
   }
   if (S.stage === "flows") {
@@ -591,10 +593,12 @@ function renderPM() {
     return;
   }
   // Nothing left to ask right now: look for more on its own, up to the cap.
-  if (PM.rounds < MAX_ROUNDS && engineReady() && pmNextTarget()) { pmDigDeeper(); return; }
-
   const rs = Object.values(S.screens);
   const notReady = rs.filter((r) => !r.is_build_ready);
+  // Keep digging only while something is still not ready. Once every screen is ready, stop and say so;
+  // the founder can still ask for another pass.
+  if (notReady.length && PM.rounds < MAX_ROUNDS && engineReady() && pmNextTarget()) { pmDigDeeper(); return; }
+
   ask.innerHTML = `
     <div class="summary-num" style="color:${notReady.length ? "var(--text)" : "var(--ok)"}">${rs.length - notReady.length} of ${rs.length}</div>
     <div class="about">screens are ready to build</div>
@@ -699,6 +703,10 @@ document.addEventListener("click", (e) => {
   if (t.id === "pmParked") { PM.skipped.clear(); return render(); }
   if (t.id === "pmMore") { PM.rounds = 0; return pmDigDeeper(); }
   if (t.id === "drawBtn") return drawScreens();
+  if (t.id === "defaultsBtn") {
+    return api("/api/questions/accept-defaults", { method: "POST" })
+      .then((r) => { PM.changed = new Set(r.changed); return load(); }).catch(fail);
+  }
   if (t.dataset.id) { S.selected = t.dataset.id; return render(); }
 });
 document.addEventListener("keydown", (e) => {

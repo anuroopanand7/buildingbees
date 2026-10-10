@@ -156,3 +156,25 @@ def add_gap_questions(g: BuildingBeesEngine) -> list:
     asks = [q for q in asks if not any(o.question_status == QuestionStatus.OPEN for o in g.get_questions_for_node(q.target_id)
                                        if o.category.value == q.category)]
     return add_questions(g, asks, "BuildingBees")
+
+
+def apply_gap_default(g: BuildingBeesEngine, q: QuestionNode) -> bool:
+    """Answers one gap question with its first suggestion and writes it onto the board. No model call.
+    Only for the detail questions written by add_gap_questions; the bees' own questions always need the founder."""
+    n = g.nodes.get(q.target_node_id)
+    if not n or q.metadata.get("source") != "BuildingBees" or not q.suggested_options:
+        return False
+    choice = q.suggested_options[0]
+    if n.layer.value == "SCREEN":
+        loading, _, error = choice.partition(", and ")
+        n.states.loading = n.states.loading or loading
+        n.states.error = n.states.error or (error or choice)
+    elif n.layer.value == "API":
+        n.timeout_ms = int("".join(ch for ch in choice.split(" ")[0] if ch.isdigit()) or 3) * 1000
+    elif n.layer.value == "CTA":
+        n.target_screen_on_failure = n.parent_screen_id
+    else:
+        return False
+    q.question_status, q.answer_text = QuestionStatus.ANSWERED, choice
+    q.metadata["note"] = "Applied as the default for this detail."
+    return True

@@ -43,7 +43,7 @@ from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.adapters.nvidia_adapter import pdf_to_text
 from src.adapters.spec_prompts import REACT_PROMPT
 from src.core.brief import build_brief
-from src.core.ingest import add_gap_questions, add_questions, build_flows_graph, build_graph_from_extract
+from src.core.ingest import add_gap_questions, add_questions, apply_gap_default, build_flows_graph, build_graph_from_extract
 
 app = FastAPI(
     title="BuildingBees API",
@@ -296,6 +296,19 @@ def react_to_answer(question_id: str, engine: str) -> Dict[str, Any]:
     q.metadata.pop("previous_answer", None)
     return {"is_vague": r.is_vague, "note": q.metadata["note"], "changed": changed,
             "follow_up": [a.id for a in added]}
+
+
+@app.post("/api/questions/accept-defaults")
+def accept_detail_defaults() -> Dict[str, Any]:
+    """The founder chooses to take the first suggestion for every remaining detail question in one go."""
+    g = _board()
+    now = datetime.datetime.utcnow().isoformat()
+    done = []
+    for q in list(g.nodes.values()):
+        if isinstance(q, QuestionNode) and q.question_status == QuestionStatus.OPEN and apply_gap_default(g, q):
+            q.answered_at = now
+            done.append(q.target_node_id)
+    return {"applied": len(done), "changed": list(dict.fromkeys(done))}
 
 
 @app.post("/api/questions/{question_id}/reopen")
