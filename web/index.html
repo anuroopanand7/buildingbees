@@ -136,6 +136,8 @@
   .steps { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .step { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; font-size: 14px; max-width: 260px; }
   .steps .ph { color: var(--line-strong); }
+  .step.fresh { border-color: var(--ok); }
+  .gone { font-size: 12px; color: var(--muted); text-decoration: line-through; margin-top: 6px; }
   .step.focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); background: var(--focus); }
   .changed { animation: changed 2.4s ease-out 1; }
   @keyframes changed { 0%, 35% { box-shadow: 0 0 0 3px var(--ok); background: var(--ok-soft); } 100% { box-shadow: 0 0 0 0 transparent; } }
@@ -493,7 +495,7 @@ function renderMap() {
     const ids = [...new Set([...(f.screen_ids || []), ...(S.fwd[f.id] || [])])].filter((i) => S.nodes[i]?.layer === "SCREEN");
     ids.forEach((i) => placed.add(i));
     const who = (S.rev[f.id] || []).map((u) => S.nodes[u]?.title).filter(Boolean).join(", ");
-    return { id: f.id, title: f.title, who, goal: f.goal, ids, steps: f.metadata?.steps || [] };
+    return { id: f.id, title: f.title, who, goal: f.goal, ids, steps: f.metadata?.steps || [], was: f.metadata?.was };
   });
   const loose = byLayer("SCREEN").map((s) => s.id).filter((i) => !placed.has(i));
   if (loose.length) rows.push({ title: "Other screens", who: "", goal: "", ids: loose });
@@ -503,7 +505,12 @@ function renderMap() {
     <div class="flow-head"><h3>${f.id ? `<button data-id="${esc(f.id)}">${esc(f.title)}</button>` : esc(f.title)}</h3>${f.who ? `<span class="who">for ${esc(f.who)}</span>` : ""}</div>
     ${f.ids.length
       ? `<div class="flow-row">${f.ids.map(screenCard).join('<div class="arrow" aria-hidden="true"><i class="ph ph-arrow-right"></i></div>')}</div>`
-      : `<div class="steps">${f.steps.map((t, i) => `<div class="step ${PM.focus === f.id && focusStep === i + 1 ? "focus" : ""} ${hit(f.id)}">${esc(t)}</div>`).join('<i class="ph ph-arrow-right" aria-hidden="true"></i>') || '<span class="muted">No steps yet.</span>'}</div>`}
+      : `<div class="steps">${f.steps.map((t, i) => {
+          // After an answer, mark only the steps it added or reworded, and list what it removed.
+          const fresh = PM.changed.has(f.id) && f.was && !f.was.includes(t);
+          return `<div class="step ${PM.focus === f.id && focusStep === i + 1 ? "focus" : ""} ${fresh ? "changed fresh" : ""}">${fresh ? '<span class="tag good">New</span> ' : ""}${esc(t)}</div>`;
+        }).join('<i class="ph ph-arrow-right" aria-hidden="true"></i>') || '<span class="muted">No steps yet.</span>'}</div>
+        ${PM.changed.has(f.id) && f.was ? f.was.filter((t) => !f.steps.includes(t)).map((t) => `<div class="gone">Replaced: ${esc(t)}</div>`).join("") : ""}`}
   </div>`).join("");
 }
 

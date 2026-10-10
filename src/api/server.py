@@ -214,6 +214,7 @@ def _apply_reaction(g: BuildingBeesEngine, r) -> List[str]:
             continue
         if f and f.layer.value == "FLOW" and fu.steps:
             f.title, f.goal = fu.title or f.title, fu.goal or f.goal
+            f.metadata["was"] = f.metadata.get("steps", [])  # so the board can show what this answer changed
             f.metadata["steps"] = fu.steps
             for q in g.get_questions_for_node(f.id):  # step numbers no longer line up
                 if q.question_status == QuestionStatus.OPEN:
