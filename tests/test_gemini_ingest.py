@@ -256,3 +256,20 @@ def test_brief_states_decisions_and_gaps(monkeypatch):
     assert "BLOCKS THE BUILD: What if the gateway times out?" in brief
     assert "timeout: NOT DECIDED ms" in brief and "Empty: NOT DECIDED" in brief
     assert "\u2014" not in brief
+
+
+def test_changed_answer_tells_the_bee_what_to_undo(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", Reactor())
+    c, h = TestClient(server.app), {"X-Board": "reactor-change"}
+    q = _answered_flow_question(c, h, "Yes, guests can buy")
+    Reactor.reaction = Reaction(is_vague=False, note="ok", follow_up=[], flow_updates=[], user_updates=[], field_updates=[])
+    c.post(f"/api/questions/{q['id']}/react?engine=gemini", headers=h)
+    assert "CHANGED THEIR MIND" not in Reactor.prompt
+    c.post(f"/api/questions/{q['id']}/reopen", headers=h)
+    c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "No, sign-in required"}, headers=h)
+    c.post(f"/api/questions/{q['id']}/react?engine=gemini", headers=h)
+    assert 'FIRST ANSWERED "Yes, guests can buy"' in Reactor.prompt and "No, sign-in required" in Reactor.prompt
+    c.post(f"/api/questions/{q['id']}/reopen", headers=h)  # and the marker does not linger
+    c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "Third thought"}, headers=h)
+    c.post(f"/api/questions/{q['id']}/react?engine=gemini", headers=h)
+    assert 'FIRST ANSWERED "No, sign-in required"' in Reactor.prompt

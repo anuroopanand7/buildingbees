@@ -276,6 +276,9 @@ def react_to_answer(question_id: str, engine: str) -> Dict[str, Any]:
         stage=stage, board=json.dumps(board, default=str)[:14000], decisions=decisions[:4000],
         category=q.category.value, target=(target.title if target else q.target_node_id),
         step=f", step {step}" if step else "", question=q.question_text, answer=q.answer_text,
+        changed_from=(f"\nTHE FOUNDER FIRST ANSWERED \"{q.metadata['previous_answer']}\" AND HAS NOW CHANGED THEIR MIND. "
+                      "Take back whatever that first answer put on the board, then apply the new one."
+                      if q.metadata.get("previous_answer") else ""),
     )
     try:
         r = eng.react(prompt)
@@ -287,6 +290,7 @@ def react_to_answer(question_id: str, engine: str) -> Dict[str, Any]:
         f.target_id, f.category = q.target_node_id, f.category or q.category.value
     added = add_questions(g, r.follow_up[:1], eng.label)
     q.metadata["note"] = r.note[:300]
+    q.metadata.pop("previous_answer", None)
     return {"is_vague": r.is_vague, "note": q.metadata["note"], "changed": changed,
             "follow_up": [a.id for a in added]}
 
@@ -297,6 +301,8 @@ def reopen_question(question_id: str) -> Dict[str, Any]:
     node = graph.get_node(question_id)
     if not node or not isinstance(node, QuestionNode):
         raise HTTPException(status_code=404, detail=f"Question '{question_id}' not found")
+    # Keep what they said before, so the bee can undo what that answer put on the board.
+    node.metadata["previous_answer"] = node.answer_text or node.metadata.get("previous_answer", "")
     node.question_status = QuestionStatus.OPEN
     node.answer_text = None
     node.answered_at = None
