@@ -30,7 +30,7 @@
   main { display: grid; grid-template-columns: 300px 1fr 360px; height: calc(100vh - 53px); }
   aside, section { overflow: auto; padding: 16px; }
   main > section, .gate { background-image: radial-gradient(var(--line-strong) 1px, transparent 1px); background-size: 20px 20px; }
-  main > section { background-color: var(--bg); }
+  main > section { background-color: var(--bg); position: relative; }
   aside.left { border-right: 1px solid var(--line); background: var(--panel); }
   aside.right { border-left: 1px solid var(--line); background: var(--panel); }
   h2 { font: 500 11px/1.4 "JetBrains Mono", ui-monospace, monospace; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
@@ -79,6 +79,14 @@
   .chip:hover { background: var(--text); color: #fff; border-color: var(--text); }
   .score { font-size: 32px; font-weight: 700; letter-spacing: -.03em; }
   .reasons { font-size: 12px; color: var(--muted); padding-left: 16px; margin: 6px 0 14px; }
+  .working { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(247,247,245,.86); z-index: 5; }
+  .working[hidden] { display: none; }
+  .working-card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px 28px; text-align: center; min-width: 280px; box-shadow: 0 6px 24px rgba(17,17,16,.06); }
+  .spinner { width: 28px; height: 28px; margin: 0 auto 14px; border: 3px solid var(--fill); border-top-color: var(--text); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+  .working b { display: block; font-size: 15px; }
+  .working span { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
   .gate { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
   .gate[hidden] { display: none; }
   .gate-box { max-width: 720px; width: 100%; }
@@ -127,6 +135,9 @@
   </aside>
 
   <section>
+    <div class="working" id="working" hidden role="status" aria-live="polite">
+      <div class="working-card"><div class="spinner"></div><b id="workingTitle"></b><span id="workingStep"></span><span class="mono" id="workingTime"></span></div>
+    </div>
     <div class="crumbs" id="crumbs"></div>
     <div class="board" id="board"></div>
   </section>
@@ -343,11 +354,27 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && e.target.dataset.answer) answer(e.target.dataset.answer, e.target.value).catch((err) => say(err.message, true));
 });
 
+const STEPS = ["Reading the spec", "Mapping users and flows", "Laying out screens and buttons", "Linking APIs", "Looking for what the spec leaves out", "Writing the questions"];
+let workTimer = null;
+function working(title) {
+  clearInterval(workTimer);
+  $("working").hidden = !title;
+  if (!title) return;
+  const t0 = Date.now();
+  const tick = () => {
+    const sec = Math.round((Date.now() - t0) / 1000);
+    $("workingTitle").textContent = title;
+    $("workingStep").textContent = STEPS[Math.min(STEPS.length - 1, Math.floor(sec / 8))] + "...";
+    $("workingTime").textContent = `${sec}s elapsed. This usually takes 20 to 60 seconds.`;
+  };
+  tick(); workTimer = setInterval(tick, 1000);
+}
+
 async function ingest(promise, label) {
-  busy(true); say(`${label}... this can take 20 to 60 seconds.`);
+  busy(true); say(""); working(label);
   try { await promise(); S.selected = null; await load(); say(label === "Clearing" ? "Board cleared." : "Graph built. Red badges are what your spec leaves out."); }
   catch (err) { say(err.message, true); }
-  finally { busy(false); }
+  finally { busy(false); working(""); }
 }
 $("buildBtn").onclick = () => ingest(() => api(`/api/ingest-prd?${eq()}`, {
   method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prd_markdown: $("prd").value }),

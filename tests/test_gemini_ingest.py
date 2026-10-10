@@ -109,3 +109,21 @@ def test_boards_are_per_visitor_and_restorable(monkeypatch):
     assert back["total_nodes"] == saved["total_nodes"] and back["total_edges"] == saved["total_edges"]
     screens = {s["screen_id"]: s for s in c.get("/api/screens", headers=a).json()}
     assert screens["W01_CART"]["is_build_ready"] is False  # questions survived the round trip
+
+
+def test_gemini_falls_back_when_model_is_overloaded():
+    from src.adapters.gemini_adapter import FALLBACK_MODELS, GoogleGeminiAdapter
+
+    calls = []
+
+    class Models:
+        def generate_content(self, model, contents, config):
+            calls.append(model)
+            if len(calls) == 1:
+                raise RuntimeError("503 UNAVAILABLE. This model is currently experiencing high demand.")
+            return type("R", (), {"parsed": EXTRACT, "text": ""})()
+
+    a = GoogleGeminiAdapter(api_key="k", model="primary")
+    a._client = type("C", (), {"models": Models()})()
+    assert a.extract_spec(text="shop").product_name == "Tiny Shop"
+    assert calls == ["primary", FALLBACK_MODELS[0]]

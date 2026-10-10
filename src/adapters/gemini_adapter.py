@@ -12,7 +12,8 @@ from src.adapters.spec_prompts import (  # noqa: F401  (re-exported for callers)
     INGEST_PROMPT, INTERROGATE_PROMPT, QuestionList, SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
 )
 
-DEFAULT_MODEL = "gemini-3.7-flash"
+DEFAULT_MODEL = "gemini-3.5-flash"
+FALLBACK_MODELS = ["gemini-3.5-flash-lite", "gemini-3.7-flash", "gemini-flash-latest"]
 
 
 class EngineNotConfigured(RuntimeError):
@@ -39,16 +40,23 @@ class GoogleGeminiAdapter:
         from google.genai import types
 
         if self._client is None:
-            self._client = genai.Client(api_key=self.api_key)
-        resp = self._client.models.generate_content(
-            model=self.model,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=schema,
-                temperature=0.2,
-            ),
+            # 45 s per attempt: a slow or overloaded model must fail over, not hang the visitor.
+            self._client = genai.Client(api_key=self.api_key, http_options=types.HttpOptions(timeout=45_000))
+        config = types.GenerateContentConfig(
+            response_mime_type="application/json", response_schema=schema, temperature=0.2,
         )
+        resp, last_error = None, None
+        for model in dict.fromkeys([self.model, *FALLBACK_MODELS]):
+            try:
+                resp = self._client.models.generate_content(model=model, contents=contents, config=config)
+                self.last_model = model
+                break
+            except Exception as e:  # overloaded (503), rate limited (429) or timed out: try the next model
+                last_error = e
+                if not any(t in str(e) for t in ("503", "429", "404", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "overloaded", "imed out", "DEADLINE")):
+                    raise
+        if resp is None:
+            raise RuntimeError(f"Gemini is busy right now, please try again in a minute. ({str(last_error)[:120]})")
         if resp.parsed is None:
             return schema.model_validate_json(resp.text)
         return resp.parsed
