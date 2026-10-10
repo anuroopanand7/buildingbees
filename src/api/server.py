@@ -43,7 +43,7 @@ from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.adapters.nvidia_adapter import pdf_to_text
 from src.adapters.spec_prompts import REACT_PROMPT
 from src.core.brief import build_brief
-from src.core.ingest import add_questions, build_flows_graph, build_graph_from_extract
+from src.core.ingest import add_gap_questions, add_questions, build_flows_graph, build_graph_from_extract
 
 app = FastAPI(
     title="BuildingBees API",
@@ -287,9 +287,12 @@ def react_to_answer(question_id: str, engine: str) -> Dict[str, Any]:
 
     changed = [] if r.is_vague else _apply_reaction(g, r)
     for f in r.follow_up[:1]:
-        f.target_id, f.category = q.target_node_id, f.category or q.category.value
+        f.target_id, f.category = q.target_node_id, q.category.value  # the bee that asked follows up
     added = add_questions(g, r.follow_up[:1], eng.label)
+    if stage == "screens":
+        add_gap_questions(g)  # anything the answer left unfilled gets asked
     q.metadata["note"] = r.note[:300]
+    q.metadata["vague"] = bool(r.is_vague)  # a vague answer is kept in the chat but is not a decision
     q.metadata.pop("previous_answer", None)
     return {"is_vague": r.is_vague, "note": q.metadata["note"], "changed": changed,
             "follow_up": [a.id for a in added]}
@@ -455,6 +458,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
         if q.target_node_id in g.nodes:
             g.add_node(q)
             g.add_edge(q.target_node_id, q.id)
+    add_gap_questions(g)
     _set_graph(g)
     return get_graph_state()
 

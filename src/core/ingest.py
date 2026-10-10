@@ -24,10 +24,29 @@ def _state(value: str) -> str:
     return "" if not value or value.strip().upper() == "UNSPECIFIED" else value
 
 
+_FILLER = {"the", "a", "an", "is", "are", "do", "does", "should", "what", "how", "if", "to", "of", "for", "in",
+           "on", "we", "it", "this", "that", "and", "or", "when", "while", "happens", "happen", "be", "can", "their"}
+
+
+def _words(text: str) -> set:
+    return {w for w in "".join(ch.lower() if ch.isalnum() else " " for ch in text).split() if w not in _FILLER}
+
+
+def _already_asked(engine: BuildingBeesEngine, text: str) -> bool:
+    """True when the board already holds a question that says nearly the same thing."""
+    new = _words(text)
+    for n in engine.nodes.values():
+        if isinstance(n, QuestionNode):
+            old = _words(n.question_text)
+            if new and old and len(new & old) / len(new | old) >= 0.6:
+                return True
+    return False
+
+
 def add_questions(engine: BuildingBeesEngine, questions: Iterable[XQuestion], source: str = "ai") -> list:
     added = []
     for q in questions:
-        if q.target_id not in engine.nodes:
+        if q.target_id not in engine.nodes or _already_asked(engine, q.question):
             continue
         try:
             cat = QuestionCategory(q.category.upper())
@@ -105,3 +124,35 @@ def build_flows_graph(x: FlowsExtract, source: str = "ai") -> BuildingBeesEngine
             g.add_edge(f.user_id, f.id)
     add_questions(g, x.questions, source)
     return g
+
+
+def add_gap_questions(g: BuildingBeesEngine) -> list:
+    """Asks about details the board still lacks, so "ready to build" can actually be reached.
+    One bundled question per screen or API, written here (no model call), skipped if a bee already asked."""
+    asks = []
+    for n in list(g.nodes.values()):
+        if n.layer.value == "SCREEN":
+            missing = [name for name, v in (("loading", n.states.loading), ("error", n.states.error)) if not v]
+            if missing:
+                asks.append(XQuestion(
+                    target_id=n.id, category="FRONTEND", is_blocking=False,
+                    question=f"What should \"{n.title}\" show while it is {' and when there is an '.join(missing)}?"
+                    if missing == ["loading"] else
+                    f"What should \"{n.title}\" show {'while it loads and ' if 'loading' in missing else ''}when something goes wrong?",
+                    suggested_options=["A skeleton while loading, and an inline message with a retry button on error",
+                                       "A spinner while loading, and a full-page error with a way back",
+                                       "Keep what the person typed and show the problem next to the field"]))
+        elif n.layer.value == "CTA" and n.apis_called and not n.target_screen_on_failure:
+            asks.append(XQuestion(
+                target_id=n.id, category="FRONTEND", is_blocking=False,
+                question=f"If \"{n.label}\" fails, where does the person end up?",
+                suggested_options=["Stay on the same screen and show what went wrong",
+                                   "Go back one screen", "Show a separate error screen"]))
+        elif n.layer.value == "API" and n.timeout_ms <= 0:
+            asks.append(XQuestion(
+                target_id=n.id, category="BACKEND", is_blocking=False,
+                question=f"How long do we wait for \"{n.method} {n.path}\" before giving up, and do we retry?",
+                suggested_options=["3 seconds, retry once", "5 seconds, no retry", "10 seconds, retry twice with a pause"]))
+    asks = [q for q in asks if not any(o.question_status == QuestionStatus.OPEN for o in g.get_questions_for_node(q.target_id)
+                                       if o.category.value == q.category)]
+    return add_questions(g, asks, "BuildingBees")

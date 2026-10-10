@@ -136,7 +136,8 @@ class BuildingBeesEngine:
                 if not b_node.states.loading or not b_node.states.error:
                     completeness_reasons.append(f"Screen {b_node.id} missing explicit loading/error states")
             elif isinstance(b_node, CTANode):
-                if not b_node.target_screen_on_failure:
+                # A button that only moves between screens cannot fail; one that calls an API can.
+                if b_node.apis_called and not b_node.target_screen_on_failure:
                     completeness_reasons.append(f"CTA {b_node.id} missing failure fallback destination")
             elif isinstance(b_node, APINode):
                 if b_node.timeout_ms <= 0:
@@ -150,7 +151,8 @@ class BuildingBeesEngine:
         else:
             base_score = 1.0 - (len(completeness_reasons) * 0.1)
             score = max(0.0, min(1.0, base_score))
-            is_ready = score >= 0.8
+            # Ready means nothing is left to guess: no blocking question and no missing detail.
+            is_ready = not completeness_reasons
 
         return BranchReadiness(
             branch_id=f"branch_{screen_id}",

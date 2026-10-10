@@ -1,7 +1,7 @@
 """
 NVIDIA adapter: Nemotron through any OpenAI-compatible endpoint.
-Default is NVIDIA's API catalogue (build.nvidia.com). For the Nebius hackathon, point
-NVIDIA_BASE_URL at Nebius AI Studio and use a Nemotron model id it serves.
+Default endpoint is Nebius Token Factory, which the Nebius x NVIDIA hackathon requires. Set NVIDIA_BASE_URL
+and NVIDIA_MODEL from the Token Factory dashboard; any OpenAI-compatible endpoint serving Nemotron works.
 Same two jobs as the Gemini adapter, with the same output schemas, so the graph code
 does not care which engine ran. PDFs are converted to text first (no multimodal input).
 """
@@ -19,7 +19,7 @@ from src.adapters.spec_prompts import (
     FLOWS_PROMPT, FlowsExtract, INGEST_PROMPT, INTERROGATE_PROMPT, QuestionList, Reaction, SpecExtract, XQuestion,
 )
 
-DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1"
+DEFAULT_BASE_URL = "https://api.tokenfactory.nebius.com/v1"  # the hackathon requires Nebius Token Factory
 DEFAULT_MODEL = "nvidia/llama-3.3-nemotron-super-49b-v1"
 
 

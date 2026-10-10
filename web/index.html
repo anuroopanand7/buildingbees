@@ -60,7 +60,7 @@
   .team li b { display: block; font-weight: 600; }
   .team li span span { color: var(--muted); }
   .team li .bee { width: 34px; height: 34px; font-size: 17px; }
-  #start h1 { font-size: clamp(34px, 4.4vw, 56px); line-height: 1.04; letter-spacing: -.035em; margin: 0 0 14px; font-weight: 600; }
+  #start h1 { text-wrap: balance; font-size: clamp(34px, 4.4vw, 56px); line-height: 1.04; letter-spacing: -.035em; margin: 0 0 14px; font-weight: 600; }
   #start p.lead { font-size: 18px; color: var(--muted); max-width: 52ch; margin: 0 0 28px; }
   .composer { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 20px; box-shadow: var(--shadow); padding: 16px; }
   .composer label.cap { display: block; font-size: 13px; font-weight: 500; margin: 0 4px 8px; }
@@ -132,7 +132,7 @@
   .flow-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
   .flow-head h3 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
   .flow-head .who { font-size: 13px; font-weight: 400; margin: 0; color: var(--muted); }
-  .flow-row { display: flex; align-items: flex-start; gap: 0; }
+  .flow-row { display: flex; align-items: flex-start; flex-wrap: wrap; row-gap: 18px; }
   .steps { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .step { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; font-size: 14px; max-width: 260px; }
   .steps .ph { color: var(--line-strong); }
@@ -222,6 +222,8 @@
     #briefBody { overflow: visible; padding: 0; }
   }
 
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 40; max-width: min(560px, calc(100% - 32px)); background: var(--ink); color: var(--on-ink); border-radius: 12px; padding: 12px 16px; font-size: 14px; box-shadow: var(--shadow); }
+
   /* Working overlay: shown for every slow call, with what is happening and how long it has taken. */
   #working { position: fixed; inset: 56px 0 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 88%, transparent); z-index: 20; }
   .working-card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: 26px 30px; min-width: 300px; text-align: center; }
@@ -263,10 +265,10 @@
 <main id="start" hidden>
   <div class="start-inner">
    <div>
-    <h1>What are we building?</h1>
-    <p class="lead">Give me a spec or a rough idea. I map the product, then ask you about everything it leaves out, before anyone writes code.</p>
+    <h1>Other tools guess. We ask.</h1>
+    <p class="lead">Tell us what you want to build. Six bees map the flows, ask your product team what the idea leaves out, and redraw the board with every answer. Nothing gets built on a guess.</p>
     <div class="composer">
-      <label class="cap" for="prd">Your spec or idea</label>
+      <label class="cap" for="prd">What are we building?</label>
       <textarea id="prd" placeholder="Paste a PRD, a feature brief, or two lines about what you want to build."></textarea>
       <div class="composer-foot">
         <div class="seg" id="engineSeg" role="group" aria-label="AI engine (required)"></div>
@@ -314,6 +316,8 @@
     <div id="briefBody"></div>
   </div>
 </div>
+
+<div id="toast" hidden role="alert"></div>
 
 <div id="working" hidden role="status" aria-live="polite">
   <div class="working-card"><div class="spinner"></div><b id="workingTitle"></b><span id="workingStep"></span><span class="mono" id="workingTime"></span></div>
@@ -428,15 +432,17 @@ function render() {
 
 // ---------- engine ----------
 function renderEngine() {
-  $("engineSeg").innerHTML = Object.entries(ENGINE_COPY).map(([k, name]) => {
-    const on = S.engines[k]?.enabled;
-    return `<button data-engine="${k}" aria-pressed="${S.engine === k}" ${on ? "" : "disabled"} title="${on ? esc(S.engines[k].model) : "Key not added yet"}">${name}</button>`;
-  }).join("");
+  const live = Object.keys(ENGINE_COPY).filter((k) => S.engines[k]?.enabled);
+  if (live.length === 1 && S.engine !== live[0]) S.engine = live[0]; // nothing to choose between
+  if (S.engine && live.length && !live.includes(S.engine)) S.engine = null;
+  $("engineSeg").hidden = live.length < 2;
+  $("engineSeg").innerHTML = live.map((k) => `<button data-engine="${k}" aria-pressed="${S.engine === k}" title="${esc(S.engines[k].model)}">${ENGINE_COPY[k]}</button>`).join("");
   const b = $("engineBtn");
-  b.hidden = !S.engine;
+  b.hidden = !S.engine || live.length < 2; // only worth showing when there is a choice
   if (S.engine) b.textContent = ENGINE_COPY[S.engine];
   $("buildBtn").disabled = !engineReady();
-  if (!S.engine && Object.keys(S.engines).length) say("Pick an engine to continue.");
+  if (!S.engine && live.length > 1) say("Pick an engine to continue.");
+  else if (Object.keys(S.engines).length && !live.length) say("No AI engine is connected. Add a key to .env and restart.", true);
 }
 
 // ---------- map ----------
@@ -531,7 +537,7 @@ function renderPM() {
   const all = byLayer("QUESTION");
   const open = openQuestions();
   const done = all.filter((q) => q.question_status !== "OPEN").sort((a, b) => String(a.answered_at).localeCompare(String(b.answered_at)));
-  $("pmSub").textContent = all.length ? `${done.length} of ${all.length} questions answered` : "No questions yet";
+  $("pmSub").textContent = all.length ? `${done.length} of ${all.length} answered. A one-shot tool would have guessed all ${all.length}.` : "No questions yet";
   $("pmBar").style.width = `${all.length ? (done.length / all.length) * 100 : 0}%`;
 
   // The hive: who has questions waiting. Click a bee to hear only from that one.
@@ -670,7 +676,12 @@ async function answer(qid, text) {
   await load();
   if (matchMedia("(min-width: 901px)").matches) document.querySelector("#flows .changed")?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
 }
-const fail = (err) => { PM.error = err.message; alert(err.message); };
+let toastTimer = null;
+function toast(text) {
+  $("toast").textContent = text; $("toast").hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => ($("toast").hidden = true), 6000);
+}
+const fail = (err) => { PM.error = err.message; toast(err.message); };
 
 document.addEventListener("click", (e) => {
   const t = e.target.closest("button, [data-id]");
@@ -774,13 +785,13 @@ $("briefBtn").onclick = async () => {
     briefText = await res.text();
     $("briefBody").innerHTML = mdToHtml(briefText);
     $("brief").hidden = false; $("briefClose").focus();
-  } catch (err) { alert(err.message); }
+  } catch (err) { toast(err.message); }
 };
 $("briefClose").onclick = () => { $("brief").hidden = true; };
 $("brief").onclick = (e) => { if (e.target.id === "brief") $("brief").hidden = true; };
 $("briefCopy").onclick = async () => {
   try { await navigator.clipboard.writeText(briefText); $("briefCopy").lastChild.textContent = "Copied"; setTimeout(() => ($("briefCopy").lastChild.textContent = "Copy"), 1500); }
-  catch (err) { alert("Copy was blocked by the browser. Use Download instead."); }
+  catch (err) { toast("Copy was blocked by the browser. Use Download instead."); }
 };
 $("briefAgent").onclick = async () => {
   const url = `${location.origin}/api/brief?board=${encodeURIComponent(BOARD)}`;
@@ -798,12 +809,12 @@ $("briefPrint").onclick = () => window.print();
 $("newBtn").onclick = async () => {
   if (!confirm("Start a new spec? This clears the current map and its answers.")) return;
   try { await api("/api/reset", { method: "POST" }); resetPM(); S.selected = null; await load(); $("prd").focus(); }
-  catch (err) { alert(err.message); }
+  catch (err) { toast(err.message); }
 };
 // Switching engine mid-board only changes who asks the next questions.
 $("engineBtn").onclick = () => {
   const keys = Object.keys(ENGINE_COPY).filter((k) => S.engines[k]?.enabled);
-  if (keys.length < 2) return alert("Only one engine is connected right now.");
+  if (keys.length < 2) return toast("Only one engine is connected right now.");
   S.engine = keys[(keys.indexOf(S.engine) + 1) % keys.length]; store.set("bb_engine", S.engine); renderEngine();
 };
 

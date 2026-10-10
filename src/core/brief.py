@@ -22,8 +22,8 @@ def build_brief(g: BuildingBeesEngine) -> str:
     out: List[str] = []
     add = out.append
     questions = [n for n in g.nodes.values() if isinstance(n, QuestionNode)]
-    decided = sorted((q for q in questions if q.question_status == QuestionStatus.ANSWERED),
-                     key=lambda q: q.answered_at or "")
+    decided = sorted((q for q in questions if q.question_status == QuestionStatus.ANSWERED
+                      and not q.metadata.get("vague")), key=lambda q: q.answered_at or "")
     still_open = [q for q in questions if q.question_status == QuestionStatus.OPEN]
     screens = _layer(g, "SCREEN")
     title = lambda node_id: getattr(g.nodes.get(node_id), "title", node_id)  # noqa: E731
@@ -38,6 +38,9 @@ def build_brief(g: BuildingBeesEngine) -> str:
     else:
         add(f"**Status:** flows are being agreed, no screens drawn yet. {count(len(decided), 'decision')} made, "
             f"{count(len(still_open), 'question')} open.")
+    add("")
+    add(f"A tool that draws from one prompt would have guessed {count(len(questions), 'thing')} here. "
+        f"This brief asked about each of them instead.")
     add("")
 
     add("## Who it is for")

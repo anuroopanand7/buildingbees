@@ -273,3 +273,41 @@ def test_changed_answer_tells_the_bee_what_to_undo(monkeypatch):
     c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "Third thought"}, headers=h)
     c.post(f"/api/questions/{q['id']}/react?engine=gemini", headers=h)
     assert 'FIRST ANSWERED "No, sign-in required"' in Reactor.prompt
+
+
+def test_same_question_is_not_asked_twice():
+    from src.core.ingest import add_questions
+    g = build_graph_from_extract(EXTRACT)
+    before = len(g.get_questions_for_node("API_PAY"))
+    dup = XQuestion(target_id="API_PAY", category="TESTER", question="What happens if the gateway times out?",
+                    is_blocking=True, suggested_options=[])
+    new = XQuestion(target_id="API_PAY", category="BACKEND", question="Which currency do we charge in?",
+                    is_blocking=True, suggested_options=[])
+    assert len(add_questions(g, [dup, new])) == 1
+    assert len(g.get_questions_for_node("API_PAY")) == before + 1
+
+
+def test_missing_details_mean_not_ready():
+    g = build_graph_from_extract(EXTRACT)
+    for q in list(g.nodes.values()):
+        if getattr(q, "question_status", None):
+            q.question_status = "ANSWERED"
+    r = g.evaluate_branch_readiness("W01_CART")  # empty state unspecified is fine, but API_PAY has no timeout
+    assert not r.is_build_ready and any("timeout" in x for x in r.completeness_reasons)
+
+
+def test_gap_questions_make_ready_reachable():
+    from src.core.ingest import add_gap_questions
+    g = build_graph_from_extract(EXTRACT)
+    added = add_gap_questions(g)
+    targets = {q.target_node_id for q in added}
+    assert "API_PAY" not in targets  # a bee already has an open backend question there
+    for q in list(g.nodes.values()):
+        if getattr(q, "question_status", None):
+            q.question_status = "ANSWERED"
+    assert {q.target_node_id for q in add_gap_questions(g)} == {"API_PAY"}  # timeout still missing, so it is asked
+    g.nodes["API_PAY"].timeout_ms = 3000
+    for q in list(g.nodes.values()):
+        if getattr(q, "question_status", None):
+            q.question_status = "ANSWERED"
+    assert g.evaluate_branch_readiness("W01_CART").is_build_ready and add_gap_questions(g) == []
