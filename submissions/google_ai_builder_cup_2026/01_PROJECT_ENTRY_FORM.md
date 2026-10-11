@@ -11,7 +11,7 @@ Everything here describes the prototype as it runs today.
 - **Who it is for:** product teams, founders without a product manager, and anyone about to hand an idea to engineers or to an AI coding agent.
 - **Live prototype:** https://buildingbees-853213660594.asia-south1.run.app
 - **Code:** https://github.com/anuroopanand7/buildingbees (MIT licence)
-- **Google technology:** Gemini API (structured output, native PDF input), Google Cloud Run, Cloud Build.
+- **Google technology:** Gemini API (structured output, native PDF input), Google Cloud Run, Firestore, Cloud Build.
 
 ## Abstract (about 150 words)
 
@@ -46,13 +46,14 @@ A screen is "ready to build" only when it has no open blocking question, its loa
 | Gemini native PDF input | Uploading a spec as a PDF |
 | Automatic model fail-over | A second Gemini model takes over when the first is overloaded or slow |
 | Google Cloud Run | Hosts the prototype, scaled to zero when idle |
+| Firestore | Saves every board after each change, so a board and its Brief link survive the server sleeping |
 | Cloud Build | Builds the container on deploy |
 
 ## What is real today, and what is not
 
 | Real and tested | Not built |
 |---|---|
-| Flows-first mapping, six bees, follow-ups on vague answers, live board updates, screens with wireframes, readiness, changing an answer, the Brief (copy, download, print, agent link), an automated test suite, live on Cloud Run | Accounts, shared editing, durable storage (boards live in memory; the browser restores them), integrations with ticketing tools |
+| Flows-first mapping, six bees, follow-ups on vague answers, live board updates, screens with wireframes, readiness, changing an answer, the Brief (copy, download, print, agent link), an automated test suite, boards saved to Firestore, live on Cloud Run | Accounts, shared editing, integrations with ticketing tools |
 
 The six bees are roles inside one model call, not six separate agents.
 

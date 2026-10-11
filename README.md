@@ -91,7 +91,7 @@ Every call takes the board id in an `X-Board` header or a `?board=` query parame
 
 ## Known limits
 
-- Boards live in server memory. The browser keeps a copy and puts it back if the server restarts, but a Brief link stops working once the server has slept.
+- Boards are saved to Firestore on Cloud Run, so a board and its Brief link survive the server sleeping. Run locally, boards live in memory and the browser keeps the backup copy. There are no accounts: anyone with a board link can open that board.
 - No accounts and no shared editing yet.
 
 ## Built with
