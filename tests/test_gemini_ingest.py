@@ -385,3 +385,34 @@ def test_changed_answer_after_screens_asks_for_a_redraw(monkeypatch):
     assert c.get("/api/graph", headers=h).json()["needs_redraw"] is True
     c.post("/api/expand?engine=gemini", headers=h)
     assert c.get("/api/graph", headers=h).json()["needs_redraw"] is False
+
+
+class FakeStore:
+    """Stands in for the Firestore collection: one dict of documents."""
+    def __init__(self):
+        self.docs = {}
+
+    def document(self, key):
+        store = self
+
+        class Doc:
+            exists = key in store.docs
+            def set(self, data): store.docs[key] = data
+            def get(self, field=None): return store.docs[key][field] if field else Doc()
+        return Doc()
+
+
+def test_board_survives_the_server_sleeping(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", FakeGemini())
+    monkeypatch.setattr(server, "_store", FakeStore())
+    c, h = TestClient(server.app), {"X-Board": "sleeper/../odd id"}
+    c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h)
+    c.post("/api/expand?engine=gemini", headers=h)
+    before = c.get("/api/graph", headers=h).json()
+
+    server.boards.clear()  # server slept: memory gone
+    after = c.get("/api/graph", headers=h).json()
+    assert after["total_nodes"] == before["total_nodes"] > 0 and after["total_edges"] == before["total_edges"]
+    assert after["product_name"] == "Tiny Shop" and after["stage"] == "screens"
+    assert "Tiny Shop" in c.get("/api/brief?board=sleeper/../odd id").text  # the agent link still works
+    assert c.get("/api/graph", headers={"X-Board": "someone-else"}).json()["total_nodes"] == 0

@@ -386,7 +386,7 @@ async function load() {
     catch (e) { store.set("bb_graph", ""); }
     finally { restoring = false; }
   }
-  if (!LINKED) store.set("bb_graph", g.total_nodes ? JSON.stringify({ product_name: g.product_name, spec_text: g.spec_text, entities: g.entities, nodes: g.nodes, edges: g.edges }) : "");
+  if (!LINKED) store.set("bb_graph", g.total_nodes ? JSON.stringify({ product_name: g.product_name, spec_text: g.spec_text, entities: g.entities, needs_redraw: g.needs_redraw, nodes: g.nodes, edges: g.edges }) : "");
   S.stage = g.stage; S.needsRedraw = g.needs_redraw;
   S.nodes = {}; S.fwd = {}; S.rev = {}; S.screens = {};
   g.nodes.forEach((n) => (S.nodes[n.id] = n));

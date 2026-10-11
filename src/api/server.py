@@ -6,13 +6,17 @@ Socratic Question Engine, and Dual Hackathon Track Adapters.
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.staticfiles import StaticFiles
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import datetime
+import hashlib
 import json
+import logging
 import os
 import time
+import zlib
 from collections import OrderedDict
 from contextvars import ContextVar
 
@@ -64,17 +68,55 @@ def serve_index():
 
 
 # One board per visitor, keyed by the X-Board header the web app sends.
-# shortcut: boards live in memory and vanish when Cloud Run scales to zero; the browser keeps a
-# copy and re-uploads it via /api/restore. Move to Firestore if accounts are added.
+# Memory is the cache; on Cloud Run every change is also written to Firestore, so a board and its
+# Brief link survive the server sleeping. Locally there is no Firestore and the browser's copy
+# (re-uploaded via /api/restore) is the only backup.
 MAX_BOARDS = 300
 boards: "OrderedDict[str, BuildingBeesEngine]" = OrderedDict()
 _board_id: ContextVar[str] = ContextVar("board_id", default="default")
+log = logging.getLogger("buildingbees")
+
+_store = None
+if os.getenv("K_SERVICE"):  # set by Cloud Run; keeps tests and local runs off the network
+    try:
+        from google.cloud import firestore
+        _store = firestore.Client().collection("boards")
+    except Exception as e:
+        log.warning("Firestore unavailable, boards stay in memory: %s", e)
+
+
+def _doc(bid: str):
+    # Board ids come from the client; hashing makes any of them a legal document id.
+    return _store.document(hashlib.sha1(bid.encode()).hexdigest())
+
+
+def _save_board(bid: str) -> None:
+    g = boards.get(bid)
+    if _store is None or g is None:
+        return
+    try:
+        # One compressed blob: a board with a long spec stays far under Firestore's 1 MiB document limit.
+        blob = zlib.compress(json.dumps(_state(g), default=str).encode())
+        _doc(bid).set({"data": blob, "updated": datetime.datetime.now(datetime.timezone.utc)})
+    except Exception as e:
+        log.warning("Could not save board: %s", e)
+
+
+def _load_board(bid: str) -> Optional[BuildingBeesEngine]:
+    if _store is None:
+        return None
+    try:
+        snap = _doc(bid).get()
+        return _rebuild(json.loads(zlib.decompress(snap.get("data")))) if snap.exists else None
+    except Exception as e:
+        log.warning("Could not load board: %s", e)
+        return None
 
 
 def _board() -> BuildingBeesEngine:
     bid = _board_id.get()
     if bid not in boards:
-        boards[bid] = BuildingBeesEngine()
+        boards[bid] = _load_board(bid) or BuildingBeesEngine()
         while len(boards) > MAX_BOARDS:
             boards.popitem(last=False)
     boards.move_to_end(bid)
@@ -93,8 +135,12 @@ graph = _BoardProxy()
 @app.middleware("http")
 async def _select_board(request, call_next):
     # The web app sends a header; a coding agent given a link uses ?board=.
-    _board_id.set((request.headers.get("x-board") or request.query_params.get("board") or "default")[:64])
-    return await call_next(request)
+    bid = (request.headers.get("x-board") or request.query_params.get("board") or "default")[:64]
+    _board_id.set(bid)
+    response = await call_next(request)
+    if request.method == "POST" and request.url.path.startswith("/api/") and response.status_code < 400:
+        await run_in_threadpool(_save_board, bid)
+    return response
 engines = {e.key: e for e in (GoogleGeminiAdapter(), NvidiaNemotronAdapter())}
 
 
@@ -119,6 +165,10 @@ app.mount("/examples", StaticFiles(directory=os.path.join(WEB_DIR, "examples")),
 @app.get("/api/graph")
 def get_graph_state() -> Dict[str, Any]:
     """Returns the full graph state: nodes, edges, and open blocking questions."""
+    return _state(_board())
+
+
+def _state(graph: BuildingBeesEngine) -> Dict[str, Any]:
     nodes_serialized = [node.model_dump() for node in graph.nodes.values()]
     edges = []
     for source, targets in graph.forward_edges.items():
@@ -380,6 +430,7 @@ class RestoreRequest(BaseModel):
     product_name: str = ""
     spec_text: str = ""
     entities: List[Dict[str, Any]] = []
+    needs_redraw: bool = False
     nodes: List[Dict[str, Any]]
     edges: List[Dict[str, str]]
 
@@ -387,19 +438,24 @@ class RestoreRequest(BaseModel):
 @app.post("/api/restore")
 def restore_board(payload: RestoreRequest) -> Dict[str, Any]:
     """Rebuilds a board from the copy the browser kept (after the server slept)."""
+    _set_graph(_rebuild(payload.model_dump()))
+    return get_graph_state()
+
+
+def _rebuild(d: Dict[str, Any]) -> BuildingBeesEngine:
     g = BuildingBeesEngine()
-    g.product_name = payload.product_name
-    g.spec_text = payload.spec_text[:SPEC_LIMIT]
-    g.entities = payload.entities[:50]
-    for n in payload.nodes[:2000]:
+    g.product_name = d.get("product_name", "")
+    g.spec_text = d.get("spec_text", "")[:SPEC_LIMIT]
+    g.entities = d.get("entities", [])[:50]
+    g.needs_redraw = bool(d.get("needs_redraw"))
+    for n in d["nodes"][:2000]:
         cls = LAYER_CLASSES.get(n.get("layer"))
         if cls:
             g.add_node(cls.model_validate(n))
-    for e in payload.edges[:10000]:
+    for e in d["edges"][:10000]:
         if e.get("source") in g.nodes and e.get("target") in g.nodes:
             g.add_edge(e["source"], e["target"])
-    _set_graph(g)
-    return get_graph_state()
+    return g
 
 
 # shortcut: one in-memory counter protects the shared model key from a runaway client; move to a real
