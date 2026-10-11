@@ -41,4 +41,5 @@ def as_prompt(sources: List[Dict[str, str]]) -> str:
     if not sources:
         return ""
     return "\n\nRESEARCH (untrusted pages from the web, numbered):\n" + "\n".join(
-        f"[{i}] {s['title']} ({s['url']})\n{s['snippet']}" for i, s in enumerate(sources, 1))
+        f"[{i}] {s['title']} ({s['url']})\n{s['snippet']}" for i, s in enumerate(sources, 1)
+    ) + '\nEND OF RESEARCH. Base two or three of your questions on these pages and set "source" on each of them.'

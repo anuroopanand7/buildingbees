@@ -179,6 +179,9 @@ Do NOT design screens, buttons or APIs yet. First agree the user flows.
    usually have one (cancelling, rescheduling, signing in, refunds, an admin or staff side, notifications).
    If you think such a flow is needed, do NOT draw it: ask whether it is wanted, as a PM question on the
    nearest existing flow. Assumption is not approval.
+   Example: for "An app to book a haircut at a local salon" the only user is the client and the only flow
+   is booking. The stylist's or the salon's side (a schedule, a dashboard) was not asked for: it is a
+   question ("Do stylists need their own view to manage bookings?"), never a flow or a user.
    Every person the input says does something ("librarians can cancel a reservation") is a user with a flow
    for exactly that. Every user you list must own at least one flow. Someone who only appears inside
    another user's flow, and is not said to do anything themselves, is not a user; mention them in the steps.
