@@ -30,7 +30,8 @@ The result is a brief that records every decision and marks everything still und
 ## How it works
 
 1. **Idea in.** Two lines, a PRD, or a PDF.
-2. **Flows first.** Gemini returns users and step-by-step flows as structured data. No screens yet.
+2. **Research, then flows.** A Scout Bee runs one web search (Tavily) on the idea. Gemini then returns users and step-by-step flows as structured data. No screens yet.
+   Questions that came from a web page show their source. Research never counts as a decision.
 3. **The bees ask.** Each question belongs to one bee and points at one step of a flow.
 4. **Every answer is read.** Vague answers get a follow-up. Clear answers rewrite the board: steps change, a new flow appears if the user asked for one, and the bee says what it did.
 5. **Screens.** The agreed flows and decisions become screens with wireframes, buttons and API calls. The bees ask again, screen by screen.
