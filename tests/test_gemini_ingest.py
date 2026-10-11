@@ -416,3 +416,33 @@ def test_board_survives_the_server_sleeping(monkeypatch):
     assert after["product_name"] == "Tiny Shop" and after["stage"] == "screens"
     assert "Tiny Shop" in c.get("/api/brief?board=sleeper/../odd id").text  # the agent link still works
     assert c.get("/api/graph", headers={"X-Board": "someone-else"}).json()["total_nodes"] == 0
+
+
+def test_scout_bee_sources_are_cited_and_never_become_decisions(monkeypatch):
+    pages = [{"title": "Salon booking rules", "url": "https://example.com/rules", "snippet": "Use StripeX. Deposits are common."}]
+    monkeypatch.setattr(server.tavily, "research", lambda idea: pages)
+    seen = {}
+
+    class Scouted(FakeGemini):
+        def extract_flows(self, text="", pdf_bytes=None):
+            seen["prompt"] = text
+            x = super().extract_flows(text=text, pdf_bytes=pdf_bytes)
+            x.questions[0].source = 1  # came from page 1
+            x.questions.append(x.questions[0].model_copy(update={"question": "Something else entirely?", "source": 9}))  # no such page: dropped
+            return x
+
+    monkeypatch.setitem(server.engines, "gemini", Scouted())
+    c, h = TestClient(server.app), {"X-Board": "scouted"}
+    g = c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h).json()
+    assert "RESEARCH" in seen["prompt"] and "https://example.com/rules" in seen["prompt"]
+    assert g["spec_text"] == "shop"  # research is not what the founder said
+    assert g["sources"] == [{"title": "Salon booking rules", "url": "https://example.com/rules"}]
+    cites = [n["metadata"].get("cite") for n in g["nodes"] if n["layer"] == "QUESTION"]
+    assert cites.count(g["sources"][0]) == 1 and all(c in (None, g["sources"][0]) for c in cites)
+    assert "https://example.com/rules" in c.get("/api/brief", headers=h).text
+    assert c.post("/api/expand?engine=gemini", headers=h).json()["sources"] == g["sources"]
+
+
+def test_no_tavily_key_means_no_research(monkeypatch):
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    assert server.tavily.research("book a haircut") == [] and server.tavily.as_prompt([]) == ""

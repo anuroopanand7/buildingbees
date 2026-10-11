@@ -63,7 +63,7 @@ def add_questions(engine: BuildingBeesEngine, questions: Iterable[XQuestion], so
             question_status=QuestionStatus.OPEN,
             author_bee=BEE_FOR_CATEGORY[cat],
             suggested_options=q.suggested_options,
-            metadata={"source": source, "step": q.step},
+            metadata={"source": source, "step": q.step, "cite": q.source},
         )
         engine.add_node(node)
         engine.add_edge(q.target_id, node.id)

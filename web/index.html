@@ -111,6 +111,9 @@
   .past .a i { color: var(--ok); }
   #ask { border-top: 1px solid var(--line); padding: 18px 20px 20px; }
   .about { font-size: 13px; color: var(--muted); }
+  .sources { margin: 8px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.5; }
+  .cite { font-size: 12.5px; color: var(--muted, #6b7280); margin: -4px 0 10px; }
+  .sources a, .cite a { color: inherit; text-decoration: underline; overflow-wrap: anywhere; }
   .question { font-size: 17px; line-height: 1.4; font-weight: 600; letter-spacing: -.01em; margin: 2px 0 10px; }
   .tag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; padding: 2px 9px; border-radius: 999px; background: var(--bad-soft); color: var(--bad); }
   .tag.soft { background: var(--warn-soft); color: var(--warn); }
@@ -386,8 +389,8 @@ async function load() {
     catch (e) { store.set("bb_graph", ""); }
     finally { restoring = false; }
   }
-  if (!LINKED) store.set("bb_graph", g.total_nodes ? JSON.stringify({ product_name: g.product_name, spec_text: g.spec_text, entities: g.entities, needs_redraw: g.needs_redraw, nodes: g.nodes, edges: g.edges }) : "");
-  S.stage = g.stage; S.needsRedraw = g.needs_redraw;
+  if (!LINKED) store.set("bb_graph", g.total_nodes ? JSON.stringify({ product_name: g.product_name, spec_text: g.spec_text, entities: g.entities, sources: g.sources, needs_redraw: g.needs_redraw, nodes: g.nodes, edges: g.edges }) : "");
+  S.stage = g.stage; S.needsRedraw = g.needs_redraw; S.sources = g.sources || [];
   S.nodes = {}; S.fwd = {}; S.rev = {}; S.screens = {};
   g.nodes.forEach((n) => (S.nodes[n.id] = n));
   g.edges.forEach((e) => {
@@ -568,7 +571,10 @@ function renderPM() {
   const hello = `<div class="msg-row">${beeIcon("PM")}<div class="msg-body"><div class="who">Queen Bee <span>product and scope</span></div><div class="bubble">${S.stage === "flows"
     ? "Hi, we are your product team. We read your idea and sketched the flows on the right. Before anyone draws a screen, each of us has a few questions."
     : "The screens are drawn from your decisions. Now we go through them one by one."}</div></div></div>`;
-  thread.innerHTML = hello + done.map((q) => `
+  // Scout Bee: the pages read on the web before anyone asked a question.
+  const scout = S.sources?.length ? `<div class="msg-row"><span class="bee" aria-hidden="true"><i class="ph ph-binoculars"></i></span><div class="msg-body"><div class="who">Scout Bee <span>research</span></div><div class="bubble">Before we asked anything, I read ${S.sources.length} page${S.sources.length === 1 ? "" : "s"} about products like yours. Where a question comes from one, it says so.<ol class="sources">${S.sources.map((s) => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a></li>`).join("")}</ol></div></div></div>` : "";
+  const cite = (q) => q.metadata?.cite?.url ? `<div class="cite"><i class="ph ph-binoculars" aria-hidden="true"></i> From the Scout Bee's reading: <a href="${esc(q.metadata.cite.url)}" target="_blank" rel="noopener noreferrer">${esc(q.metadata.cite.title)}</a></div>` : "";
+  thread.innerHTML = hello + scout + done.map((q) => `
     <div class="msg-row">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(bee(q.category)[0])}</div><div class="bubble">${esc(q.question_text)}</div></div></div>
     <div class="mine"><div class="bubble">${esc(q.answer_text)}</div><div><button class="link" data-reopen="${esc(q.id)}">Change</button></div></div>
     ${q.metadata?.note ? `<div class="msg-row">${beeIcon(q.category)}<div class="msg-body"><div class="bubble">${esc(q.metadata.note)}</div></div></div>` : ""}`).join("");
@@ -590,6 +596,7 @@ function renderPM() {
     ask.innerHTML = `
       <div class="msg-row" style="margin-bottom:8px">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(bee(q.category)[0])} <span>asks about <button class="link open" data-id="${esc(q.target_node_id)}">${esc(t ? (t.label || t.title) : q.target_node_id)}</button></span></div></div></div>
       <div class="question">${esc(q.question_text)}</div>
+      ${cite(q)}
       <span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Blocks the build" : "Good to know"}</span>
       ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o) => `<button class="option" data-q="${esc(q.id)}" data-opt="${esc(o)}">${esc(o)}</button>`).join("")}</div>` : '<div style="height:12px"></div>'}
       <div class="field"><label for="own">Or answer in your own words</label><input id="own" data-answer="${esc(q.id)}" placeholder="Type your answer and press Enter" autocomplete="off"></div>

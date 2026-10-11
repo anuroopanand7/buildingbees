@@ -27,6 +27,7 @@ def build_brief(g: BuildingBeesEngine) -> str:
     still_open = [q for q in questions if q.question_status == QuestionStatus.OPEN]
     screens = _layer(g, "SCREEN")
     title = lambda node_id: getattr(g.nodes.get(node_id), "title", node_id)  # noqa: E731
+    cited = lambda q: f", prompted by {q.metadata['cite']['url']}" if isinstance(q.metadata.get('cite'), dict) else ""  # noqa: E731
     count = lambda n, word: f"{n} {word}{'' if n == 1 else 's'}"  # noqa: E731
 
     add(f"# {getattr(g, 'product_name', '') or 'Product'}: product brief")
@@ -100,11 +101,18 @@ def build_brief(g: BuildingBeesEngine) -> str:
             add(f"- **{e['name']}**: {', '.join(e.get('fields', []))}")
         add("")
 
+    sources = getattr(g, "sources", [])
+    if sources:
+        add("## Research (pages the Scout Bee read before the bees asked; reference only, not decisions)")
+        for i, s in enumerate(sources, 1):
+            add(f"{i}. [{s['title']}]({s['url']})")
+        add("")
+
     add("## Decisions")
     if not decided:
         add("None yet.")
     for q in decided:
-        add(f"- **{q.question_text}** {q.answer_text} _(asked by {BEE_NAMES.get(q.category.value, 'the team')}, about {title(q.target_node_id)})_")
+        add(f"- **{q.question_text}** {q.answer_text} _(asked by {BEE_NAMES.get(q.category.value, 'the team')}, about {title(q.target_node_id)}{cited(q)})_")
     add("")
 
     add("## Still open")

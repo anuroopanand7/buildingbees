@@ -46,6 +46,7 @@ from src.adapters.gemini_adapter import GoogleGeminiAdapter
 from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.adapters.nvidia_adapter import pdf_to_text
 from src.adapters.spec_prompts import REACT_PROMPT
+from src.adapters import tavily
 from src.core.brief import build_brief
 from src.core.ingest import add_gap_questions, add_questions, apply_gap_default, strip_guesses, build_flows_graph, build_graph_from_extract
 
@@ -181,6 +182,7 @@ def _state(graph: BuildingBeesEngine) -> Dict[str, Any]:
         "product_name": getattr(graph, "product_name", ""),
         "spec_text": getattr(graph, "spec_text", ""),
         "entities": getattr(graph, "entities", []),
+        "sources": getattr(graph, "sources", []),
         # Stage one agrees the flows; screens are only drawn after that.
         "stage": "screens" if any(n.layer.value == "SCREEN" for n in graph.nodes.values()) else "flows",
         "needs_redraw": bool(getattr(graph, "needs_redraw", False)),
@@ -430,6 +432,7 @@ class RestoreRequest(BaseModel):
     product_name: str = ""
     spec_text: str = ""
     entities: List[Dict[str, Any]] = []
+    sources: List[Dict[str, str]] = []
     needs_redraw: bool = False
     nodes: List[Dict[str, Any]]
     edges: List[Dict[str, str]]
@@ -447,6 +450,7 @@ def _rebuild(d: Dict[str, Any]) -> BuildingBeesEngine:
     g.product_name = d.get("product_name", "")
     g.spec_text = d.get("spec_text", "")[:SPEC_LIMIT]
     g.entities = d.get("entities", [])[:50]
+    g.sources = d.get("sources", [])[:tavily.MAX_SOURCES]
     g.needs_redraw = bool(d.get("needs_redraw"))
     for n in d["nodes"][:2000]:
         cls = LAYER_CLASSES.get(n.get("layer"))
@@ -484,11 +488,19 @@ SPEC_LIMIT = 60_000
 
 def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None) -> Dict[str, Any]:
     """Stage one: flows and the questions about them. No screens are drawn yet."""
+    sources = tavily.research(text)  # Scout Bee; empty without a key, and for PDFs
     try:
-        g = build_flows_graph(eng.extract_flows(text=text, pdf_bytes=pdf_bytes), eng.label)
+        g = build_flows_graph(eng.extract_flows(text=text + tavily.as_prompt(sources), pdf_bytes=pdf_bytes), eng.label)
+        # The spec is only what the founder said: research never counts as a decision.
         g.spec_text = (text or pdf_to_text(pdf_bytes))[:SPEC_LIMIT]
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"{eng.label} could not read the spec: {e}")
+    g.sources = [{"title": s["title"], "url": s["url"]} for s in sources]
+    for q in g.nodes.values():  # turn the page number the engine gave into the page itself
+        if isinstance(q, QuestionNode):
+            n = q.metadata.pop("cite", 0)
+            if isinstance(n, int) and 0 < n <= len(g.sources):
+                q.metadata["cite"] = g.sources[n - 1]
     _set_graph(g)
     return get_graph_state()
 
@@ -541,6 +553,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"{eng.label} could not draw the screens: {e}")
     g.spec_text = getattr(old, "spec_text", "")
+    g.sources = getattr(old, "sources", [])
     strip_guesses(g, g.spec_text + " " + " ".join(q.answer_text or "" for q in decisions))
     for f in flows:  # the steps the user agreed to stay on the flow
         if f.id in g.nodes:
@@ -604,6 +617,7 @@ def get_status() -> Dict[str, Any]:
     return {
         "product_name": getattr(graph, "product_name", ""),
         "engines": {k: {"label": e.label, "enabled": e.enabled, "model": e.model} for k, e in engines.items()},
+        "research": tavily.enabled(),
         "total_nodes": len(graph.nodes),
     }
 
