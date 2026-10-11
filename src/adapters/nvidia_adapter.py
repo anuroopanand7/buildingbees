@@ -20,7 +20,7 @@ from src.adapters.spec_prompts import (
 )
 
 DEFAULT_BASE_URL = "https://api.tokenfactory.nebius.com/v1"  # the hackathon requires Nebius Token Factory
-DEFAULT_MODEL = "nvidia/llama-3.3-nemotron-super-49b-v1"
+DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b"  # of the four Nemotron models on Token Factory (11 Oct 2026): Lightning is quicker but misses vague answers
 
 
 def pdf_to_text(data: bytes) -> str:
@@ -43,8 +43,9 @@ class NvidiaNemotronAdapter:
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None, base_url: Optional[str] = None):
         self.api_key = api_key or os.getenv("NVIDIA_API_KEY", "")
-        self.model = model or os.getenv("NVIDIA_MODEL", DEFAULT_MODEL)
-        self.base_url = (base_url or os.getenv("NVIDIA_BASE_URL", DEFAULT_BASE_URL)).rstrip("/")
+        # `or`, not a getenv default: .env ships these two as empty lines, and empty must mean "use the default".
+        self.model = model or os.getenv("NVIDIA_MODEL") or DEFAULT_MODEL
+        self.base_url = (base_url or os.getenv("NVIDIA_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
 
     @property
     def enabled(self) -> bool:
@@ -59,7 +60,7 @@ class NvidiaNemotronAdapter:
             + json.dumps(schema.model_json_schema())
         )
         messages = [
-            {"role": "system", "content": "detailed thinking off"},
+            {"role": "system", "content": "/no_think"},
             {"role": "user", "content": instructions},
         ]
         last_error = None
@@ -67,7 +68,9 @@ class NvidiaNemotronAdapter:
             resp = httpx.post(
                 f"{self.base_url}/chat/completions",
                 headers={"Authorization": f"Bearer {self.api_key}"},
-                json={"model": self.model, "messages": messages, "temperature": 0.2, "max_tokens": 8192},
+                # Thinking off: left on, Nemotron 3 spends the whole token budget reasoning and the JSON is cut short.
+                json={"model": self.model, "messages": messages, "temperature": 0.2, "max_tokens": 8192,
+                      "chat_template_kwargs": {"enable_thinking": False}},
                 timeout=180,
             )
             resp.raise_for_status()
