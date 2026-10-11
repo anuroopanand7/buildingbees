@@ -34,9 +34,32 @@ Values nobody stated are removed: if the engine fills in a vendor or a timeout t
 | Engine | Used for | Notes |
 |---|---|---|
 | Google Gemini | Google Cloud AI Builder Cup | Gemini API with structured output (`response_schema`) and native PDF input. Falls over to a second model when one is overloaded. |
-| NVIDIA Nemotron | Nebius x NVIDIA Global AI Hackathon | Any OpenAI-compatible endpoint; the default is Nebius Token Factory. PDFs are converted to text first. |
+| NVIDIA Nemotron | Nebius x NVIDIA Global AI Hackathon | NVIDIA Nemotron 3 on Nebius Token Factory (OpenAI-compatible API). See the section below. PDFs are converted to text first. |
 
 Both engines fill the same Pydantic schemas (`src/adapters/spec_prompts.py`), so the board code does not care which one ran. The six bees are roles inside one engine call: the prompt assigns every question to the bee that owns that aspect. They are not six separate agents.
+
+## NVIDIA Nemotron on Nebius Token Factory
+
+Pick "NVIDIA Nemotron" on the start screen and every model call in the product runs on Nemotron 3 through Token Factory (`src/adapters/nvidia_adapter.py`). Two models share the work:
+
+| Job | Model | Why | Measured (11 Oct 2026) |
+|---|---|---|---|
+| Read the idea, draw the flows, ask the first questions | `nvidia/nemotron-3-super-120b-a12b` | The founder is waiting; it has to be quick | about 10 s, including the web search |
+| Read each answer, catch a vague one, redraw the board | `nvidia/nemotron-3-super-120b-a12b` | Runs after every answer, so latency is the product | about 2 s |
+| Draw every screen, button, API and data entity from the agreed flows | `nvidia/Nemotron-3-Ultra-550b-a55b` | The one heavy reasoning job | about 8 s |
+
+What made it work:
+
+- **Thinking is switched off** (`chat_template_kwargs: {enable_thinking: false}`). Left on, Nemotron 3 spent its whole 8,192-token budget reasoning and the JSON came back cut short. Off, the same call returns valid JSON in a few seconds.
+- **Schema in the prompt, validated with Pydantic.** The reply is parsed against the same schema Gemini fills. If it does not validate, the error is sent back once and Nemotron corrects it.
+- **Token Factory's speed is what makes the interview possible.** A two-second reply after every answer feels like a colleague; a twenty-second one would not.
+- **A daily ceiling** (`NVIDIA_DAILY_CALLS`, default 400) keeps the public demo inside the hackathon credit.
+
+## Scout Bee: research with Tavily
+
+Before the bees ask anything, the Scout Bee runs one Tavily search on the idea (`src/adapters/tavily.py`) and hands up to five pages to the engine. The bees use them only to ask sharper questions: a rule that applies, a failure other products hit. A question that came from a page shows its source in the chat, and the Brief lists every page.
+
+Research never becomes a decision. It is not added to the founder's spec, it cannot draw a flow, and a vendor named on a web page is still removed and asked about. The pages are passed to the engine as untrusted reference text. Without `TAVILY_API_KEY` the product works the same, minus the research.
 
 ## Run it locally
 
@@ -45,7 +68,7 @@ Requires Python 3.9 or newer.
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-cp .env.example .env   # then add GEMINI_API_KEY and/or the NVIDIA_* values
+cp .env.example .env   # then add GEMINI_API_KEY and/or NVIDIA_API_KEY, and optionally TAVILY_API_KEY
 .venv/bin/python -m uvicorn src.api.server:app --port 8000
 ```
 
@@ -66,6 +89,7 @@ gcloud run deploy buildingbees --source . --region asia-south1 --allow-unauthent
 | `src/api/server.py` | FastAPI app, one board per visitor |
 | `src/adapters/spec_prompts.py` | Every prompt and output schema |
 | `src/adapters/gemini_adapter.py`, `nvidia_adapter.py` | The two engines |
+| `src/adapters/tavily.py` | The Scout Bee's web search |
 | `src/core/ingest.py` | Turns engine output into the board |
 | `src/core/graph.py` | The board and the readiness rule |
 | `src/core/brief.py` | Writes the Brief (no model call) |
@@ -96,7 +120,7 @@ Every call takes the board id in an `X-Board` header or a `?board=` query parame
 
 ## Built with
 
-Built with Claude Code as the coding assistant. At runtime the app calls only the selected engine.
+Built with Claude Code as the coding assistant. At runtime the app calls only the selected engine, plus Tavily for the Scout Bee's one search.
 
 ## License
 

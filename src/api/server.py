@@ -466,6 +466,10 @@ def _rebuild(d: Dict[str, Any]) -> BuildingBeesEngine:
 # rate limiter if this ever runs on more than one instance.
 MODEL_CALLS_PER_MINUTE = 40
 _recent_calls: List[float] = []
+# The Nebius key is pay-per-use, so the public site gets a hard daily ceiling: a stranger can never spend
+# more than a day's allowance of the hackathon credit. Counted in memory, per UTC day.
+NVIDIA_DAILY_CALLS = int(os.getenv("NVIDIA_DAILY_CALLS") or 400)
+_nvidia_day: Dict[str, int] = {}
 
 
 def _engine(name: str):
@@ -479,6 +483,13 @@ def _engine(name: str):
     _recent_calls[:] = [t for t in _recent_calls if now - t < 60]
     if len(_recent_calls) >= MODEL_CALLS_PER_MINUTE:
         raise HTTPException(status_code=429, detail="The bees are busy right now. Give them a minute and try again.")
+    if name == "nvidia":
+        today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+        used = _nvidia_day.get(today, 0)
+        if used >= NVIDIA_DAILY_CALLS:
+            raise HTTPException(status_code=429, detail="NVIDIA Nemotron has reached today's free limit. Try Google Gemini, or come back tomorrow.")
+        _nvidia_day.clear()  # drops yesterday's count
+        _nvidia_day[today] = used + 1
     _recent_calls.append(now)
     return eng
 

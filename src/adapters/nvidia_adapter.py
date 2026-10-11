@@ -21,6 +21,9 @@ from src.adapters.spec_prompts import (
 
 DEFAULT_BASE_URL = "https://api.tokenfactory.nebius.com/v1"  # the hackathon requires Nebius Token Factory
 DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b"  # of the four Nemotron models on Token Factory (11 Oct 2026): Lightning is quicker but misses vague answers
+# Drawing every screen, button and API from the agreed flows is the one heavy reasoning job, so it goes to
+# the largest Nemotron. Everything the founder waits on between answers stays on the fast one.
+DEFAULT_HEAVY_MODEL = "nvidia/Nemotron-3-Ultra-550b-a55b"
 
 
 def pdf_to_text(data: bytes) -> str:
@@ -45,13 +48,14 @@ class NvidiaNemotronAdapter:
         self.api_key = api_key or os.getenv("NVIDIA_API_KEY", "")
         # `or`, not a getenv default: .env ships these two as empty lines, and empty must mean "use the default".
         self.model = model or os.getenv("NVIDIA_MODEL") or DEFAULT_MODEL
+        self.heavy_model = os.getenv("NVIDIA_HEAVY_MODEL") or DEFAULT_HEAVY_MODEL
         self.base_url = (base_url or os.getenv("NVIDIA_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
 
     @property
     def enabled(self) -> bool:
         return bool(self.api_key)
 
-    def _generate(self, prompt: str, schema):
+    def _generate(self, prompt: str, schema, model: Optional[str] = None):
         if not self.enabled:
             raise EngineNotConfigured("NVIDIA_API_KEY is not set")
         instructions = (
@@ -69,7 +73,7 @@ class NvidiaNemotronAdapter:
                 f"{self.base_url}/chat/completions",
                 headers={"Authorization": f"Bearer {self.api_key}"},
                 # Thinking off: left on, Nemotron 3 spends the whole token budget reasoning and the JSON is cut short.
-                json={"model": self.model, "messages": messages, "temperature": 0.2, "max_tokens": 8192,
+                json={"model": model or self.model, "messages": messages, "temperature": 0.2, "max_tokens": 8192,
                       "chat_template_kwargs": {"enable_thinking": False}},
                 timeout=180,
             )
@@ -88,7 +92,7 @@ class NvidiaNemotronAdapter:
     def extract_spec(self, text: str = "", pdf_bytes: Optional[bytes] = None) -> SpecExtract:
         if pdf_bytes:
             text = pdf_to_text(pdf_bytes)
-        return self._generate(INGEST_PROMPT + text[:60000], SpecExtract)
+        return self._generate(INGEST_PROMPT + text[:60000], SpecExtract, model=self.heavy_model)
 
     def extract_flows(self, text: str = "", pdf_bytes: Optional[bytes] = None) -> FlowsExtract:
         if pdf_bytes:

@@ -446,3 +446,17 @@ def test_scout_bee_sources_are_cited_and_never_become_decisions(monkeypatch):
 def test_no_tavily_key_means_no_research(monkeypatch):
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
     assert server.tavily.research("book a haircut") == [] and server.tavily.as_prompt([]) == ""
+
+
+def test_nemotron_has_a_daily_ceiling(monkeypatch):
+    class FakeNemotron(FakeGemini):
+        key, label = "nvidia", "NVIDIA Nemotron"
+
+    monkeypatch.setitem(server.engines, "nvidia", FakeNemotron())
+    monkeypatch.setitem(server.engines, "gemini", FakeGemini())
+    monkeypatch.setattr(server, "NVIDIA_DAILY_CALLS", 2)
+    monkeypatch.setattr(server, "_nvidia_day", {})
+    c, h = TestClient(server.app), {"X-Board": "capped"}
+    post = lambda: c.post("/api/ingest-prd?engine=nvidia", json={"prd_markdown": "shop"}, headers=h).status_code  # noqa: E731
+    assert [post(), post(), post()] == [200, 200, 429]
+    assert c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h).status_code != 429
