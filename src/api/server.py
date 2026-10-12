@@ -501,7 +501,11 @@ def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None) -> Dict
     """Stage one: flows and the questions about them. No screens are drawn yet."""
     sources = tavily.research(text)  # Scout Bee; empty without a key, and for PDFs
     try:
-        g = build_flows_graph(eng.extract_flows(text=text + tavily.as_prompt(sources), pdf_bytes=pdf_bytes), eng.label)
+        x = eng.extract_flows(text=text + tavily.as_prompt(sources), pdf_bytes=pdf_bytes)
+        if sources and not any(q.source for q in x.questions):
+            # The pages were read but no question used them: ask once more rather than waste the research.
+            x = eng.extract_flows(text=text + tavily.as_prompt(sources), pdf_bytes=pdf_bytes)
+        g = build_flows_graph(x, eng.label)
         # The spec is only what the founder said: research never counts as a decision.
         g.spec_text = (text or pdf_to_text(pdf_bytes))[:SPEC_LIMIT]
     except Exception as e:

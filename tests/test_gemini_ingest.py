@@ -460,3 +460,17 @@ def test_nemotron_has_a_daily_ceiling(monkeypatch):
     post = lambda: c.post("/api/ingest-prd?engine=nvidia", json={"prd_markdown": "shop"}, headers=h).status_code  # noqa: E731
     assert [post(), post(), post()] == [200, 200, 429]
     assert c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h).status_code != 429
+
+
+def test_unused_research_gets_one_more_try(monkeypatch):
+    monkeypatch.setattr(server.tavily, "research", lambda idea: [{"title": "T", "url": "https://example.com/t", "snippet": "s"}])
+    calls = []
+
+    class Forgetful(FakeGemini):
+        def extract_flows(self, text="", pdf_bytes=None):
+            calls.append(1)
+            return super().extract_flows(text=text, pdf_bytes=pdf_bytes)  # never cites a page
+
+    monkeypatch.setitem(server.engines, "gemini", Forgetful())
+    r = TestClient(server.app).post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers={"X-Board": "forgetful"})
+    assert r.status_code == 200 and len(calls) == 2  # once more, then it carries on without citations

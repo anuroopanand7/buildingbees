@@ -399,6 +399,7 @@ async function load() {
   });
   screens.forEach((r) => (S.screens[r.screen_id] = r));
   S.engines = status.engines;
+  if ($("scoutCrew")) $("scoutCrew").hidden = !status.research;
   if (S.engine && !S.engines[S.engine]) S.engine = null;
   $("product").textContent = status.product_name;
   if (S.selected && !S.nodes[S.selected]) S.selected = null;
@@ -850,7 +851,8 @@ $("engineBtn").onclick = () => {
   S.engine = keys[(keys.indexOf(S.engine) + 1) % keys.length]; store.set("bb_engine", S.engine); renderEngine();
 };
 
-$("crew").innerHTML = Object.entries(BEES).map(([c, [name, , , asks]]) => `<li>${beeIcon(c)}<span><b>${name}</b><span>${asks}</span></span></li>`).join("");
+$("crew").innerHTML = Object.entries(BEES).map(([c, [name, , , asks]]) => `<li>${beeIcon(c)}<span><b>${name}</b><span>${asks}</span></span></li>`).join("")
+  + '<li id="scoutCrew" hidden><span class="bee" aria-hidden="true"><i class="ph ph-binoculars"></i></span><span><b>Scout Bee</b><span>Reads the web first, so the others ask about real rules and real failures.</span></span></li>';
 $("prd").value = store.get("bb_spec") || "";
 load().catch((err) => { $("start").hidden = false; say(err.message, true); });
 </script>
