@@ -468,7 +468,7 @@ MODEL_CALLS_PER_MINUTE = 40
 _recent_calls: List[float] = []
 # The Nebius key is pay-per-use, so the public site gets a hard daily ceiling: a stranger can never spend
 # more than a day's allowance of the hackathon credit. Counted in memory, per UTC day.
-NVIDIA_DAILY_CALLS = int(os.getenv("NVIDIA_DAILY_CALLS") or 400)
+NVIDIA_DAILY_CALLS = int(os.getenv("NVIDIA_DAILY_CALLS") or 200)
 _nvidia_day: Dict[str, int] = {}
 
 

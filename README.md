@@ -53,7 +53,7 @@ What made it work:
 - **Thinking is switched off** (`chat_template_kwargs: {enable_thinking: false}`). Left on, Nemotron 3 spent its whole 8,192-token budget reasoning and the JSON came back cut short. Off, the same call returns valid JSON in a few seconds.
 - **Schema in the prompt, validated with Pydantic.** The reply is parsed against the same schema Gemini fills. If it does not validate, the error is sent back once and Nemotron corrects it.
 - **Token Factory's speed is what makes the interview possible.** A two-second reply after every answer feels like a colleague; a twenty-second one would not.
-- **A daily ceiling** (`NVIDIA_DAILY_CALLS`, default 400) keeps the public demo inside the hackathon credit.
+- **A daily ceiling** (`NVIDIA_DAILY_CALLS`, default 200) keeps the public demo inside the hackathon credit.
 
 ## Scout Bee: research with Tavily
 
