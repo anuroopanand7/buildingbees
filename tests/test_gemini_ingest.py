@@ -469,7 +469,10 @@ def test_unused_research_gets_one_more_try(monkeypatch):
     class Forgetful(FakeGemini):
         def extract_flows(self, text="", pdf_bytes=None):
             calls.append(1)
-            return super().extract_flows(text=text, pdf_bytes=pdf_bytes)  # never cites a page
+            x = super().extract_flows(text=text, pdf_bytes=pdf_bytes)
+            for q in x.questions:  # never cites a page (the fake's extract is shared between tests)
+                q.source = 0
+            return x
 
     monkeypatch.setitem(server.engines, "gemini", Forgetful())
     r = TestClient(server.app).post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers={"X-Board": "forgetful"})
