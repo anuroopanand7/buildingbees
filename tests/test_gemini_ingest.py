@@ -477,3 +477,25 @@ def test_unused_research_gets_one_more_try(monkeypatch):
     monkeypatch.setitem(server.engines, "gemini", Forgetful())
     r = TestClient(server.app).post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers={"X-Board": "forgetful"})
     assert r.status_code == 200 and len(calls) == 2  # once more, then it carries on without citations
+
+
+def test_signed_in_people_get_a_list_of_their_boards(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", FakeGemini())
+    monkeypatch.setattr(server, "_uid", lambda auth: {"Bearer ann": "ann", "Bearer bob": "bob"}.get(auth))
+    monkeypatch.setattr(server, "_user_boards", {})
+    c = TestClient(server.app)
+    ann = lambda board: {"X-Board": board, "Authorization": "Bearer ann"}  # noqa: E731
+    c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=ann("ann-1"))
+    c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=ann("ann-2"))
+    c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers={"X-Board": "nobody"})  # not signed in
+
+    mine = c.post("/api/me/boards", headers=ann("ann-empty")).json()["boards"]
+    assert [b["id"] for b in mine] == ["ann-2", "ann-1"] and mine[0]["name"] == "Tiny Shop"  # newest first, empty board not listed
+    assert c.post("/api/me/boards", headers={"X-Board": "x", "Authorization": "Bearer bob"}).json()["boards"] == []
+    assert c.post("/api/me/boards", headers={"X-Board": "x"}).status_code == 401
+    assert c.post("/api/me/boards", headers={"X-Board": "x", "Authorization": "Bearer forged"}).status_code == 401
+
+
+def test_a_bad_token_is_nobody(monkeypatch):
+    monkeypatch.setattr(server, "FIREBASE", {"projectId": "p"})
+    assert server._uid("Bearer not-a-real-token") is None and server._uid("") is None

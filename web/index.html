@@ -211,10 +211,17 @@
   .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; border: none; background: var(--fill); font-size: 16px; }
 
   /* The Brief: the board as a document. Prints cleanly, so "Save as PDF" works from the browser. */
-  #brief { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--text) 35%, transparent); display: grid; place-items: center; padding: 24px; }
+  #brief, #boards { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--text) 35%, transparent); display: grid; place-items: center; padding: 24px; }
   .brief-sheet { background: var(--panel); border-radius: 18px; box-shadow: var(--shadow); width: min(820px, 100%); max-height: 100%; display: flex; flex-direction: column; }
   .brief-bar { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
   .brief-bar b { margin-right: auto; }
+  #boards .brief-sheet { width: min(520px, 100%); }
+  #boardsBody { overflow: auto; padding: 8px 18px 18px; }
+  #boardsBody p { color: var(--muted); font-size: 13px; margin: 10px 0; }
+  .board-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: none; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-top: 8px; font: inherit; cursor: pointer; }
+  .board-row:hover { border-color: var(--line-strong); }
+  .board-row b { flex: 1; font-weight: 600; overflow-wrap: anywhere; }
+  .board-row span { color: var(--muted); font-size: 12px; flex: none; }
   .brief-bar .btn { min-height: 34px; padding: 0 14px; font-size: 13px; }
   #briefBody { overflow: auto; padding: 8px 32px 32px; font-size: 14px; line-height: 1.6; }
   #briefBody h1 { font-size: 26px; letter-spacing: -.02em; margin: 20px 0 8px; }
@@ -270,6 +277,8 @@
   <button class="btn" id="engineBtn" hidden></button>
   <button class="btn" id="briefBtn" hidden><i class="ph ph-file-text" aria-hidden="true"></i>Brief</button>
   <button class="btn ghost" id="newBtn" hidden><i class="ph ph-plus" aria-hidden="true"></i>New spec</button>
+  <button class="btn ghost" id="boardsBtn" hidden><i class="ph ph-squares-four" aria-hidden="true"></i>My boards</button>
+  <button class="btn ghost" id="signBtn" hidden title="Keep your boards and open them on any device"><i class="ph ph-user" aria-hidden="true"></i>Sign in</button>
 </header>
 
 <main id="start" hidden>
@@ -318,6 +327,15 @@
   </section>
 </main>
 
+<div id="boards" hidden role="dialog" aria-modal="true" aria-label="My boards">
+  <div class="brief-sheet">
+    <div class="brief-bar"><b>My boards</b>
+      <button class="btn" id="signOut">Sign out</button>
+      <button class="icon-btn" id="boardsClose" aria-label="Close my boards"><i class="ph ph-x" aria-hidden="true"></i></button>
+    </div>
+    <div id="boardsBody"></div>
+  </div>
+</div>
 <div id="brief" hidden role="dialog" aria-modal="true" aria-label="Product brief">
   <div class="brief-sheet">
     <div class="brief-bar"><b>Product brief</b>
@@ -370,8 +388,12 @@ S.engine = store.get("bb_engine");
 const eq = () => `engine=${encodeURIComponent(S.engine)}`;
 const engineReady = () => !!(S.engine && S.engines[S.engine] && S.engines[S.engine].enabled);
 
+// Sign-in is optional (Firebase Authentication). Signed in, every board you work on is kept under your account.
+const AUTH = { user: null, sdk: null, fb: null };
 async function api(path, opts = {}) {
-  const res = await fetch(path, { ...opts, headers: { ...(opts.headers || {}), "X-Board": BOARD } });
+  const headers = { ...(opts.headers || {}), "X-Board": BOARD };
+  if (AUTH.user) { try { headers.Authorization = "Bearer " + await AUTH.user.getIdToken(); } catch (e) {} }
+  const res = await fetch(path, { ...opts, headers });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.detail || `Request failed (${res.status})`);
   return body;
@@ -399,6 +421,7 @@ async function load() {
   });
   screens.forEach((r) => (S.screens[r.screen_id] = r));
   S.engines = status.engines;
+  initAuth(status.firebase);
   if ($("scoutCrew")) $("scoutCrew").hidden = !status.research;
   if (S.engine && !S.engines[S.engine]) S.engine = null;
   $("product").textContent = status.product_name;
@@ -738,6 +761,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && e.target.dataset.answer) answer(e.target.dataset.answer, e.target.value).catch(fail);
   else if (e.key === "Enter" && e.target.matches(".scr, .cta")) { S.selected = e.target.dataset.id; render(); }
   else if (e.key === "Escape" && !$("brief").hidden) { $("brief").hidden = true; }
+  else if (e.key === "Escape" && !$("boards").hidden) { $("boards").hidden = true; }
   else if (e.key === "Escape" && S.selected) { S.selected = null; render(); }
 });
 
@@ -839,7 +863,45 @@ $("briefDownload").onclick = () => {
 };
 $("briefPrint").onclick = () => window.print();
 
+async function initAuth(cfg) {
+  if (AUTH.sdk || !cfg) return;
+  AUTH.sdk = {};  // claimed, so a second load() does not start it twice
+  try {
+    const [{ initializeApp }, sdk] = await Promise.all([
+      import("https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"),
+      import("https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js")]);
+    AUTH.sdk = sdk; AUTH.fb = sdk.getAuth(initializeApp(cfg));
+    sdk.onAuthStateChanged(AUTH.fb, (u) => {
+      AUTH.user = u;
+      $("signBtn").hidden = !!u; $("boardsBtn").hidden = !u;
+      if (u) api("/api/me/boards", { method: "POST" }).catch(() => {});  // the board open now joins their list
+    });
+  } catch (e) { AUTH.sdk = null; }  // offline or blocked: everything else still works without sign-in
+}
+$("signBtn").onclick = async () => {
+  try { await AUTH.sdk.signInWithPopup(AUTH.fb, new AUTH.sdk.GoogleAuthProvider()); toast("Signed in. Your boards are saved to your account."); }
+  catch (e) { if (!/popup-closed|cancelled-popup/.test(e.code || "")) toast("Could not sign in. " + (e.message || "")); }
+};
+const openBoard = (id) => { store.set("bb_board", id); store.set("bb_graph", ""); location.href = location.pathname; };
+$("boardsBtn").onclick = async () => {
+  $("boards").hidden = false; $("boardsClose").focus();
+  $("boardsBody").innerHTML = "<p>Loading your boards...</p>";
+  try {
+    const { boards } = await api("/api/me/boards", { method: "POST" });
+    $("boardsBody").innerHTML = `<p>Signed in as ${esc(AUTH.user.email || "")}. Open these on any device by signing in.</p>` + (boards.length
+      ? boards.map((b) => `<button class="board-row" data-board="${esc(b.id)}"><b>${esc(b.name)}</b><span>${b.id === BOARD ? "Open now" : esc(new Date(b.updated).toLocaleDateString(undefined, { day: "numeric", month: "short" }))}</span></button>`).join("")
+      : "<p>No boards yet. Map an idea and it will appear here.</p>");
+  } catch (err) { $("boardsBody").innerHTML = `<p>${esc(err.message)}</p>`; }
+};
+$("boardsBody").onclick = (e) => { const b = e.target.closest("[data-board]"); if (b && b.dataset.board !== BOARD) openBoard(b.dataset.board); else if (b) $("boards").hidden = true; };
+$("boardsClose").onclick = () => { $("boards").hidden = true; };
+$("signOut").onclick = async () => { await AUTH.sdk.signOut(AUTH.fb); $("boards").hidden = true; toast("Signed out."); };
+
 $("newBtn").onclick = async () => {
+  if (AUTH.user) {  // signed in: the old board stays in My boards, the new spec gets a board of its own
+    if (confirm("Start a new spec? Your current board stays in My boards.")) openBoard("");
+    return;
+  }
   if (!confirm("Start a new spec? This clears the current map and its answers.")) return;
   try { await api("/api/reset", { method: "POST" }); resetPM(); S.selected = null; await load(); $("prd").focus(); }
   catch (err) { toast(err.message); }

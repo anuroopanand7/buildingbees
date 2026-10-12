@@ -4,7 +4,7 @@ Provides REST endpoints and state synchronization for the Semantic Zoom Canvas,
 Socratic Question Engine, and Dual Hackathon Track Adapters.
 """
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, PlainTextResponse
@@ -77,11 +77,13 @@ boards: "OrderedDict[str, BuildingBeesEngine]" = OrderedDict()
 _board_id: ContextVar[str] = ContextVar("board_id", default="default")
 log = logging.getLogger("buildingbees")
 
-_store = None
+_store = None   # Firestore collection of boards
+_users = None   # Firestore collection of people and the boards they own
 if os.getenv("K_SERVICE"):  # set by Cloud Run; keeps tests and local runs off the network
     try:
         from google.cloud import firestore
-        _store = firestore.Client().collection("boards")
+        _db = firestore.Client()
+        _store, _users = _db.collection("boards"), _db.collection("users")
     except Exception as e:
         log.warning("Firestore unavailable, boards stay in memory: %s", e)
 
@@ -114,6 +116,65 @@ def _load_board(bid: str) -> Optional[BuildingBeesEngine]:
         return None
 
 
+# Sign-in (Firebase Authentication, Google accounts). Optional: without FIREBASE_WEB_CONFIG the product
+# works exactly as before, one board per browser. Signed in, every board a person works on is listed
+# under their account, so they can come back from any device.
+try:
+    FIREBASE = json.loads(os.getenv("FIREBASE_WEB_CONFIG") or "null")
+except ValueError:
+    FIREBASE = None
+_tokens: Dict[str, tuple] = {}   # token -> (uid, expiry), so each request does not re-fetch Google's keys
+_user_boards: Dict[str, Dict[str, Dict[str, Any]]] = {}  # used when there is no Firestore (local runs, tests)
+
+
+def _uid(authorization: str) -> Optional[str]:
+    """The signed-in person's id from a Firebase ID token, or None. Never raises: signing in is optional."""
+    token = authorization[7:] if authorization.lower().startswith("bearer ") else ""
+    if not token or not FIREBASE:
+        return None
+    hit = _tokens.get(token)
+    if hit and hit[1] > time.time():
+        return hit[0]
+    try:
+        from google.auth.transport import requests as google_requests
+        from google.oauth2 import id_token
+        claims = id_token.verify_firebase_token(token, google_requests.Request(), audience=FIREBASE["projectId"])
+    except Exception:
+        return None
+    if len(_tokens) > 2000:
+        _tokens.clear()
+    _tokens[token] = (claims["sub"], claims.get("exp", 0))
+    return claims["sub"]
+
+
+def _remember_board(uid: str, bid: str) -> None:
+    """Adds a board to its owner's list. Empty boards are not worth listing."""
+    g = boards.get(bid)
+    if not uid or g is None or not g.nodes:
+        return
+    entry = {"id": bid, "name": getattr(g, "product_name", "") or "Untitled board",
+             "updated": datetime.datetime.now(datetime.timezone.utc).isoformat()}
+    key = hashlib.sha1(bid.encode()).hexdigest()
+    _user_boards.setdefault(uid, {})[key] = entry
+    if _users is not None:
+        try:
+            _users.document(uid).set({"boards": {key: entry}}, merge=True)
+        except Exception as e:
+            log.warning("Could not save the board list: %s", e)
+
+
+def _list_boards(uid: str) -> List[Dict[str, Any]]:
+    mine = dict(_user_boards.get(uid, {}))
+    if _users is not None:
+        try:
+            snap = _users.document(uid).get()
+            if snap.exists:
+                mine = {**(snap.to_dict().get("boards") or {}), **mine}
+        except Exception as e:
+            log.warning("Could not load the board list: %s", e)
+    return sorted(mine.values(), key=lambda b: b.get("updated", ""), reverse=True)
+
+
 def _board() -> BuildingBeesEngine:
     bid = _board_id.get()
     if bid not in boards:
@@ -141,6 +202,9 @@ async def _select_board(request, call_next):
     response = await call_next(request)
     if request.method == "POST" and request.url.path.startswith("/api/") and response.status_code < 400:
         await run_in_threadpool(_save_board, bid)
+        auth = request.headers.get("authorization", "")
+        if auth:
+            await run_in_threadpool(lambda: _remember_board(_uid(auth), bid))
     return response
 engines = {e.key: e for e in (GoogleGeminiAdapter(), NvidiaNemotronAdapter())}
 
@@ -627,6 +691,16 @@ def reset_to_sample() -> Dict[str, Any]:
     return get_graph_state()
 
 
+@app.post("/api/me/boards")
+def my_boards(request: Request) -> Dict[str, Any]:
+    """The signed-in person's boards, newest first. The board open right now is added to the list."""
+    uid = _uid(request.headers.get("authorization", ""))
+    if not uid:
+        raise HTTPException(status_code=401, detail="Sign in to see your boards.")
+    _remember_board(uid, _board_id.get())
+    return {"boards": _list_boards(uid)}
+
+
 @app.get("/api/status")
 def get_status() -> Dict[str, Any]:
     """Honest runtime status: is a real model connected, and which one."""
@@ -634,6 +708,7 @@ def get_status() -> Dict[str, Any]:
         "product_name": getattr(graph, "product_name", ""),
         "engines": {k: {"label": e.label, "enabled": e.enabled, "model": e.model} for k, e in engines.items()},
         "research": tavily.enabled(),
+        "firebase": FIREBASE,  # public web config, safe to send to the browser
         "total_nodes": len(graph.nodes),
     }
 
