@@ -568,6 +568,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"{eng.label} could not draw the screens: {e}")
     g.spec_text = getattr(old, "spec_text", "")
+    g.product_name = getattr(old, "product_name", "") or g.product_name  # the name the founder already saw stays
     g.sources = getattr(old, "sources", [])
     strip_guesses(g, g.spec_text + " " + " ".join(q.answer_text or "" for q in decisions))
     for f in flows:  # the steps the user agreed to stay on the flow
