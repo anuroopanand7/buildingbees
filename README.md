@@ -115,8 +115,8 @@ Every call takes the board id in an `X-Board` header or a `?board=` query parame
 
 ## Known limits
 
-- Boards are saved to Firestore on Cloud Run, so a board and its Brief link survive the server sleeping. Run locally, boards live in memory and the browser keeps the backup copy. There are no accounts: anyone with a board link can open that board.
-- No accounts and no shared editing yet.
+- Boards are saved to Firestore on Cloud Run, so a board and its Brief link survive the server sleeping. Run locally, boards live in memory and the browser keeps the backup copy. Sign in with Google (Firebase Authentication) is optional: signed in, every board you work on is listed under "My boards" on any device.
+- A board link still opens that board for anyone who has it; boards are not private to their owner yet. No shared editing yet.
 
 ## Built with
 
