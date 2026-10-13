@@ -89,7 +89,8 @@
   .pm-head .sub { font-size: 13px; color: var(--muted); }
   .progress { height: 4px; background: var(--fill); border-radius: 4px; overflow: hidden; margin-top: 10px; }
   .progress i { display: block; height: 100%; background: var(--ok); transition: width .3s; }
-  #thread { flex: 1; overflow: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; }
+  #thread { flex: 1; overflow: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; -webkit-mask-image: linear-gradient(transparent, #000 22px); mask-image: linear-gradient(transparent, #000 22px); }
+  #thread > :first-child { margin-top: auto; }
   .hive { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
   .hive button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 10px 4px 5px; font-size: 12px; font-weight: 500; }
   .hive button[aria-pressed="true"] { border-color: var(--text); background: var(--fill); }
@@ -137,7 +138,7 @@
 
   /* The map: every flow is a row of screens, in order. Each screen lists its buttons and the APIs they call. */
   #map { position: relative; overflow: auto; padding: 24px 28px 60px; background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 22px 22px; }
-  .flow { margin-bottom: 32px; }
+  .flow { margin-bottom: 40px; }
   .flow-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; width: fit-content; background: var(--bg); padding: 2px 10px 2px 0; border-radius: 6px; }
   .flow-head h3 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
   .flow-head .who { font-size: 13px; font-weight: 400; margin: 0; color: var(--muted); }
@@ -149,15 +150,22 @@
   .wires.draw path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw .55s ease-out forwards; }
   @keyframes draw { to { stroke-dashoffset: 0; } }
   @media (prefers-reduced-motion: reduce) { .wires.draw path { animation: none; stroke-dashoffset: 0; } }
-  .flow-row { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 56px 56px; }
-  .steps { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 224px)); gap: 56px 56px; align-items: stretch; }
-  .step { position: relative; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 12px; padding: 12px 14px 13px; box-shadow: 0 1px 2px rgba(17, 17, 16, .05); }
+  .flow-row { display: flex; align-items: stretch; flex-wrap: wrap; gap: 56px 56px; }
+  .steps { display: grid; grid-template-columns: repeat(auto-fill, minmax(212px, 1fr)); gap: 56px 56px; align-items: stretch; max-width: 1180px; }
+  .step { position: relative; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-content: start; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 12px; padding: 12px 14px 13px; box-shadow: 0 1px 2px rgba(17, 17, 16, .05); }
   .step .num { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--fill); color: var(--muted); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .step b { display: block; font-size: 14px; font-weight: 600; line-height: 22px; letter-spacing: -.005em; overflow-wrap: anywhere; }
   .step p { grid-column: 2; margin: 2px 0 0; font-size: 13px; line-height: 1.42; color: var(--muted); text-wrap: pretty; }
   .step b + p { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .step.focus b + p { -webkit-line-clamp: unset; color: var(--text); }
   .step.focus .num { background: var(--accent); color: #2b1f00; }
-  .pin { position: absolute; right: 10px; top: -12px; max-width: calc(100% - 56px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-flex; align-items: center; gap: 5px; background: var(--text); color: var(--on-ink); border-radius: 999px; padding: 2px 9px 2px 3px; font-size: 11px; font-weight: 600; }
+  .step.next { font: inherit; text-align: left; cursor: pointer; background: transparent; border-style: dashed; box-shadow: none; transition: background .15s, border-color .15s; }
+  .step.next:hover { background: var(--panel); border-color: var(--text); }
+  .step.next .num { background: var(--text); color: var(--on-ink); font-size: 13px; }
+  .nudge { animation: nudge .7s ease-out 1; }
+  @keyframes nudge { 0% { transform: scale(1); } 35% { transform: scale(1.035); } 100% { transform: scale(1); } }
+  @media (prefers-reduced-motion: reduce) { .nudge { animation: none; } }
+  .pin { position: absolute; right: 10px; top: -12px; z-index: 3; box-shadow: 0 0 0 2px var(--panel); max-width: calc(100% - 56px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-flex; align-items: center; gap: 5px; background: var(--text); color: var(--on-ink); border-radius: 999px; padding: 2px 9px 2px 3px; font-size: 11px; font-weight: 600; }
   .pin .bee { width: 18px; height: 18px; font-size: 10px; }
   .step .tag { grid-column: 2; justify-self: start; margin-bottom: 4px; }
   .step.fresh { border-color: var(--ok); }
@@ -174,11 +182,15 @@
   .scr { position: relative; flex: none; width: 264px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-card); padding: 14px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
   .scr:hover { border-color: var(--line-strong); }
   .scr.focus, .cta.focus, .api.focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); background: var(--focus); }
+  .cta.focus { border-radius: 8px; }
   .scr h4 { margin: 0 0 8px; font-size: 15px; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
   .scr .bar { height: 4px; background: var(--fill); border-radius: 4px; overflow: hidden; margin: 10px 0 12px; }
   .scr .bar i { display: block; height: 100%; }
-  .ctas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
-  .cta { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--bg); }
+  .ctas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .behind { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .02em; margin: 2px 0 4px; }
+  .cta { border: 1px solid transparent; border-top-color: var(--line); padding: 8px 6px; }
+  .cta-label .ph { color: var(--muted); margin-right: 6px; vertical-align: -1px; }
+  .cta-label .muted { font-weight: 400; font-size: 12px; margin-left: 4px; }
   .cta:hover { border-color: var(--line-strong); }
   .cta-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
   .cta-label { font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
@@ -203,11 +215,11 @@
   .wf.small { max-width: none; border-radius: 12px; padding: 12px; gap: 7px; margin: 10px 0 12px; background: var(--bg); border-color: var(--line); }
   .wf.small .wf-heading { font-size: 13px; }
   .wf.small .wf-text, .wf.small .wf-list, .wf.small .wf-input { font-size: 11px; }
-  .wf.small .wf-note { font-size: 10px; }
+  .wf.small .wf-note { font-size: 11px; }
   .wf.small .wf-input { padding: 5px 8px; }
-  .wf.small .wf-choice span { font-size: 10px; padding: 2px 7px; }
+  .wf.small .wf-choice span { font-size: 11px; padding: 2px 8px; }
   .wf.small .wf-list i { height: 14px; }
-  .wf.small .wf-image { height: 40px; font-size: 10px; }
+  .wf.small .wf-image { height: 40px; font-size: 11px; }
   .wf.small .wf-button { font-size: 11px; padding: 5px 10px; }
   .card-bees { display: inline-flex; gap: 2px; vertical-align: middle; margin-left: 6px; }
 
@@ -279,6 +291,7 @@
     .flow-row, .steps { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 216px; gap: 0 44px; overflow-x: auto; padding: 14px 2px 8px; }
     .flow-row { grid-auto-columns: 264px; }
     .stage-note { display: none; }
+    .pin { left: 36px; right: auto; max-width: calc(100% - 44px); }
     #hive button, header .btn { min-height: 44px; }
     .ask-foot .link, .mine .link { padding: 13px 0; }
     .scr { width: 100%; }
@@ -478,13 +491,14 @@ function render() {
   const rs = Object.values(S.screens), ready = rs.filter((r) => r.is_build_ready).length;
   const flowsStage = S.stage === "flows";
   const qAll = byLayer("QUESTION").length, qOpen = openQuestions().length;
-  $("meterText").textContent = flowsStage ? "Agreeing the flows, screens come next" : `${ready} of ${rs.length} screens ready to build`;
+  $("meterText").textContent = flowsStage ? "Step 1 of 2: agree the flows" : `${ready} of ${rs.length} screens ready to build`;
   $("meterBar").style.width = flowsStage ? `${qAll ? ((qAll - qOpen) / qAll) * 100 : 0}%` : `${rs.length ? (ready / rs.length) * 100 : 0}%`;
   renderMap(); renderPM(); renderDetails();
 
   // Bring the node the PM is asking about into view, once per question.
-  if (PM.focus && PM.focus !== PM.lastFocus && matchMedia("(min-width: 901px)").matches) {
-    document.querySelector("#flows .focus")?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  if (PM.focus && PM.focus !== PM.lastFocus) {
+    const at = document.querySelector("#flows .step.focus, #flows .scr.focus, #flows .focus");
+    at?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" }); at?.classList.add("nudge");
   }
   PM.lastFocus = PM.focus;
 }
@@ -535,12 +549,11 @@ function screenCard(id) {
     ${pmQueue()[0] && screenOf(pmQueue()[0].target_node_id) === id ? `<span class="pin">${beeIcon(pmQueue()[0].category, true)}${esc(bee(pmQueue()[0].category)[0])} is asking</span>` : ""}
     <h4>${esc(n.title)}</h4>${state}${branchBees(id)}
     ${n.metadata?.elements?.length ? wireframe(n.metadata.elements, true) : ""}
-    ${r && r.readiness_score > 0 ? `<div class="bar"><i style="width:${r.readiness_score * 100}%;background:${color(r.readiness_score)}"></i></div>` : '<div style="height:12px"></div>'}
-    ${ctas.length ? `<ul class="ctas">${ctas.map((c) => {
+    ${ctas.length ? `<div class="behind">Behind the buttons</div><ul class="ctas">${ctas.map((c) => {
       const apis = (S.fwd[c.id] || []).map((a) => S.nodes[a]).filter((a) => a && a.layer === "API");
       const cnt = openBlocking(c.id) + apis.reduce((t, a) => t + openBlocking(a.id), 0);
       return `<li class="cta ${PM.focus === c.id || S.selected === c.id ? "focus" : ""} ${hit(c.id) || apis.map((a) => hit(a.id)).find(Boolean) || ""}" data-id="${esc(c.id)}" tabindex="0">
-        <div class="cta-top"><span class="cta-label">${esc(c.label || c.title)}</span>${cnt ? `<span class="count" title="Open blocking questions">${cnt}</span>` : ""}</div>
+        <div class="cta-top"><span class="cta-label"><i class="ph ph-cursor-click" aria-hidden="true"></i>${esc(c.label || c.title)}${apis.length ? "" : ' <span class="muted">no API call</span>'}</span>${cnt ? `<span class="count" title="Open blocking questions">${cnt}</span>` : ""}</div>
         ${apis.length ? `<div class="apis">${apis.map((a) => `<button class="api mono ${PM.focus === a.id || S.selected === a.id ? "focus" : ""}" data-id="${esc(a.id)}">${esc(a.method)} ${esc(a.path)}</button>`).join("")}</div>` : ""}
       </li>`;
     }).join("")}</ul>` : '<div class="no-ctas">No buttons defined</div>'}
@@ -561,7 +574,8 @@ function renderMap() {
   const note = S.stage === "flows" ? '<p class="stage-note">This is how I understood your idea, as flows. No screens yet: answer the bees on the left and I redraw this as we talk. Screens are drawn from your decisions, not from my guesses.</p>' : "";
   const asking = pmQueue()[0];
   const redraw = S.needsRedraw ? '<div class="redraw" role="status"><span>You changed a decision after the screens were drawn, so some screens no longer match it.</span><button class="btn primary" id="drawBtn">Redraw the screens</button></div>' : "";
-  $("flows").innerHTML = redraw + note + rows.map((f) => `<div class="flow ${f.id && ((PM.focus === f.id && !focusStep) || S.selected === f.id) ? "focus" : ""}">
+  const lastFlow = rows.filter((f) => f.id && !f.ids.length).pop();
+  $("flows").innerHTML = redraw + note + rows.map((f) => { const last = f === lastFlow && S.stage === "flows"; return `<div class="flow ${f.id && ((PM.focus === f.id && !focusStep) || S.selected === f.id) ? "focus" : ""}">
     <div class="flow-head"><h3>${f.id ? `<button data-id="${esc(f.id)}">${esc(f.title)}</button>` : esc(f.title)}</h3>${f.who ? `<span class="who">for ${esc(f.who)}</span>` : ""}</div>
     ${f.ids.length
       ? `<div class="flow-row wire">${f.ids.map(screenCard).join("")}</div>`
@@ -574,9 +588,9 @@ function renderMap() {
             <span class="num" aria-hidden="true">${i + 1}</span>${fresh ? '<span class="tag good">From your answer</span>' : ""}
             ${title ? `<b>${esc(title)}</b><p>${esc(text)}</p>` : `<p style="grid-column:2;grid-row:1;margin:0;color:var(--text)">${esc(text)}</p>`}
             ${on && asking ? `<span class="pin">${beeIcon(asking.category, true)}${esc(bee(asking.category)[0])} is asking</span>` : ""}</div>`;
-        }).join("") || '<span class="muted">No steps yet.</span>'}</div>
+        }).join("") || '<span class="muted">No steps yet.</span>'}${last && f.steps.length ? `<button class="step next" data-node data-draw><span class="num" aria-hidden="true"><i class="ph ph-pencil-simple-line"></i></span><b>Draw the screens</b><p>Next: I draw every screen, button and API from these flows and your answers.</p></button>` : ""}</div>
         ${PM.changed.has(f.id) && f.was ? f.was.filter((t) => !f.steps.includes(t)).map((t) => `<div class="gone">Replaced: ${esc(t)}</div>`).join("") : ""}`}
-  </div>`).join("");
+  </div>`; }).join("");
   requestAnimationFrame(drawWires);
 }
 // The step a question points at, by its short title ("" when it is about the whole flow or has no title).
@@ -601,7 +615,7 @@ function drawWires() {
     svg.setAttribute("width", box.scrollWidth); svg.setAttribute("height", box.scrollHeight);
     nodes.slice(0, -1).forEach((a, i) => {
       const r = a.getBoundingClientRect(), n = nodes[i + 1].getBoundingClientRect();
-      const x = (v) => Math.round(v - o.left), y = (v) => Math.round(v - o.top);
+      const x = (v) => Math.round(v - o.left + box.scrollLeft), y = (v) => Math.round(v - o.top + box.scrollTop);  // the strip scrolls sideways on a phone
       let d, tip;
       if (Math.abs(n.top - r.top) < 6 && n.left > r.right) {          // same row
         const yy = y(r.top) + IN; d = `M${x(r.right) + 3} ${yy} H${x(n.left) - 5}`; tip = [x(n.left) - 5, yy, 0];
@@ -821,7 +835,7 @@ document.addEventListener("click", (e) => {
   if (t.id === "closeDetails") { S.selected = null; return render(); }
   if (t.id === "pmParked") { PM.skipped.clear(); return render(); }
   if (t.id === "pmMore") { PM.rounds = 0; return pmDigDeeper(); }
-  if (t.id === "drawBtn") return drawScreens();
+  if (t.id === "drawBtn" || "draw" in t.dataset) return drawScreens();
   if (t.id === "defaultsBtn") {
     return api("/api/questions/accept-defaults", { method: "POST" })
       .then((r) => { PM.changed = new Set(r.changed); return load(); }).catch(fail);
