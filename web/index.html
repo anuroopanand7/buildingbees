@@ -14,7 +14,7 @@
     color-scheme: light;
     --bg: #f7f7f5; --panel: #ffffff; --line: #e6e5e1; --line-strong: #cfcdc7; --fill: #efeeea;
     --text: #111110; --muted: #64635f; --ink: #111110; --on-ink: #ffffff;
-    --accent: #f5b301; --focus: #fff6d6;
+    --accent: #f5b301; --focus: #fff6d6; --wire: #45443f;
     --ok: #12805c; --ok-soft: #e4f4ed; --warn: #a55505; --warn-soft: #fdf0dc; --bad: #c0301e; --bad-soft: #fdebe8;
     --r-card: 14px; --r-input: 12px;
     --shadow: 0 8px 28px rgba(17, 17, 16, .07);
@@ -88,7 +88,7 @@
   .pm-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
   .pm-head .sub { font-size: 13px; color: var(--muted); }
   .progress { height: 4px; background: var(--fill); border-radius: 4px; overflow: hidden; margin-top: 10px; }
-  .progress i { display: block; height: 100%; background: var(--ink); transition: width .3s; }
+  .progress i { display: block; height: 100%; background: var(--ok); transition: width .3s; }
   #thread { flex: 1; overflow: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; }
   .hive { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
   .hive button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 10px 4px 5px; font-size: 12px; font-weight: 500; }
@@ -101,6 +101,8 @@
   .msg-body { min-width: 0; }
   .who { font-size: 12px; font-weight: 600; margin-bottom: 3px; }
   .who span { font-weight: 400; color: var(--muted); }
+  .who .num.on { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: #2b1f00; font-size: 11px; font-weight: 600; vertical-align: -3px; }
+  .who .about { color: var(--text); font-weight: 600; }
   .bubble { background: var(--fill); border-radius: 4px 14px 14px 14px; padding: 9px 13px; font-size: 14px; }
   .mine { align-self: flex-end; max-width: 86%; text-align: right; }
   .mine .bubble { display: inline-block; text-align: left; background: var(--ink); color: var(--on-ink); border-radius: 14px 14px 4px 14px; }
@@ -109,9 +111,10 @@
   .past .q { color: var(--muted); }
   .past .a { display: inline-flex; gap: 6px; align-items: baseline; margin-top: 4px; padding: 6px 12px; border-radius: 12px; background: var(--fill); }
   .past .a i { color: var(--ok); }
-  #ask { border-top: 1px solid var(--line); padding: 18px 20px 20px; }
+  #ask { border-top: 2px solid var(--accent); padding: 18px 20px 20px; }
   .about { font-size: 13px; color: var(--muted); }
-  .sources { margin: 8px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.5; }
+  .sources { margin: 8px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+  .read summary { cursor: pointer; font-size: 13px; color: var(--muted); margin-top: 6px; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
   .cite { font-size: 12.5px; color: var(--muted, #6b7280); margin: -4px 0 10px; }
   .sources a, .cite a { color: inherit; text-decoration: underline; overflow-wrap: anywhere; }
   .question { font-size: 17px; line-height: 1.4; font-weight: 600; letter-spacing: -.01em; margin: 2px 0 10px; }
@@ -133,15 +136,30 @@
   @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } * { transition: none !important; scroll-behavior: auto !important; } }
 
   /* The map: every flow is a row of screens, in order. Each screen lists its buttons and the APIs they call. */
-  #map { position: relative; overflow: auto; padding: 24px 28px 60px; background-image: radial-gradient(var(--line-strong) 1px, transparent 1px); background-size: 22px 22px; }
+  #map { position: relative; overflow: auto; padding: 24px 28px 60px; background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 22px 22px; }
   .flow { margin-bottom: 32px; }
-  .flow-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .flow-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; width: fit-content; background: var(--bg); padding: 2px 10px 2px 0; border-radius: 6px; }
   .flow-head h3 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
   .flow-head .who { font-size: 13px; font-weight: 400; margin: 0; color: var(--muted); }
-  .flow-row { display: flex; align-items: flex-start; flex-wrap: wrap; row-gap: 18px; }
-  .steps { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-  .step { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; font-size: 14px; max-width: 260px; }
-  .steps .ph { color: var(--line-strong); }
+  /* The board is a diagram: nodes in reading order, joined by drawn connectors (see drawWires). */
+  .wire { position: relative; }
+  .wires { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+  .wires path { fill: none; stroke: var(--wire); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .wires path.head { fill: var(--wire); stroke-width: 1; }
+  .wires.draw path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw .55s ease-out forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @media (prefers-reduced-motion: reduce) { .wires.draw path { animation: none; stroke-dashoffset: 0; } }
+  .flow-row { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 56px 56px; }
+  .steps { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 224px)); gap: 56px 56px; align-items: stretch; }
+  .step { position: relative; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 12px; padding: 12px 14px 13px; box-shadow: 0 1px 2px rgba(17, 17, 16, .05); }
+  .step .num { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--fill); color: var(--muted); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .step b { display: block; font-size: 14px; font-weight: 600; line-height: 22px; letter-spacing: -.005em; overflow-wrap: anywhere; }
+  .step p { grid-column: 2; margin: 2px 0 0; font-size: 13px; line-height: 1.42; color: var(--muted); text-wrap: pretty; }
+  .step b + p { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .step.focus .num { background: var(--accent); color: #2b1f00; }
+  .pin { position: absolute; right: 10px; top: -12px; max-width: calc(100% - 56px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-flex; align-items: center; gap: 5px; background: var(--text); color: var(--on-ink); border-radius: 999px; padding: 2px 9px 2px 3px; font-size: 11px; font-weight: 600; }
+  .pin .bee { width: 18px; height: 18px; font-size: 10px; }
+  .step .tag { grid-column: 2; justify-self: start; margin-bottom: 4px; }
   .step.fresh { border-color: var(--ok); }
   .gone { font-size: 12px; color: var(--muted); text-decoration: line-through; margin-top: 6px; }
   .step.focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); background: var(--focus); }
@@ -152,9 +170,8 @@
   .flow.focus .flow-head h3 { box-shadow: 0 2px 0 var(--accent); }
   .redraw { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; background: var(--warn-soft); color: var(--warn); border-radius: var(--r-card); padding: 12px 16px; margin-bottom: 20px; font-size: 14px; }
   .redraw span { flex: 1; min-width: 240px; }
-  .stage-note { font-size: 13px; color: var(--muted); margin: 0 0 20px; max-width: 70ch; }
-  .arrow { flex: none; width: 36px; height: 120px; display: flex; align-items: center; justify-content: center; color: var(--line-strong); font-size: 18px; }
-  .scr { flex: none; width: 264px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-card); padding: 14px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+  .stage-note { font-size: 13px; line-height: 1.5; color: var(--text); margin: 0 0 24px; max-width: 72ch; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+  .scr { position: relative; flex: none; width: 264px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-card); padding: 14px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
   .scr:hover { border-color: var(--line-strong); }
   .scr.focus, .cta.focus, .api.focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); background: var(--focus); }
   .scr h4 { margin: 0 0 8px; font-size: 15px; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
@@ -256,10 +273,14 @@
     header { gap: 8px; padding: 0 12px; }
     #product, #engineBtn { display: none; }
     #pm { border-right: none; border-bottom: 1px solid var(--line); }
-    #thread { max-height: 30dvh; }
-    #map { padding: 20px 16px 40px; }
-    .flow-row { flex-direction: column; }
-    .arrow { width: auto; height: 28px; transform: rotate(90deg); }
+    #thread { max-height: 22dvh; }
+    #map { order: -1; position: sticky; top: 0; z-index: 5; max-height: 42dvh; overflow: auto; padding: 14px 16px 18px; border-bottom: 1px solid var(--line-strong); background-color: var(--bg); }
+    .flow { margin-bottom: 18px; }
+    .flow-row, .steps { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 216px; gap: 0 44px; overflow-x: auto; padding: 14px 2px 8px; }
+    .flow-row { grid-auto-columns: 264px; }
+    .stage-note { display: none; }
+    #hive button, header .btn { min-height: 44px; }
+    .ask-foot .link, .mine .link { padding: 13px 0; }
     .scr { width: 100%; }
     #details { position: fixed; top: 56px; }
     .meter { display: none !important; }
@@ -510,10 +531,11 @@ function screenCard(id) {
     : open ? `<span class="tag"><i class="ph ph-warning" aria-hidden="true"></i>${open} open question${open > 1 ? "s" : ""}</span>`
     : '<span class="tag soft">Details missing</span>';
   const ctas = (S.fwd[id] || []).map((c) => S.nodes[c]).filter((c) => c && c.layer === "CTA");
-  return `<article class="scr ${PM.focus === id || S.selected === id ? "focus" : ""} ${hit(id)}" data-id="${esc(id)}" tabindex="0">
+  return `<article class="scr ${PM.focus === id || S.selected === id ? "focus" : ""} ${hit(id)}" data-id="${esc(id)}" data-node tabindex="0">
+    ${pmQueue()[0] && screenOf(pmQueue()[0].target_node_id) === id ? `<span class="pin">${beeIcon(pmQueue()[0].category, true)}${esc(bee(pmQueue()[0].category)[0])} is asking</span>` : ""}
     <h4>${esc(n.title)}</h4>${state}${branchBees(id)}
     ${n.metadata?.elements?.length ? wireframe(n.metadata.elements, true) : ""}
-    ${r ? `<div class="bar"><i style="width:${Math.max(4, r.readiness_score * 100)}%;background:${color(r.readiness_score)}"></i></div>` : ""}
+    ${r && r.readiness_score > 0 ? `<div class="bar"><i style="width:${r.readiness_score * 100}%;background:${color(r.readiness_score)}"></i></div>` : '<div style="height:12px"></div>'}
     ${ctas.length ? `<ul class="ctas">${ctas.map((c) => {
       const apis = (S.fwd[c.id] || []).map((a) => S.nodes[a]).filter((a) => a && a.layer === "API");
       const cnt = openBlocking(c.id) + apis.reduce((t, a) => t + openBlocking(a.id), 0);
@@ -536,20 +558,69 @@ function renderMap() {
   const loose = byLayer("SCREEN").map((s) => s.id).filter((i) => !placed.has(i));
   if (loose.length) rows.push({ title: "Other screens", who: "", goal: "", ids: loose });
   const focusStep = Number(pmQueue()[0]?.metadata?.step || 0);
-  const note = S.stage === "flows" ? '<p class="stage-note">These are the user flows I read from your input. No screens are drawn yet: answer the questions on the left first, so the screens are built on your decisions and not on my guesses.</p>' : "";
+  const note = S.stage === "flows" ? '<p class="stage-note">This is how I understood your idea, as flows. No screens yet: answer the bees on the left and I redraw this as we talk. Screens are drawn from your decisions, not from my guesses.</p>' : "";
+  const asking = pmQueue()[0];
   const redraw = S.needsRedraw ? '<div class="redraw" role="status"><span>You changed a decision after the screens were drawn, so some screens no longer match it.</span><button class="btn primary" id="drawBtn">Redraw the screens</button></div>' : "";
   $("flows").innerHTML = redraw + note + rows.map((f) => `<div class="flow ${f.id && ((PM.focus === f.id && !focusStep) || S.selected === f.id) ? "focus" : ""}">
     <div class="flow-head"><h3>${f.id ? `<button data-id="${esc(f.id)}">${esc(f.title)}</button>` : esc(f.title)}</h3>${f.who ? `<span class="who">for ${esc(f.who)}</span>` : ""}</div>
     ${f.ids.length
-      ? `<div class="flow-row">${f.ids.map(screenCard).join('<div class="arrow" aria-hidden="true"><i class="ph ph-arrow-right"></i></div>')}</div>`
-      : `<div class="steps">${f.steps.map((t, i) => {
+      ? `<div class="flow-row wire">${f.ids.map(screenCard).join("")}</div>`
+      : `<div class="steps wire">${f.steps.map((t, i) => {
           // After an answer, mark only the steps it added or reworded, and list what it removed.
           const fresh = PM.changed.has(f.id) && f.was && !f.was.includes(t);
-          return `<div class="step ${PM.focus === f.id && focusStep === i + 1 ? "focus" : ""} ${fresh ? "changed fresh" : ""}">${fresh ? '<span class="tag good">New</span> ' : ""}${esc(t)}</div>`;
-        }).join('<i class="ph ph-arrow-right" aria-hidden="true"></i>') || '<span class="muted">No steps yet.</span>'}</div>
+          const on = PM.focus === f.id && focusStep === i + 1;
+          const [title, text] = stepParts(t);
+          return `<div class="step ${on ? "focus" : ""} ${fresh ? "changed fresh" : ""}" data-node>
+            <span class="num" aria-hidden="true">${i + 1}</span>${fresh ? '<span class="tag good">From your answer</span>' : ""}
+            ${title ? `<b>${esc(title)}</b><p>${esc(text)}</p>` : `<p style="grid-column:2;grid-row:1;margin:0;color:var(--text)">${esc(text)}</p>`}
+            ${on && asking ? `<span class="pin">${beeIcon(asking.category, true)}${esc(bee(asking.category)[0])} is asking</span>` : ""}</div>`;
+        }).join("") || '<span class="muted">No steps yet.</span>'}</div>
         ${PM.changed.has(f.id) && f.was ? f.was.filter((t) => !f.steps.includes(t)).map((t) => `<div class="gone">Replaced: ${esc(t)}</div>`).join("") : ""}`}
   </div>`).join("");
+  requestAnimationFrame(drawWires);
 }
+// The step a question points at, by its short title ("" when it is about the whole flow or has no title).
+const stepOf = (q) => stepParts(S.nodes[q.target_node_id]?.metadata?.steps?.[(q.metadata?.step || 0) - 1] || "")[0];
+// A step is written "Short title: what happens". Boards made before 14 Oct 2026 have only the sentence.
+function stepParts(t) {
+  const i = t.indexOf(": "), head = i > 0 ? t.slice(0, i) : "";
+  return head && head.length <= 34 && head.split(" ").length <= 4 ? [head, t.slice(i + 2)] : ["", t];
+}
+// Connectors between consecutive nodes: a straight arrow along a row, an elbow down to the next row.
+let wired = "";
+function drawWires() {
+  const NS = "http://www.w3.org/2000/svg", IN = 23;  // IN: how far below a node's top edge its connector sits
+  const sig = [...document.querySelectorAll("#flows [data-node]")].length + ":" + S.stage;
+  document.querySelectorAll("#flows .wire").forEach((box) => {
+    box.querySelector(".wires")?.remove();
+    const nodes = [...box.children].filter((n) => n.hasAttribute("data-node"));
+    if (nodes.length < 2) return;
+    const o = box.getBoundingClientRect();
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("class", "wires" + (sig !== wired ? " draw" : "")); svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("width", box.scrollWidth); svg.setAttribute("height", box.scrollHeight);
+    nodes.slice(0, -1).forEach((a, i) => {
+      const r = a.getBoundingClientRect(), n = nodes[i + 1].getBoundingClientRect();
+      const x = (v) => Math.round(v - o.left), y = (v) => Math.round(v - o.top);
+      let d, tip;
+      if (Math.abs(n.top - r.top) < 6 && n.left > r.right) {          // same row
+        const yy = y(r.top) + IN; d = `M${x(r.right) + 3} ${yy} H${x(n.left) - 5}`; tip = [x(n.left) - 5, yy, 0];
+      } else {                                                          // next row (or stacked on a phone)
+        const mid = y(n.top) - 30, x1 = x(r.left + r.width / 2), x2 = x(n.left) + IN, q = 8, s = x2 < x1 ? -1 : 1;
+        d = Math.abs(x2 - x1) < 2 * q ? `M${x2} ${y(r.bottom) + 3} V${y(n.top) - 5}`
+          : `M${x1} ${y(r.bottom) + 3} V${mid - q} Q${x1} ${mid} ${x1 + s * q} ${mid} H${x2 - s * q} Q${x2} ${mid} ${x2} ${mid + q} V${y(n.top) - 5}`;
+        tip = [x2, y(n.top) - 5, 90];
+      }
+      const p = document.createElementNS(NS, "path"); p.setAttribute("d", d); p.setAttribute("pathLength", "1"); svg.appendChild(p);
+      const h = document.createElementNS(NS, "path");
+      h.setAttribute("d", "M-9 -5 L0 0 L-9 5 Z"); h.setAttribute("class", "head"); h.setAttribute("pathLength", "1"); h.setAttribute("transform", `translate(${tip[0]} ${tip[1]}) rotate(${tip[2]})`); svg.appendChild(h);
+    });
+    box.appendChild(svg);
+  });
+  wired = sig;
+}
+addEventListener("resize", () => requestAnimationFrame(drawWires));
+document.fonts?.ready.then(() => requestAnimationFrame(drawWires));
 
 // ---------- product manager ----------
 // Next node worth a deeper look: buttons first (they tie screens to APIs), then APIs, then screens,
@@ -596,7 +667,7 @@ function renderPM() {
     ? "Hi, we are your product team. We read your idea and sketched the flows on the right. Before anyone draws a screen, each of us has a few questions."
     : "The screens are drawn from your decisions. Now we go through them one by one."}</div></div></div>`;
   // Scout Bee: the pages read on the web before anyone asked a question.
-  const scout = S.sources?.length ? `<div class="msg-row"><span class="bee" aria-hidden="true"><i class="ph ph-binoculars"></i></span><div class="msg-body"><div class="who">Scout Bee <span>research</span></div><div class="bubble">Before we asked anything, I read ${S.sources.length} page${S.sources.length === 1 ? "" : "s"} about products like yours. Where a question comes from one, it says so.<ol class="sources">${S.sources.map((s) => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a></li>`).join("")}</ol></div></div></div>` : "";
+  const scout = S.sources?.length ? `<div class="msg-row"><span class="bee" aria-hidden="true"><i class="ph ph-binoculars"></i></span><div class="msg-body"><div class="who">Scout Bee <span>research</span></div><div class="bubble">Before we asked anything, I read ${S.sources.length} page${S.sources.length === 1 ? "" : "s"} about products like yours. Where a question comes from one, it says so.<details class="read"><summary>Show the ${S.sources.length} page${S.sources.length === 1 ? "" : "s"}</summary><ol class="sources">${S.sources.map((s) => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a></li>`).join("")}</ol></details></div></div></div>` : "";
   const cite = (q) => q.metadata?.cite?.url ? `<div class="cite"><i class="ph ph-binoculars" aria-hidden="true"></i> From the Scout Bee's reading: <a href="${esc(q.metadata.cite.url)}" target="_blank" rel="noopener noreferrer">${esc(q.metadata.cite.title)}</a></div>` : "";
   thread.innerHTML = hello + scout + done.map((q) => `
     <div class="msg-row">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(bee(q.category)[0])}</div><div class="bubble">${esc(q.question_text)}</div></div></div>
@@ -618,7 +689,7 @@ function renderPM() {
     const t = S.nodes[q.target_node_id];
     const details = open.filter((o) => o.metadata?.source === "BuildingBees").length; // routine gaps, not a bee's question
     ask.innerHTML = `
-      <div class="msg-row" style="margin-bottom:8px">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(bee(q.category)[0])} <span>asks about <button class="link open" data-id="${esc(q.target_node_id)}">${esc(t ? (t.label || t.title) : q.target_node_id)}</button></span></div></div></div>
+      <div class="msg-row" style="margin-bottom:8px">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(bee(q.category)[0])} <span>asks about ${stepOf(q) ? `<span class="num on">${q.metadata.step}</span> <b class="about">${esc(stepOf(q))}</b> in ` : ""}<button class="link open" data-id="${esc(q.target_node_id)}">${esc(t ? (t.label || t.title) : q.target_node_id)}</button></span></div></div></div>
       <div class="question">${esc(q.question_text)}</div>
       ${cite(q)}
       <span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Blocks the build" : "Good to know"}</span>
@@ -726,7 +797,7 @@ async function answer(qid, text) {
   } catch (err) { PM.error = err.message; }
   PM.reacting = "";
   await load();
-  if (matchMedia("(min-width: 901px)").matches) document.querySelector("#flows .changed")?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  document.querySelector("#flows .changed")?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
 }
 let toastTimer = null;
 function toast(text) {

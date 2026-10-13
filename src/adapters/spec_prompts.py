@@ -175,6 +175,10 @@ Do NOT design screens, buttons or APIs yet. First agree the user flows.
 
 1. List the users (1-3) and the user flows (1-4). Use short UPPER_SNAKE ids (USER_PATIENT, FLOW_CREATE_VIDEO).
 2. For each flow write 3-7 plain-language steps: what the user does and what the product does in reply.
+   Write every step as "Short title: one short sentence". The title is one to three words naming the step
+   ("Pick a slot", "Pay deposit", "Confirmation"); the sentence, under 12 words, says what happens
+   and does not repeat the title.
+   Example: "Pick a slot: The client chooses a stylist and an open time."
    Only draw flows and steps the input actually asks for. Do not add a flow because products like this
    usually have one (cancelling, rescheduling, signing in, refunds, an admin or staff side, notifications).
    If you think such a flow is needed, do NOT draw it: ask whether it is wanted, as a PM question on the
@@ -253,7 +257,9 @@ A. If the answer is vague, evasive or too broad to build from ("everyone", "all 
 
 B. Otherwise set is_vague false and apply the decision to the board. Change only what the answer implies.
    - Flows (the board is at the flows stage): return every flow that changes in flow_updates with its full new
-     list of steps (add, reword, reorder or remove steps). If the answer changes who a user is, return it in
+     list of steps (add, reword, reorder or remove steps). Keep each step in the board's form, "Short title:
+     one short sentence" (a one to three word title, then what happens), and copy unchanged steps exactly.
+     If the answer changes who a user is, return it in
      user_updates. Keep every existing id exactly as given. If the founder has now asked for a flow that is
      not on the board (for example they said yes, customers can cancel), add it to flow_updates with a new
      UPPER_SNAKE flow_id, its steps, and the user_id of the user it belongs to. If that flow belongs to
