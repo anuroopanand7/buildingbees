@@ -28,3 +28,6 @@ second_brain/.obsidian/workspace*
 # Private planning notes: kept on disk, not published
 second_brain/
 HANDOVER.md
+
+# Pitch deck: carries the organisers' template artwork, kept out of the public repo
+submissions/**/BuildingBees-deck.pdf
