@@ -146,7 +146,7 @@
 
   /* The map: every flow is a row of screens, in order. Each screen lists its buttons and the APIs they call. */
   /* The board is a canvas: drag empty space or scroll to pan, pinch or Ctrl/Cmd+scroll to zoom. */
-  #canvas { position: absolute; left: 0; top: 0; width: 100%; padding: 18px 24px 120px; transform-origin: 0 0; will-change: transform; }
+  #canvas { position: absolute; left: 0; top: 0; width: max-content; min-width: 100%; padding: 18px 24px 120px; transform-origin: 0 0; will-change: transform; }
   #canvas.glide { transition: transform .5s var(--ease-out); }
   #map.panning, #map.panning * { cursor: grabbing !important; user-select: none; }
   .zoombar { position: absolute; right: 16px; bottom: 16px; z-index: 4; display: flex; align-items: center; gap: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 3px; box-shadow: var(--shadow); }
@@ -165,8 +165,9 @@
   .wires.draw path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw .55s ease-out forwards; }
   @keyframes draw { to { stroke-dashoffset: 0; } }
   @media (prefers-reduced-motion: reduce) { .wires.draw path { animation: none; stroke-dashoffset: 0; } }
-  .flow-row { display: flex; align-items: stretch; flex-wrap: wrap; gap: 56px 56px; }
-  .steps { display: grid; grid-template-columns: repeat(auto-fill, minmax(212px, 1fr)); gap: 56px 56px; align-items: stretch; max-width: 1180px; }
+  .flow-row { display: flex; align-items: stretch; flex-wrap: nowrap; gap: 56px; }
+  .steps { display: flex; flex-wrap: nowrap; gap: 56px; align-items: stretch; }
+  .steps > .step { flex: 0 0 224px; }
   .step { position: relative; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-content: start; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 12px; padding: 12px 14px 13px; box-shadow: 0 1px 2px rgba(17, 17, 16, .05); }
   .step .num { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--fill); color: var(--muted); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .step b { display: block; font-size: 14px; font-weight: 600; line-height: 22px; letter-spacing: -.005em; overflow-wrap: anywhere; }
@@ -793,7 +794,7 @@ function drawWires() {
       const r = a.getBoundingClientRect(), n = nodes[i + 1].getBoundingClientRect();
       const x = (v) => Math.round((v - o.left) / VIEW.z), y = (v) => Math.round((v - o.top) / VIEW.z);  // screen px to board px at any zoom
       let d, tip;
-      if (Math.abs(n.top - r.top) < 6 && n.left > r.right) {          // same row
+      if (n.top < r.bottom && n.bottom > r.top && n.left > r.right) {   // same row
         const yy = y(r.top) + IN; d = `M${x(r.right) + 3} ${yy} H${x(n.left) - 5}`; tip = [x(n.left) - 5, yy, 0];
       } else {                                                          // next row (or stacked on a phone)
         const mid = y(n.top) - 30, x1 = x(r.left + r.width / 2), x2 = x(n.left) + IN, q = 8, s = x2 < x1 ? -1 : 1;

@@ -57,7 +57,7 @@ def add_questions(engine: BuildingBeesEngine, questions: Iterable[XQuestion], so
             title=f"Spec gap on {q.target_id}",
             target_node_id=q.target_id,
             category=cat,
-            question_text=q.question,
+            question_text=q.question.replace("\u2014", ", ").replace(" ,", ","),  # house style: no em dashes
             is_blocking=q.is_blocking,
             assigned_to=f"{cat.value}_LEAD",
             question_status=QuestionStatus.OPEN,
