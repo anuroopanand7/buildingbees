@@ -48,7 +48,7 @@ from src.adapters.nvidia_adapter import pdf_to_text
 from src.adapters.spec_prompts import REACT_PROMPT
 from src.adapters import tavily
 from src.core.brief import build_brief
-from src.core.ingest import add_gap_questions, add_questions, apply_gap_default, strip_guesses, build_flows_graph, build_graph_from_extract
+from src.core.ingest import add_gap_questions, add_questions, apply_gap_default, strip_guesses, build_flows_graph, build_graph_from_extract, clean_branches, ask_open_branches
 
 app = FastAPI(
     title="BuildingBees API",
@@ -320,7 +320,8 @@ def _apply_reaction(g: BuildingBeesEngine, r) -> List[str]:
         f = g.nodes.get(fu.flow_id)
         if f is None and fu.steps and fu.title and not drawn:
             # A flow the founder has just asked for. Only while flows are still being agreed.
-            f = g.add_node(FlowNode(id=fu.flow_id, title=fu.title, goal=fu.goal, metadata={"steps": fu.steps}))
+            f = g.add_node(FlowNode(id=fu.flow_id, title=fu.title, goal=fu.goal,
+                                   metadata={"steps": fu.steps, "branches": clean_branches(fu.branches, len(fu.steps))}))
             owner = fu.user_id if fu.user_id in users else (users[0] if users else None)
             if owner:
                 g.add_edge(owner, f.id)
@@ -332,6 +333,9 @@ def _apply_reaction(g: BuildingBeesEngine, r) -> List[str]:
             before = f.metadata.get("steps", [])
             f.metadata["was"] = before  # so the board can show what this answer changed
             f.metadata["steps"] = fu.steps
+            f.metadata["was_branches"] = f.metadata.get("branches", [])
+            f.metadata["branches"] = clean_branches(fu.branches, len(fu.steps)) if fu.branches else \
+                [b for b in f.metadata.get("branches", []) if b["at_step"] <= len(fu.steps)]
             for q in g.get_questions_for_node(f.id):  # keep each open question on its step if that step survived
                 k = int(q.metadata.get("step") or 0)
                 if q.question_status == QuestionStatus.OPEN and k:
@@ -375,6 +379,7 @@ def react_to_answer(question_id: str, engine: str) -> Dict[str, Any]:
             "users": [{"id": n.id, "title": n.title, "description": n.description}
                       for n in g.nodes.values() if n.layer.value == "USER"],
             "flows": [{"id": n.id, "title": n.title, "goal": n.goal, "steps": n.metadata.get("steps", []),
+                       "branches": n.metadata.get("branches", []),
                        "user_id": next(iter(g.reverse_edges.get(n.id, [])), "")}
                       for n in g.nodes.values() if n.layer.value == "FLOW"],
         }
@@ -394,7 +399,9 @@ def react_to_answer(question_id: str, engine: str) -> Dict[str, Any]:
     prompt = REACT_PROMPT.format(
         stage=stage, board=json.dumps(board, default=str)[:14000], decisions=decisions[:4000],
         category=q.category.value, target=(target.title if target else q.target_node_id),
-        step=f", step {step}" if step else "", question=q.question_text, answer=q.answer_text,
+        step=(f", step {step}" if step else "") + (f", the \"{q.metadata['branch'].split('|', 1)[1]}\" path that splits off there"
+                                                   if q.metadata.get("branch") else ""),
+        question=q.question_text, answer=q.answer_text,
         changed_from=(f"\nTHE FOUNDER FIRST ANSWERED \"{q.metadata['previous_answer']}\" AND HAS NOW CHANGED THEIR MIND. "
                       "Take back whatever that first answer put on the board, then apply the new one."
                       if q.metadata.get("previous_answer") else ""),
@@ -415,6 +422,8 @@ def react_to_answer(question_id: str, engine: str) -> Dict[str, Any]:
         g.needs_redraw = True  # a decision changed after the screens were drawn; field edits cannot fix structure
     if stage == "screens":
         add_gap_questions(g)  # anything the answer left unfilled gets asked
+    else:
+        ask_open_branches(g, eng.label)  # a split the answer drew but did not settle gets asked
     q.metadata["note"] = r.note[:300]
     q.metadata["vague"] = bool(r.is_vague)  # a vague answer is kept in the chat but is not a decision
     q.metadata.pop("previous_answer", None)
@@ -622,6 +631,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
         json.dumps({
             "users": [{"id": u.id, "title": u.title} for u in users],
             "flows": [{"id": f.id, "title": f.title, "goal": f.goal, "steps": f.metadata.get("steps", []),
+                       "branches": f.metadata.get("branches", []),
                        "user_id": next(iter(old.reverse_edges.get(f.id, [])), "")} for f in flows],
         }),
         "\nDECISIONS THE PRODUCT OWNER HAS ALREADY MADE (part of the spec now, do not ask these again):",
@@ -638,6 +648,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     for f in flows:  # the steps the user agreed to stay on the flow
         if f.id in g.nodes:
             g.nodes[f.id].metadata["steps"] = f.metadata.get("steps", [])
+            g.nodes[f.id].metadata["branches"] = f.metadata.get("branches", [])
     for q in asked:  # every earlier question and its answer travels with the board
         if q.target_node_id in g.nodes:
             g.add_node(q)

@@ -82,12 +82,23 @@ class SpecExtract(BaseModel):
     entities: List[XEntity] = []  # the things the product stores
 
 
+class XBranch(BaseModel):
+    """Where a flow splits: after step at_step the user can go another way (payment fails, slot taken)."""
+    at_step: int          # 1-based step the decision comes after
+    decision: str         # the split as a short question ("Payment went through?")
+    main_label: str       # label on the arrow that carries on along the main row ("Yes")
+    label: str            # label on this other path ("No")
+    steps: List[str] = []  # "Short title: one sentence"; empty = nobody has decided yet, a bee asks
+    rejoin_step: int = 0   # step of the main row this path returns to; 0 = the path ends here
+
+
 class XFlowPlan(BaseModel):
     id: str
     title: str
     goal: str
     user_id: str
     steps: List[str]
+    branches: List[XBranch] = []
 
 
 class FlowsExtract(BaseModel):
@@ -103,6 +114,7 @@ class XFlowUpdate(BaseModel):
     goal: str
     steps: List[str]
     user_id: str = ""  # only needed when the flow is new
+    branches: List[XBranch] = []  # the full new list; empty keeps the branches already drawn
 
 
 class XUserUpdate(BaseModel):
@@ -190,6 +202,17 @@ Do NOT design screens, buttons or APIs yet. First agree the user flows.
    for exactly that. Every user you list must own at least one flow. Someone who only appears inside
    another user's flow, and is not said to do anything themselves, is not a user; mention them in the steps.
    product_name is a short name for the founder's product. Never put "BuildingBees" in it.
+   BRANCHES. Real flows split. Where a step can go two ways, add a branch to the flow: at_step is the
+   step the split comes after, decision is the split as a short question ("Payment went through?",
+   "Slot still free?"), main_label names the way the main row carries on ("Yes"), label names the other
+   way ("No"). Two branches with the same at_step and decision make a three-way split.
+   If the input says what happens on the other path, write its 1-3 steps in the same "Short title: one
+   short sentence" form, and set rejoin_step to the main step it returns to (0 if it ends there).
+   If the input does not say, still draw the split where a real product clearly can fail (a payment, a
+   slot or stock someone else can take, an upload, a check that can say no), leave its steps empty, and
+   ask what should happen there as a question on that flow with "step" set to at_step. An empty branch
+   is how the founder sees what the spec forgot: never fill it with a guess. At most 2 branches per flow;
+   leave branches empty when the flow has no real split.
 3. Then ask what a senior PM would need answered before anyone draws a screen: exactly who the user is,
    what they bring in, what they get out, what is in and out of scope, what happens when it goes wrong,
    how we know it worked. Ask 4-8 questions, most important first. Target each at the flow id or user id
@@ -267,6 +290,14 @@ B. Otherwise set is_vague false and apply the decision to the board. Change only
      UPPER_SNAKE user_id, and use that user_id on the flow.
      Something the user does at a different moment from this flow (cancelling, rescheduling, checking
      history, getting a refund) is its own new flow. Never squeeze it in as a step of the flow it is not part of.
+     Branches: a flow can split after a step (see each flow's "branches"). If the answer says what happens
+     on a path that splits off (the payment fails, the slot is taken), return that flow with its full
+     branches list: fill that branch's steps, or add a new branch where the answer creates a split.
+     Put each part of the answer on the split it is really about, even if the question was about another
+     one (an answer about a failed card belongs on the payment split, not on the slot split).
+     If the path leads back into the main row (they try again, pick another slot), set rejoin_step to the
+     main step it goes back to; use 0 only when the path really ends (they give up, they are turned away).
+     Keep at_step pointing at the right step if you reorder steps. Return branches empty to leave them as they are.
    - Screens (the board is at the screens stage): return field_updates as (node_id, field, value) using only
      these fields. SCREEN: description, states.loading, states.empty, states.error. CTA: label,
      target_screen_on_success, target_screen_on_failure, error_display_type, max_retries. API: method, path,

@@ -153,7 +153,19 @@
   .zoombar button { min-width: 34px; height: 32px; padding: 0 8px; border: 0; background: none; border-radius: 9px; font-size: 12.5px; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-variant-numeric: tabular-nums; }
   .zoombar button:hover { background: var(--fill); }
   #map { position: relative; overflow: hidden; touch-action: none; cursor: grab; padding: 0; background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 22px 22px; }
-  .flow { margin-bottom: 40px; }
+  .flow { position: relative; margin-bottom: 40px; }
+  /* Where a flow splits: a diamond in the row, the other path drawn underneath it (see drawWires). */
+  .steps > .step.decision { flex: 0 0 120px; display: flex; flex-direction: column; align-items: center; background: none; border: 0; padding: 0; box-shadow: none; }
+  .decision .dia { position: relative; width: 46px; height: 46px; display: grid; place-items: center; color: #2b1f00; }
+  .decision .dia::before { content: ""; position: absolute; inset: 7px; transform: rotate(45deg); border: 1.5px solid var(--accent); background: var(--focus); border-radius: 4px; }
+  .decision .dia i { position: relative; font-size: 15px; }
+  .decision p { margin: 6px 0 0; font-size: 12px; line-height: 1.35; text-align: center; color: var(--text); text-wrap: balance; }
+  .branch { margin-top: 48px; }
+  .branch + .branch { margin-top: 28px; }
+  .step.open { border: 1.5px dashed var(--warn); background: var(--warn-soft); }
+  .step.open .num { background: var(--warn); color: #fff; }
+  .branch .end { align-self: flex-start; margin-top: 10px; padding: 4px 12px; border-radius: 999px; background: var(--fill); color: var(--muted); font-size: 12px; font-weight: 600; }
+  .wires text { fill: var(--muted); stroke: none; font-size: 11px; font-weight: 600; }
   .flow-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; width: fit-content; background: var(--bg); padding: 2px 10px 2px 0; border-radius: 6px; }
   .flow-head h3 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
   .flow-head .who { font-size: 13px; font-weight: 400; margin: 0; color: var(--muted); }
@@ -730,7 +742,8 @@ function renderMap() {
     const ids = [...new Set([...(f.screen_ids || []), ...(S.fwd[f.id] || [])])].filter((i) => S.nodes[i]?.layer === "SCREEN");
     ids.forEach((i) => placed.add(i));
     const who = (S.rev[f.id] || []).map((u) => S.nodes[u]?.title).filter(Boolean).join(", ");
-    return { id: f.id, title: f.title, who, goal: f.goal, ids, steps: f.metadata?.steps || [], was: f.metadata?.was };
+    return { id: f.id, title: f.title, who, goal: f.goal, ids, steps: f.metadata?.steps || [], was: f.metadata?.was,
+             branches: f.metadata?.branches || [], wasBranches: f.metadata?.was_branches };
   });
   const loose = byLayer("SCREEN").map((s) => s.id).filter((i) => !placed.has(i));
   if (loose.length) rows.push({ title: "Other screens", who: "", goal: "", ids: loose });
@@ -752,12 +765,15 @@ function renderMap() {
           const fresh = PM.changed.has(f.id) && f.was && !f.was.includes(t);
           const on = !sk && PM.focus === f.id && focusStep === i + 1, drawing = sk && sk.target === f.id && sk.step === i + 1;
           const [title, text] = stepParts(t);
-          return `<div class="step ${on ? "focus" : ""} ${drawing ? "sketching" : ""} ${fresh ? "changed fresh" : ""}" data-node data-key="${esc(f.id + "|" + t)}">
+          const fork = f.branches.find((b) => b.at_step === i + 1);
+          return `<div class="step ${on ? "focus" : ""} ${drawing ? "sketching" : ""} ${fresh ? "changed fresh" : ""}" data-node data-n="${i + 1}" data-key="${esc(f.id + "|" + t)}">
             <span class="num" aria-hidden="true">${i + 1}</span>${fresh ? '<span class="tag good">From your answer</span>' : ""}
             ${title ? `<b>${esc(title)}</b><p>${esc(text)}</p>` : `<p style="grid-column:2;grid-row:1;margin:0;color:var(--text)">${esc(text)}</p>`}
             ${drawing ? `<span class="pin"><i class="ph ph-pencil-simple-line" aria-hidden="true"></i> ${esc(PM.reacting)} is redrawing</span>` : ""}
-            ${on && asking ? `<span class="pin">${beeIcon(asking.category, true)}${esc(bee(asking.category)[0])} is asking</span>` : ""}</div>`;
+            ${on && asking ? `<span class="pin">${beeIcon(asking.category, true)}${esc(bee(asking.category)[0])} is asking</span>` : ""}</div>${fork
+            ? `<div class="step decision" data-node data-fork="${i + 1}" data-yes="${esc(fork.main_label)}" data-key="${esc(f.id + "|?" + fork.decision)}"><span class="dia" aria-hidden="true"><i class="ph ph-git-fork"></i></span><p>${esc(fork.decision)}</p></div>` : ""}`;
         }).join("") || '<span class="muted">No steps yet.</span>'}${last && f.steps.length ? `<button class="step next" data-node data-draw><span class="num" aria-hidden="true"><i class="ph ph-pencil-simple-line"></i></span><b>Draw the screens</b><p>Next: I draw every screen, button and API from these flows and your answers.</p></button>` : ""}</div>
+        ${branchRows(f)}
         ${PM.changed.has(f.id) && f.was ? f.was.filter((t) => !f.steps.includes(t)).map((t) => `<div class="gone">Before your answer: ${esc(stepParts(t)[1])}</div>`).join("") : ""}`}
   </div>`; }).join("");
   let fresh = 0;  // nodes drawn for the first time rise in, in reading order
@@ -767,6 +783,21 @@ function renderMap() {
   });
   WIRE_DELAY = fresh ? fresh * 60 + 250 : 0;  // wires start once the new nodes have landed
   requestAnimationFrame(drawWires);
+}
+// The other paths of a flow, one row each under its diamond. The rightmost split goes nearest the main row,
+// so every connector drops down beside the rows above it, never through them.
+function branchRows(f) {
+  const old = new Set((f.wasBranches || []).flatMap((b) => b.steps));
+  return [...f.branches].sort((a, b) => b.at_step - a.at_step).map((b) => {
+    const nodes = b.steps.map((t, j) => {
+      const [title, text] = stepParts(t), fresh = PM.changed.has(f.id) && f.wasBranches && !old.has(t);
+      return `<div class="step ${fresh ? "changed fresh" : ""}" data-node data-key="${esc(f.id + "|" + b.label + "|" + t)}"><span class="num" aria-hidden="true">${b.at_step}${"abc"[j] || ""}</span>${fresh ? '<span class="tag good">From your answer</span>' : ""}
+        ${title ? `<b>${esc(title)}</b><p>${esc(text)}</p>` : `<p style="grid-column:2;grid-row:1;margin:0;color:var(--text)">${esc(text)}</p>`}</div>`;
+    }).join("");
+    return `<div class="steps wire branch" data-at="${b.at_step}" data-to="${b.rejoin_step || 0}" data-label="${esc(b.label)}">${nodes
+      ? nodes + (b.rejoin_step ? "" : '<div class="end" data-node>End</div>')
+      : `<div class="step open" data-node data-key="${esc(f.id + "|open|" + b.label)}"><span class="num" aria-hidden="true">?</span><b>Not decided yet</b><p>Nobody has said what happens here yet. A bee will ask.</p></div>`}</div>`;
+  }).join("");
 }
 // The step a question points at, by its short title ("" when it is about the whole flow or has no title).
 const stepOf = (q) => stepParts(S.nodes[q.target_node_id]?.metadata?.steps?.[(q.metadata?.step || 0) - 1] || "")[0];
@@ -782,6 +813,11 @@ const SEEN = new Set();  // nodes already drawn on screen; only new ones get the
 function drawWires() {
   const NS = "http://www.w3.org/2000/svg", IN = 23;  // IN: how far below a node's top edge its connector sits
   const sig = [...document.querySelectorAll("#flows [data-node]")].length + ":" + S.stage;
+  document.querySelectorAll("#flows .branch").forEach((row) => {  // each other path starts under its diamond
+    const d = row.parentElement.querySelector(`.decision[data-fork="${row.dataset.at}"]`);
+    row.style.marginLeft = (d ? d.offsetLeft : 0) + "px";
+  });
+  const R = (el) => (el.querySelector(":scope > .dia") || el).getBoundingClientRect();  // a diamond joins at its tips
   document.querySelectorAll("#flows .wire").forEach((box) => {
     box.querySelector(".wires")?.remove();
     const nodes = [...box.children].filter((n) => n.hasAttribute("data-node"));
@@ -791,7 +827,7 @@ function drawWires() {
     svg.setAttribute("class", "wires" + (sig !== wired ? " draw" : "")); svg.setAttribute("aria-hidden", "true");
     svg.setAttribute("width", box.scrollWidth); svg.setAttribute("height", box.scrollHeight);
     nodes.slice(0, -1).forEach((a, i) => {
-      const r = a.getBoundingClientRect(), n = nodes[i + 1].getBoundingClientRect();
+      const r = R(a), n = R(nodes[i + 1]);
       const x = (v) => Math.round((v - o.left) / VIEW.z), y = (v) => Math.round((v - o.top) / VIEW.z);  // screen px to board px at any zoom
       let d, tip;
       if (n.top < r.bottom && n.bottom > r.top && n.left > r.right) {   // same row
@@ -809,6 +845,47 @@ function drawWires() {
       h.setAttribute("d", "M-9 -5 L0 0 L-9 5 Z"); h.setAttribute("class", "head"); h.setAttribute("pathLength", "1"); h.setAttribute("transform", `translate(${tip[0]} ${tip[1]}) rotate(${tip[2]})`); svg.appendChild(h);
     });
     box.appendChild(svg);
+  });
+  document.querySelectorAll("#flows .flow").forEach((fl) => {  // links between rows: into each other path, and back
+    fl.querySelector(":scope > .links")?.remove();
+    const rows = [...fl.querySelectorAll(":scope > .branch")], main = fl.querySelector(":scope > .steps:not(.branch)");
+    if (!rows.length || !main) return;
+    const o = fl.getBoundingClientRect(), x = (v) => Math.round((v - o.left) / VIEW.z), y = (v) => Math.round((v - o.top) / VIEW.z);
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("class", "wires links" + (sig !== wired ? " draw" : "")); svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("width", fl.scrollWidth); svg.setAttribute("height", fl.scrollHeight);
+    let n = 0;
+    const line = (d, tip) => {
+      const p = document.createElementNS(NS, "path"); p.setAttribute("d", d); p.setAttribute("pathLength", "1");
+      p.style.setProperty("--d", WIRE_DELAY + 400 + n * 90); svg.appendChild(p);
+      const h = document.createElementNS(NS, "path"); h.style.setProperty("--d", WIRE_DELAY + 700 + n++ * 90);
+      h.setAttribute("d", "M-9 -5 L0 0 L-9 5 Z"); h.setAttribute("class", "head"); h.setAttribute("pathLength", "1");
+      h.setAttribute("transform", `translate(${tip[0]} ${tip[1]}) rotate(${tip[2]})`); svg.appendChild(h);
+    };
+    const label = (tx, ty, t) => { const e = document.createElementNS(NS, "text"); e.setAttribute("x", tx); e.setAttribute("y", ty); e.textContent = t; svg.appendChild(e); };
+    const mb = y(main.getBoundingClientRect().bottom), lane = mb + 22, first = {};
+    fl.querySelectorAll(":scope > .steps > .decision").forEach((d) => {
+      const r = R(d);
+      if (d.nextElementSibling?.hasAttribute("data-node")) label(x(r.right) + 8, y(r.top) + IN - 7, d.dataset.yes);
+    });
+    rows.forEach((row) => {
+      const d = main.querySelector(`.decision[data-fork="${row.dataset.at}"]`), nodes = [...row.children].filter((c) => c.hasAttribute("data-node"));
+      if (!d || !nodes.length) return;
+      const a = nodes[0].getBoundingClientRect(), cx = x(d.getBoundingClientRect().left + d.getBoundingClientRect().width / 2);
+      if (!first[row.dataset.at]) {  // straight down from the diamond into its first other path
+        first[row.dataset.at] = 1;
+        line(`M${cx} ${mb + 3} V${y(a.top) - 5}`, [cx, y(a.top) - 5, 90]); label(cx + 7, y(a.top) - 12, row.dataset.label);
+      } else {                       // a third way: down the left side and in from the left
+        const lx = x(a.left) - 18, yy = y(a.top) + IN;
+        line(`M${cx} ${mb + 3} V${lane} H${lx} V${yy} H${x(a.left) - 5}`, [x(a.left) - 5, yy, 0]); label(lx + 4, yy - 7, row.dataset.label);
+      }
+      const to = main.querySelector(`.step[data-n="${row.dataset.to}"]`);
+      if (Number(row.dataset.to) && to) {  // the path rejoins the main row: up into that step from below
+        const z = nodes[nodes.length - 1].getBoundingClientRect(), t = to.getBoundingClientRect(), tx = x(t.left + t.width * .7), xr = x(z.right) + 22;
+        line(`M${x(z.right) + 3} ${y(z.top) + IN} H${xr} V${lane + 8} H${tx} V${y(t.bottom) + 5}`, [tx, y(t.bottom) + 5, -90]);
+      }
+    });
+    fl.appendChild(svg);
   });
   wired = sig;
 }

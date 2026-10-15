@@ -138,6 +138,35 @@ def strip_guesses(g: BuildingBeesEngine, said: str) -> list:
     return list(dict.fromkeys(blanked))
 
 
+def clean_branches(branches, n_steps: int) -> list:
+    """Branches that split off a step that exists; anything pointing elsewhere is dropped, never guessed."""
+    out = []
+    for b in branches:
+        if 1 <= b.at_step <= n_steps and b.decision:
+            d = b.model_dump()
+            d["rejoin_step"] = d["rejoin_step"] if 0 < d["rejoin_step"] <= n_steps else 0
+            out.append(d)
+    return out
+
+
+def ask_open_branches(g: BuildingBeesEngine, source: str = "ai") -> list:
+    """Every path nobody has decided gets one Testing Bee question, so an empty branch on the board is always asked about."""
+    added = []
+    for f in [n for n in g.nodes.values() if n.layer.value == "FLOW"]:
+        asked = {q.metadata.get("branch") for q in g.get_questions_for_node(f.id)}
+        for b in f.metadata.get("branches", []):
+            key = f"{b['at_step']}|{b['label']}"
+            if b["steps"] or key in asked:
+                continue
+            q = XQuestion(target_id=f.id, category="TESTER", is_blocking=True, step=b["at_step"],
+                          question=f'If the answer to "{b["decision"]}" is {b["label"].lower()}, what should happen next?',
+                          suggested_options=["Let them try again", "Show a message and stop", "Someone follows up"])
+            for node in add_questions(g, [q], source, dedupe=False):
+                node.metadata["branch"] = key
+                added.append(node)
+    return added
+
+
 def build_flows_graph(x: FlowsExtract, source: str = "ai") -> BuildingBeesEngine:
     """Stage one: users and flows only, with the questions to settle before any screen is drawn."""
     g = BuildingBeesEngine()
@@ -146,10 +175,12 @@ def build_flows_graph(x: FlowsExtract, source: str = "ai") -> BuildingBeesEngine
         g.add_node(UserNode(id=u.id, title=u.title, description=u.description,
                             flow_ids=[f.id for f in x.flows if f.user_id == u.id]))
     for f in x.flows:
-        g.add_node(FlowNode(id=f.id, title=f.title, goal=f.goal, metadata={"steps": f.steps}))
+        g.add_node(FlowNode(id=f.id, title=f.title, goal=f.goal,
+                            metadata={"steps": f.steps, "branches": clean_branches(f.branches, len(f.steps))}))
         if f.user_id in g.nodes:
             g.add_edge(f.user_id, f.id)
     add_questions(g, x.questions, source)
+    ask_open_branches(g, source)
     return g
 
 

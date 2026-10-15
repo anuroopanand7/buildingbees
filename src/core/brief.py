@@ -56,6 +56,10 @@ def build_brief(g: BuildingBeesEngine) -> str:
             add(f"Goal: {f.goal}")
         for i, step in enumerate(f.metadata.get("steps", []), 1):
             add(f"{i}. {step}")
+        for b in f.metadata.get("branches", []):
+            end = f"back to step {b['rejoin_step']}" if b.get("rejoin_step") else "ends here"
+            add(f"- After step {b['at_step']}, {b['decision']} {b['main_label']}: carry on. "
+                f"{b['label']}: " + ("; ".join(b["steps"]) + f" ({end})" if b["steps"] else "**not decided yet**"))
         add("")
 
     if screens:

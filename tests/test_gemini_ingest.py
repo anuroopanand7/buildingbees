@@ -3,7 +3,7 @@
 from fastapi.testclient import TestClient
 
 from src.adapters.spec_prompts import (
-    FlowsExtract, Reaction, XFieldUpdate, XFlowPlan, XFlowUpdate, SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
+    FlowsExtract, Reaction, XBranch, XFieldUpdate, XFlowPlan, XFlowUpdate, SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
 )
 from src.api import server
 from src.core.ingest import build_graph_from_extract
@@ -34,7 +34,9 @@ FLOWS = FlowsExtract(
     product_name="Tiny Shop",
     users=[XUser(id="U_BUYER", title="Buyer", description="Buys things")],
     flows=[XFlowPlan(id="F_BUY", title="Buy", goal="Purchase", user_id="U_BUYER",
-                     steps=["Open cart", "Pay", "See confirmation"])],
+                     steps=["Open cart", "Pay", "See confirmation"],
+                     branches=[XBranch(at_step=2, decision="Payment went through?", main_label="Yes", label="No"),
+                               XBranch(at_step=9, decision="Off the end?", main_label="Yes", label="No")])],
     questions=[XQuestion(target_id="F_BUY", category="PM", question="Is guest checkout allowed?",
                          is_blocking=True, suggested_options=["Yes", "No, sign-in required"])],
 )
@@ -203,6 +205,29 @@ def test_clear_answer_updates_the_board(monkeypatch):
     assert nodes["F_BUY"]["metadata"]["steps"][0] == "Sign in"
     assert nodes[q["id"]]["metadata"]["note"] == "Got it, I added a sign-in step."
     assert "No, sign-in required" in Reactor.prompt
+
+
+def test_flow_branches_are_drawn_filled_by_an_answer_and_briefed(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", Reactor())
+    c, h = TestClient(server.app), {"X-Board": "reactor-branch"}
+    q = _answered_flow_question(c, h, "Show the error and let them try another card")
+    flow = next(n for n in c.get("/api/graph", headers=h).json()["nodes"] if n["id"] == "F_BUY")
+    assert [b["at_step"] for b in flow["metadata"]["branches"]] == [2]  # a split off a missing step is dropped
+    assert "**not decided yet**" in c.get("/api/brief", headers=h).text
+    asks = [n for n in c.get("/api/graph", headers=h).json()["nodes"] if n["layer"] == "QUESTION" and n["metadata"].get("branch")]
+    assert len(asks) == 1 and asks[0]["metadata"]["step"] == 2  # the empty path is asked about, once
+    Reactor.reaction = Reaction(
+        is_vague=False, note="Got it, a failed payment goes back to the card.", follow_up=[], user_updates=[],
+        field_updates=[], flow_updates=[XFlowUpdate(
+            flow_id="F_BUY", title="Buy", goal="Purchase", steps=["Open cart", "Pay", "See confirmation"],
+            branches=[XBranch(at_step=2, decision="Payment went through?", main_label="Yes", label="No",
+                              steps=["Payment failed: The buyer sees why and keeps the cart."], rejoin_step=2)])],
+    )
+    c.post(f"/api/questions/{q['id']}/react?engine=gemini", headers=h)
+    assert '"branches"' in Reactor.prompt  # the bee sees the splits it may fill
+    flow = next(n for n in c.get("/api/graph", headers=h).json()["nodes"] if n["id"] == "F_BUY")
+    assert flow["metadata"]["branches"][0]["steps"] == ["Payment failed: The buyer sees why and keeps the cart."]
+    assert "(back to step 2)" in c.get("/api/brief", headers=h).text
 
 
 def test_vague_answer_gets_a_follow_up_and_changes_nothing(monkeypatch):
