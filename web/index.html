@@ -55,7 +55,7 @@
   .proof { max-width: 1280px; margin: 56px 0 24px; }
   .proof img { display: block; width: 100%; height: auto; border: 1px solid var(--line-strong); border-radius: 16px; box-shadow: var(--shadow); }
   .proof figcaption { font-size: 13px; color: var(--muted); margin-top: 10px; }
-  .team { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 22px 24px; }
+  .team { background: var(--island); border: 0; border-radius: 14px; box-shadow: var(--island-shadow); padding: 20px 22px; }
   .team h2 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
   .team p { margin: 0 0 14px; font-size: 14px; color: var(--muted); }
   .team ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
@@ -63,9 +63,9 @@
   .team li b { display: block; font-weight: 600; }
   .team li span span { color: var(--muted); }
   .team li .bee { width: 34px; height: 34px; font-size: 17px; }
-  #start h1 { text-wrap: balance; font-size: clamp(34px, 4.4vw, 56px); line-height: 1.04; letter-spacing: -.035em; margin: 0 0 14px; font-weight: 600; }
+  #start h1 { text-wrap: balance; font-size: clamp(32px, 3.8vw, 50px); line-height: 1.04; letter-spacing: -.035em; margin: 0 0 14px; font-weight: 600; }
   #start p.lead { font-size: 18px; color: var(--muted); max-width: 52ch; margin: 0 0 28px; }
-  .composer { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 20px; box-shadow: var(--shadow); padding: 16px; }
+  .composer { background: var(--island); border: 0; border-radius: 14px; box-shadow: var(--island-shadow); padding: 16px; }
   .composer label.cap { display: block; font-size: 13px; font-weight: 500; margin: 0 4px 8px; }
   .composer textarea { display: block; width: 100%; min-height: 150px; max-height: 40dvh; resize: vertical; border: none; outline: none; background: none; color: var(--text); font: inherit; padding: 4px; }
   .composer textarea::placeholder { color: var(--muted); }
@@ -174,8 +174,8 @@
   .step b + p { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .step.focus b + p { -webkit-line-clamp: unset; color: var(--text); }
   .step.focus .num { background: var(--accent); color: #2b1f00; }
-  .step.next { font: inherit; text-align: left; cursor: pointer; background: transparent; border-style: dashed; box-shadow: none; transition: background .15s, border-color .15s; }
-  .step.next:hover { background: var(--panel); border-color: var(--text); }
+  .step.next { font: inherit; text-align: left; cursor: pointer; background: color-mix(in srgb, var(--focus) 55%, transparent); border: 1.5px dashed var(--accent); box-shadow: none; transition: background .15s, border-color .15s, transform .12s var(--ease-out); }
+  .step.next:hover { background: var(--focus); border-style: solid; }
   .step.next .num { background: var(--text); color: var(--on-ink); font-size: 13px; }
   /* Motion: one entrance, one curve, one stagger. New nodes rise in as they are drawn; wires follow. */
   :root { --ease-out: cubic-bezier(.16, 1, .3, 1); }
@@ -312,42 +312,152 @@
   .working-card span { display: block; color: var(--muted); font-size: 13px; margin-top: 4px; }
 
   @media (max-width: 900px) {
-    #work { grid-template-columns: minmax(0, 1fr); height: auto; }
-    #pm, #map { min-width: 0; }
-    #thread { flex: none; }
     #start { padding: 24px 16px; }
-    header { gap: 8px; padding: 0 12px; }
-    #product, #engineBtn { display: none; }
-    #pm { border-right: none; border-bottom: 1px solid var(--line); }
-    #thread { max-height: 22dvh; }
-    #map { order: -1; position: sticky; top: 0; z-index: 5; height: 42dvh; overflow: hidden; padding: 0; border-bottom: 1px solid var(--line-strong); background-color: var(--bg); }
     .flow { margin-bottom: 18px; }
-    .flow-row, .steps { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 216px; gap: 0 44px; padding: 14px 2px 8px; }
-    .flow-row { grid-auto-columns: 264px; }
     .stage-note { display: none; }
     .pin { left: 36px; right: auto; max-width: calc(100% - 44px); }
-    #hive button, header .btn { min-height: 44px; }
     .ask-foot .link, .mine .link { padding: 13px 0; }
     .scr { width: 100%; }
-    #details { position: fixed; top: 48px; }
-    .meter { display: none !important; }
-    .logo { margin-right: auto; }
     .composer-foot .btn.primary { margin-left: 0; width: 100%; }
     .start-inner { grid-template-columns: 1fr; }
+  }
+
+  /* ===== Canvas-first shell (15 Oct 2026). The board fills the screen; everything else is an island. ===== */
+  :root { --island: #ffffff; --island-line: transparent; --island-shadow: 0 0 1px rgba(0, 0, 0, .17), 0 0 3px rgba(0, 0, 0, .08), 0 7px 14px rgba(0, 0, 0, .05); --r-island: 10px; }
+  body { font-size: 13px; }
+  .island { background: var(--island); border: 1px solid var(--island-line); border-radius: var(--r-island); box-shadow: var(--island-shadow); }
+  .tool { width: 36px; height: 36px; display: inline-grid; place-items: center; border: 0; border-radius: 9px; background: transparent; color: var(--text); font-size: 18px; cursor: pointer; transition: background .15s, transform .12s var(--ease-out); }
+  .tool:hover { background: var(--fill); }
+  .tool:active { transform: scale(.94); }
+  .tool[aria-pressed="true"], .tool[aria-expanded="true"]:not(#menuBtn):not(#dockMin) { background: var(--focus); box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .tool.sm { width: 28px; height: 28px; font-size: 15px; border-radius: 7px; }
+  .btn.sm { min-height: 34px; padding: 0 13px; font-size: 13px; gap: 6px; }
+  /* Tooltips: icons say what they are on hover or keyboard focus, after a short pause. */
+  [data-tip] { position: relative; }
+  [data-tip]::after { content: attr(data-tip); position: absolute; z-index: 60; left: 50%; top: calc(100% + 8px); transform: translate(-50%, -3px); background: #1d1c1a; color: #fff; font: 500 11.5px/1.35 var(--sans, inherit); padding: 5px 8px; border-radius: 6px; white-space: pre; pointer-events: none; opacity: 0; transition: opacity .12s, transform .12s; text-align: left; letter-spacing: 0; }
+  [data-tip]:hover::after, [data-tip]:focus-visible::after { opacity: 1; transform: translate(-50%, 0); transition-delay: .3s; }
+  [data-tip-pos="right"]::after { left: calc(100% + 10px); top: 50%; transform: translate(-3px, -50%); }
+  [data-tip-pos="right"]:hover::after, [data-tip-pos="right"]:focus-visible::after { transform: translate(0, -50%); }
+  [data-tip-pos="top"]::after { top: auto; bottom: calc(100% + 8px); transform: translate(-50%, 3px); }
+  [data-tip-pos="top"]:hover::after, [data-tip-pos="top"]:focus-visible::after { transform: translate(-50%, 0); }
+  [data-tip-pos="bottom-end"]::after { left: auto; right: 0; transform: translate(0, -3px); }
+  [data-tip-pos="bottom-end"]:hover::after, [data-tip-pos="bottom-end"]:focus-visible::after { transform: none; }
+  /* Top left: menu and name. Top right: account and the Brief. Top centre: where you are. */
+  .brand { position: fixed; top: 12px; left: 12px; z-index: 30; display: flex; align-items: center; gap: 4px; padding: 4px 12px 4px 4px; min-height: 46px; max-width: min(46vw, 420px); }
+  #menuBtn[hidden] + .logo { padding-left: 8px; }
+  .brand .logo { display: flex; align-items: center; gap: 7px; font-weight: 600; font-size: 13.5px; letter-spacing: -.01em; white-space: nowrap; }
+  .brand .hex { width: 16px; height: 16px; }
+  #product { color: var(--muted); font-size: 13px; padding-left: 8px; margin-left: 4px; border-left: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  #product:empty { display: none; }
+  .menu { position: fixed; top: 58px; left: 12px; z-index: 31; min-width: 210px; padding: 6px; display: grid; gap: 1px; transform-origin: top left; animation: pop .18s var(--ease-out) both; }
+  .menu button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; text-align: left; padding: 8px 10px; border-radius: 7px; font-size: 13px; cursor: pointer; }
+  .menu button:hover, .menu button:focus-visible { background: var(--fill); }
+  .menu button .ph { font-size: 16px; color: var(--muted); }
+  @keyframes pop { from { opacity: 0; transform: scale(.96) translateY(-4px); } }
+  .topright { position: fixed; top: 12px; right: 12px; z-index: 30; display: flex; align-items: center; gap: 8px; }
+  .topright .island.tool { width: 38px; height: 38px; border-radius: 10px; }
+  .brief-btn { background: var(--island); min-height: 38px; border-radius: 10px; font-weight: 600; }
+  .brief-btn:hover { background: var(--fill); }
+  .stage { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 29; display: flex; align-items: center; gap: 10px; padding: 7px 14px; font-size: 12.5px; white-space: nowrap; }
+  .stage .track { width: 90px; height: 4px; border-radius: 4px; background: var(--fill); overflow: hidden; }
+  .stage .track i { display: block; height: 100%; background: var(--ok); transition: width .4s var(--ease-out); }
+  #pmSub { color: var(--muted); }
+  /* Workspace: the board is the whole screen. */
+  #work { position: fixed; inset: 0; display: block; height: auto; }
+  #map { position: absolute; inset: 0; }
+  #canvas { padding: 84px 96px 300px 92px; }
+  /* Left: the bees, as tools. */
+  .rail { position: fixed; left: 12px; top: 50%; transform: translateY(-50%); z-index: 25; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; }
+  .rail #hive { display: flex; flex-direction: column; gap: 4px; }
+  .rail #hive button { position: relative; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 10px; background: none; padding: 0; cursor: pointer; transition: background .15s, transform .12s var(--ease-out), opacity .2s; }
+  .rail #hive button:hover { background: var(--fill); }
+  .rail #hive button:active { transform: scale(.94); }
+  .rail #hive button .bee { width: 30px; height: 30px; font-size: 15px; }
+  .rail #hive button[aria-pressed="true"] { background: var(--focus); box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .rail #hive button.quiet .bee { filter: grayscale(1); opacity: .45; }
+  .rail #hive button.asking .bee { animation: bob 1.8s ease-in-out infinite; }
+  .rail #hive button.asking::before { content: ""; position: absolute; left: -7px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
+  .rail #hive button .badge { animation: badge-pop .32s cubic-bezier(.34, 1.56, .64, 1) both; }
+  @keyframes badge-pop { from { transform: scale(.5); } }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+  .rail .badge { position: absolute; top: 1px; right: 1px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: #1d1c1a; color: #fff; font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; box-shadow: 0 0 0 2px var(--island); font-variant-numeric: tabular-nums; }
+  .rail .done { position: absolute; bottom: 3px; right: 3px; width: 13px; height: 13px; border-radius: 50%; background: var(--ok); color: #fff; font-size: 9px; display: grid; place-items: center; box-shadow: 0 0 0 2px var(--island); }
+  .rail-sep { width: 22px; height: 1px; background: var(--line); margin: 3px 0; }
+  /* The conversation slides out beside the rail when asked for. */
+  .convo { position: fixed; left: 72px; top: 64px; bottom: 64px; z-index: 24; width: 330px; display: flex; flex-direction: column; overflow: hidden; transform: translateX(-12px); opacity: 0; visibility: hidden; transition: transform .3s var(--ease-out), opacity .2s, visibility 0s .3s; }
+  .convo.open { transform: none; opacity: 1; visibility: visible; transition: transform .3s var(--ease-out), opacity .2s; }
+  .convo-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 10px 8px 16px; border-bottom: 1px solid var(--line); font-size: 13px; }
+  #pm #thread { flex: 1 1 auto; max-height: none; -webkit-mask-image: none; mask-image: none; padding: 14px 16px; gap: 12px; font-size: 13px; }
+  #thread .bubble { font-size: 13px; padding: 9px 12px; }
+  /* Bottom centre: the question, the heart of the product. */
+  .dock { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 26; width: min(600px, calc(100vw - 168px)); max-height: min(40vh, 360px); display: flex; flex-direction: column; transition: max-height .35s var(--ease-out); }
+  .dock #ask { border: 0; padding: 12px 16px 12px; overflow: auto; flex: 1 1 auto; }
+  .dock .dock-min { position: absolute; top: 8px; right: 8px; z-index: 2; color: var(--muted); }
+  .dock.min #ask { display: none; }
+  .dock.min .dock-min { display: none; }
+  .dock-pill { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; padding: 9px 14px 9px 10px; font: inherit; font-size: 13px; text-align: left; cursor: pointer; border-radius: var(--r-island); }
+  .dock-pill:hover { background: var(--fill); }
+  .dock-pill .ph { margin-left: auto; color: var(--muted); }
+  .dock .question { font-size: 14.5px; line-height: 1.38; margin: 4px 30px 6px 0; text-wrap: pretty; }
+  .dock .cite { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0 0 6px; }
+  .dock .field label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .dock .tag { font-size: 11px; padding: 2px 8px; }
+  .dock .ask-foot { margin-top: 6px; }
+  .dock .ask-foot + .ask-foot { margin-top: 2px; }
+  .dock .msg-row .who { font-size: 12px; }
+  .dock .options { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .dock .option { border-radius: 999px; padding: 6px 12px; font-size: 12.5px; width: auto; }
+  .dock .field label { font-size: 11.5px; }
+  .dock .field input { font-size: 13.5px; padding: 8px 12px; min-height: 0; }
+  .dock .ask-foot { margin-top: 8px; font-size: 12px; }
+  .dock .cite { font-size: 12px; }
+  /* What the bee changed, said once above the question, then it fades. */
+  #beeNote { display: flex; gap: 10px; align-items: flex-start; padding: 10px 40px 10px 14px; border-bottom: 1px solid var(--line); background: var(--ok-soft); border-radius: var(--r-island) var(--r-island) 0 0; font-size: 13px; animation: rise .4s var(--ease-out) both; }
+  #beeNote .bee { width: 22px; height: 22px; font-size: 11px; flex: none; }
+  #coach { display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 12.5px; font-weight: 500; background: var(--focus); border-bottom: 1px solid #f3e2a8; border-radius: var(--r-island) var(--r-island) 0 0; animation: rise .4s var(--ease-out) both; }
+  #coach .ph { font-size: 15px; animation: bob 1.4s ease-in-out infinite; }
+  /* Bottom left: zoom. */
+  .zoombar { left: 12px; right: auto; bottom: 16px; position: fixed; z-index: 25; padding: 3px; gap: 1px; }
+  .zoombar button { min-width: 32px; height: 30px; font-size: 12px; }
+  /* Right: details slide in as an island. */
+  #details { position: fixed; top: 64px; right: 12px; bottom: 16px; width: min(380px, calc(100vw - 24px)); border: 1px solid var(--island-line); border-radius: var(--r-island); box-shadow: var(--island-shadow); z-index: 27; font-size: 13px; animation: slide-in .3s var(--ease-out) both; }
+  @keyframes slide-in { from { opacity: 0; transform: translateX(16px); } }
+  #working { inset: 0; }
+  #start { padding-top: clamp(84px, 11vh, 120px); min-height: 100dvh; }
+  .stage-note { font-size: 12.5px; }
+  @media (prefers-reduced-motion: reduce) { .menu, #beeNote, #details, .rail #hive button.asking .bee { animation: none !important; } .convo, .dock { transition: none; } }
+  @media (max-width: 900px) {
+    .stage { display: none; }
+    .brand { max-width: calc(100vw - 120px); }
+    .rail { top: auto; bottom: auto; top: 64px; transform: none; left: 8px; padding: 4px; }
+    .rail #hive button { width: 34px; height: 34px; }
+    .rail #hive button .bee { width: 24px; height: 24px; }
+    .convo { left: 8px; right: 8px; width: auto; top: 64px; }
+    .dock { width: calc(100vw - 16px); bottom: 8px; max-height: 40dvh; }
+    .dock .question { font-size: 14px; }
+    .rail { top: 70px; }
+    .zoombar { display: none; }
+    #canvas { padding: 76px 16px 46dvh 64px; }
   }
 </style>
 </head>
 <body>
-<header>
-  <div class="logo"><div class="hex" aria-hidden="true"></div>BuildingBees</div>
-  <div id="product"></div>
-  <div class="meter" id="meter" hidden><span id="meterText"></span><div class="track"><i id="meterBar"></i></div></div>
-  <button class="btn" id="engineBtn" hidden></button>
-  <button class="btn" id="briefBtn" hidden><i class="ph ph-file-text" aria-hidden="true"></i>Brief</button>
-  <button class="btn ghost" id="newBtn" hidden><i class="ph ph-plus" aria-hidden="true"></i>New spec</button>
-  <button class="btn ghost" id="boardsBtn" hidden><i class="ph ph-squares-four" aria-hidden="true"></i>My boards</button>
-  <button class="btn ghost" id="signBtn" hidden title="Keep your boards and open them on any device"><i class="ph ph-user" aria-hidden="true"></i>Sign in</button>
-</header>
+<!-- The chrome floats over the page as small islands, the way Excalidraw and Figma do. -->
+<div class="island brand" id="brand">
+  <button class="tool" id="menuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="menu" aria-label="Menu" data-tip="Menu" data-tip-pos="bottom"><i class="ph ph-list" aria-hidden="true"></i></button>
+  <span class="logo"><span class="hex" aria-hidden="true"></span>BuildingBees</span><span id="product"></span>
+</div>
+<div class="island menu" id="menu" hidden>
+  <button id="newBtn" hidden><i class="ph ph-plus" aria-hidden="true"></i>New spec</button>
+  <button id="boardsBtn" hidden><i class="ph ph-squares-four" aria-hidden="true"></i>My boards</button>
+  <button id="engineBtn" hidden></button>
+  <button id="menuBrief" hidden><i class="ph ph-file-text" aria-hidden="true"></i>Open the Brief</button>
+</div>
+<div class="island stage" id="meter" hidden><span id="meterText"></span><div class="track"><i id="meterBar"></i></div><span id="pmSub"></span></div>
+<div class="topright">
+  <button class="island tool" id="signBtn" hidden aria-label="Sign in" data-tip="Sign in to keep your boards" data-tip-pos="bottom-end"><i class="ph ph-user" aria-hidden="true"></i></button>
+  <button class="island btn sm brief-btn" id="briefBtn" hidden data-tip="Every decision and open question, for engineers" data-tip-pos="bottom-end"><i class="ph ph-file-text" aria-hidden="true"></i>Brief</button>
+</div>
 
 <main id="start" hidden>
   <div class="start-inner">
@@ -369,7 +479,7 @@
       <button class="btn ghost" data-idea="A to-do list app where I can share a list with my family.">Shared to-do list</button>
       <button class="btn ghost" data-idea="An app for flatmates to split bills and see who owes whom.">Split bills with flatmates</button>
     </div>
-    <div class="start-note"><button class="link" id="exampleBtn">Or load a full example spec (food delivery)</button><span id="msg" role="status" aria-live="polite"></span></div>
+    <div class="start-note"><button class="btn ghost sm" id="exampleBtn"><i class="ph ph-sparkle" aria-hidden="true"></i>Load the food delivery example</button><span id="msg" role="status" aria-live="polite"></span></div>
    </div>
    <aside class="team" aria-label="The bees who will ask you questions">
     <h2>Six bees will question your idea</h2>
@@ -378,29 +488,39 @@
    </aside>
   </div>
   <figure class="proof">
-    <img src="/examples/board.png" width="1440" height="900" loading="lazy" alt="A BuildingBees board for a salon booking app: the bees' questions on the left, and five screens with wireframes, buttons and API calls on the right.">
-    <figcaption>A real board, partway through. It started from one line: "an app to book a haircut at my local salon".</figcaption>
+    <img src="/examples/board.png" width="1440" height="900" loading="lazy" alt="A BuildingBees board for a salon booking app: the bees as tools on the left, a bee's question at the bottom, and six screens with wireframes and the API behind each button.">
+    <figcaption>A real board, partway through. It started from one line: "a website where neighbours can lend and borrow tools".</figcaption>
   </figure>
 </main>
 
 <main id="work" hidden>
-  <aside id="pm" aria-label="Your product team">
-    <div class="pm-head"><div class="pm-row"><div class="sub" id="pmSub"></div><button class="link mini" id="beesToggle" aria-expanded="false" aria-controls="hiveFold">Bees</button></div><div class="progress"><i id="pmBar"></i></div>
-      <div class="fold" id="hiveFold"><div><div class="hive" id="hive" role="group" aria-label="Filter questions by bee"></div></div></div></div>
-    <button class="link mini chat-toggle" id="chatToggle" aria-expanded="false" aria-controls="thread">Show the whole conversation</button>
-    <div id="thread"></div>
-    <div id="ask" aria-live="polite"></div>
-  </aside>
-  <section id="map" aria-label="Product map">
+  <section id="map" aria-label="Product board">
     <div id="canvas"><div id="flows"></div></div>
-    <div class="zoombar" role="group" aria-label="Zoom the board">
-      <button id="zoomOut" aria-label="Zoom out"><i class="ph ph-minus" aria-hidden="true"></i></button>
-      <button id="zoomPct" aria-label="Reset zoom to 100%">100%</button>
-      <button id="zoomIn" aria-label="Zoom in"><i class="ph ph-plus" aria-hidden="true"></i></button>
-      <button id="zoomFit" aria-label="Fit the whole board"><i class="ph ph-arrows-out" aria-hidden="true"></i> Fit</button>
-    </div>
-    <aside id="details" hidden aria-label="Details"></aside>
   </section>
+  <!-- The bees are the tools: one per part of the product. -->
+  <nav class="island rail" id="rail" aria-label="Your bees">
+    <div id="hive" role="group" aria-label="Hear from one bee at a time"></div>
+    <span class="rail-sep" aria-hidden="true"></span>
+    <button class="tool" id="chatToggle" aria-expanded="false" aria-controls="pm" aria-label="Conversation" data-tip="Conversation so far" data-tip-pos="right"><i class="ph ph-chats-circle" aria-hidden="true"></i></button>
+  </nav>
+  <aside class="island convo" id="pm" aria-label="Conversation so far">
+    <div class="convo-head"><b>Conversation</b><button class="tool sm" id="convoClose" aria-label="Close the conversation" data-tip="Close" data-tip-pos="bottom"><i class="ph ph-x" aria-hidden="true"></i></button></div>
+    <div id="thread"></div>
+  </aside>
+  <section class="island dock" id="dock" aria-label="Question from the bees">
+    <div id="beeNote" hidden role="status"></div>
+    <div id="coach" hidden><i class="ph ph-hand-pointing" aria-hidden="true"></i>Answer here, and watch the board redraw as we talk.</div>
+    <button class="tool sm dock-min" id="dockMin" aria-expanded="true" aria-label="Hide the question" data-tip="Hide" data-tip-pos="top"><i class="ph ph-caret-down" aria-hidden="true"></i></button>
+    <button class="dock-pill" id="dockPill" hidden></button>
+    <div id="ask" aria-live="polite"></div>
+  </section>
+  <div class="island zoombar" role="group" aria-label="Zoom the board">
+    <button id="zoomOut" aria-label="Zoom out" data-tip="Zoom out" data-tip-pos="top"><i class="ph ph-minus" aria-hidden="true"></i></button>
+    <button id="zoomPct" aria-label="Reset zoom to 100%" data-tip="Reset to 100%" data-tip-pos="top">100%</button>
+    <button id="zoomIn" aria-label="Zoom in" data-tip="Zoom in" data-tip-pos="top"><i class="ph ph-plus" aria-hidden="true"></i></button>
+    <button id="zoomFit" aria-label="Fit the whole board" data-tip="Fit the whole board" data-tip-pos="top"><i class="ph ph-arrows-in-simple" aria-hidden="true"></i></button>
+  </div>
+  <aside id="details" hidden aria-label="Details"></aside>
 </main>
 
 <div id="boards" hidden role="dialog" aria-modal="true" aria-label="My boards">
@@ -525,7 +645,7 @@ function screenOf(id) {
 function render() {
   const has = Object.keys(S.nodes).length > 0;
   $("start").hidden = has; $("work").hidden = !has;
-  $("newBtn").hidden = !has; $("meter").hidden = !has; $("briefBtn").hidden = !has;
+  $("newBtn").hidden = !has; $("meter").hidden = !has; $("briefBtn").hidden = !has; $("menuBrief").hidden = !has; syncMenu();
   renderEngine();
   if (!has) return;
 
@@ -548,13 +668,14 @@ function render() {
 // ---------- engine ----------
 function renderEngine() {
   const live = Object.keys(ENGINE_COPY).filter((k) => S.engines[k]?.enabled);
+  if (!S.engine && live.length) S.engine = live.includes("gemini") ? "gemini" : live[0];  // a sensible default; the founder can switch
   if (live.length === 1 && S.engine !== live[0]) S.engine = live[0]; // nothing to choose between
   if (S.engine && live.length && !live.includes(S.engine)) S.engine = null;
   $("engineSeg").hidden = live.length < 2;
   $("engineSeg").innerHTML = live.map((k) => `<button data-engine="${k}" aria-pressed="${S.engine === k}" title="${esc(S.engines[k].model)}">${ENGINE_COPY[k]}</button>`).join("");
   const b = $("engineBtn");
   b.hidden = !S.engine || live.length < 2; // only worth showing when there is a choice
-  if (S.engine) b.textContent = ENGINE_COPY[S.engine];
+  if (S.engine) b.innerHTML = `<i class="ph ph-cpu" aria-hidden="true"></i>Engine: ${esc(ENGINE_COPY[S.engine])}`;
   $("buildBtn").disabled = !engineReady();
   if (!S.engine && live.length > 1) say("Pick an engine to continue.");
   else if (Object.keys(S.engines).length && !live.length) say("No AI engine is connected. Add a key to .env and restart.", true);
@@ -584,7 +705,7 @@ function screenCard(id) {
   const r = S.screens[id];
   const open = r ? r.open_blocking_questions.length : 0;
   const state = !r ? "" : r.is_build_ready && !open ? '<span class="tag good"><i class="ph ph-check-circle" aria-hidden="true"></i>Ready to build</span>'
-    : open ? `<span class="tag"><i class="ph ph-warning" aria-hidden="true"></i>${open} open question${open > 1 ? "s" : ""}</span>`
+    : open ? `<span class="tag soft"><i class="ph ph-question" aria-hidden="true"></i>${open} open question${open > 1 ? "s" : ""}</span>`
     : '<span class="tag soft">Details missing</span>';
   const ctas = (S.fwd[id] || []).map((c) => S.nodes[c]).filter((c) => c && c.layer === "CTA");
   return `<article class="scr ${PM.focus === id || S.selected === id ? "focus" : ""} ${hit(id)}" data-id="${esc(id)}" data-node tabindex="0">
@@ -715,7 +836,9 @@ function fitView() {
 // Bring a node into view, the canvas version of scrollIntoView.
 function reveal(el) {
   if (!el || !$("map").offsetWidth) return;
-  const m = $("map").getBoundingClientRect(), r = el.getBoundingClientRect(), pad = 48;
+  const b = $("map").getBoundingClientRect(), r = el.getBoundingClientRect(), pad = 32;
+  const dock = $("dock").getBoundingClientRect(), rail = $("rail").getBoundingClientRect();
+  const m = { left: Math.max(b.left, rail.right), right: b.right, top: b.top + 56, bottom: Math.min(b.bottom, dock.top) };
   let dx = 0, dy = 0;
   if (r.right > m.right - pad) dx = m.right - pad - r.right;
   if (r.left + dx < m.left + pad) dx = m.left + pad - r.left;
@@ -783,16 +906,22 @@ function renderPM() {
   const all = byLayer("QUESTION");
   const open = openQuestions();
   const done = all.filter((q) => q.question_status !== "OPEN").sort((a, b) => String(a.answered_at).localeCompare(String(b.answered_at)));
-  $("pmSub").textContent = all.length ? `${done.length} of ${all.length} answered. A one-shot tool would have guessed all ${all.length}.` : "No questions yet";
-  $("chatToggle").hidden = !done.length;
-  $("pmBar").style.width = `${all.length ? (done.length / all.length) * 100 : 0}%`;
+  $("pmSub").textContent = all.length ? `${done.length} of ${all.length} answered` : "";
+  $("coach").hidden = !!(done.length || store.get("bb_coach") || PM.reacting);
+  $("meter").dataset.tip = all.length ? `A one-shot tool would have guessed all ${all.length}.` : "";
+  $("meter").dataset.tipPos = "bottom";
 
   // The hive: who has questions waiting. Click a bee to hear only from that one.
   if (PM.bee && !open.some((q) => q.category === PM.bee)) PM.bee = null;
-  $("hive").innerHTML = Object.keys(BEES).filter((c) => all.some((q) => q.category === c)).map((c) => {
-    const n = open.filter((q) => q.category === c).length;
-    return `<button data-bee="${c}" aria-pressed="${PM.bee === c}" ${n ? "" : "disabled"} title="${esc(bee(c)[0])}: ${esc(bee(c)[1])}" aria-label="${esc(bee(c)[0])}, ${n} open">${beeIcon(c, true)}${esc(bee(c)[0].replace(" Bee", ""))}${n ? `<span class="n">${n}</span>` : '<i class="ph ph-check" aria-hidden="true"></i>'}</button>`;
-  }).join("");
+  const now = pmQueue()[0]?.category;
+  $("hive").innerHTML = Object.keys(BEES).map((c) => {
+    const n = open.filter((q) => q.category === c).length, asked = all.filter((q) => q.category === c).length;
+    const tip = `${bee(c)[0]}: ${bee(c)[1]}\n${n ? `${n} question${n > 1 ? "s" : ""} for you. Click to hear only from this bee.` : asked ? "All answered" : "Nothing to ask yet"}`;
+    return `<button data-bee="${c}" aria-pressed="${PM.bee === c}" class="${n ? "" : "quiet"} ${c === now ? "asking" : ""}" aria-label="${esc(bee(c)[0])}, ${n} open" data-tip="${esc(tip)}" data-tip-pos="right">${beeIcon(c)}${n ? `<span class="badge">${n}</span>` : asked ? '<span class="done"><i class="ph ph-check" aria-hidden="true"></i></span>' : ""}</button>`;
+  }).join("") + (S.sources?.length ? `<button data-scout aria-label="Scout Bee: ${S.sources.length} pages read" data-tip="Scout Bee: research\nRead ${S.sources.length} pages before the bees asked. Click to see them." data-tip-pos="right"><span class="bee" aria-hidden="true"><i class="ph ph-binoculars"></i></span></button>` : "");
+  // Collapsed question: a single line that says who is waiting.
+  const waiting = pmQueue()[0];
+  $("dockPill").innerHTML = waiting ? `${beeIcon(waiting.category, true)}<span><b>${esc(bee(waiting.category)[0])}</b> has a question for you</span><i class="ph ph-caret-up" aria-hidden="true"></i>` : `<span>No questions waiting</span><i class="ph ph-caret-up" aria-hidden="true"></i>`;
 
   const thread = $("thread");
   const hello = `<div class="msg-row">${beeIcon("PM")}<div class="msg-body"><div class="who">Queen Bee <span>product and scope</span></div><div class="bubble">${S.stage === "flows"
@@ -824,14 +953,14 @@ function renderPM() {
     const t = S.nodes[q.target_node_id];
     const details = open.filter((o) => o.metadata?.source === "BuildingBees").length; // routine gaps, not a bee's question
     ask.innerHTML = `
-      <div class="msg-row" style="margin-bottom:8px">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(bee(q.category)[0])} <span>asks about ${stepOf(q) ? `<span class="num on">${q.metadata.step}</span> <b class="about">${esc(stepOf(q))}</b> in ` : ""}<button class="link open" data-id="${esc(q.target_node_id)}">${esc(t ? (t.label || t.title) : q.target_node_id)}</button></span></div></div></div>
+      <div class="msg-row" style="margin-bottom:8px">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(bee(q.category)[0])} <span>about ${stepOf(q) ? `<span class="num on">${q.metadata.step}</span> <b class="about">${esc(stepOf(q))}</b>` : `<button class="link open" data-id="${esc(q.target_node_id)}">${esc(t ? (t.label || t.title) : q.target_node_id)}</button>`}</span></div></div></div>
       <div class="question">${esc(q.question_text)}</div>
       ${cite(q)}
       <span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Blocks the build" : "Good to know"}</span>
       ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o) => `<button class="option" data-q="${esc(q.id)}" data-opt="${esc(o)}">${esc(o)}</button>`).join("")}</div>` : '<div style="height:12px"></div>'}
-      <div class="field"><label for="own">Or answer in your own words</label><input id="own" data-answer="${esc(q.id)}" placeholder="Type your answer and press Enter" autocomplete="off"></div>
+      <div class="field"><label for="own">Or answer in your own words</label><input id="own" data-answer="${esc(q.id)}" placeholder="Or type your own answer and press Enter" autocomplete="off"></div>
       <div class="ask-foot"><button class="link" data-skip="${esc(q.id)}">Not sure yet, ask me later</button><span class="muted">${open.length - 1} more waiting</span></div>
-      ${S.stage === "flows" ? '<div class="ask-foot"><button class="link" id="drawBtn">Skip ahead and draw the screens</button></div>' : ""}
+      ${S.stage === "flows" ? '<div class="ask-foot"><button class="link" id="drawBtn">Skip the rest and draw the screens</button></div>' : ""}
       ${details > 1 && q.metadata?.source === "BuildingBees" ? `<div class="ask-foot"><button class="btn" id="defaultsBtn" style="width:100%">Use the first suggestion for all ${details} remaining details</button></div>` : ""}`;
     if (PM.lastAsk !== q.id) { [...ask.children].forEach((c, i) => { c.classList.add("enter"); c.style.setProperty("--i", i); }); PM.lastAsk = q.id; }  // a new question rises in
     return;
@@ -914,6 +1043,12 @@ function renderDetails() {
 }
 
 // ---------- actions ----------
+let noteTimer;
+function beeNote(cat, text) {
+  const n = $("beeNote"); clearTimeout(noteTimer);
+  n.innerHTML = `${beeIcon(cat)}<span><b>${esc(bee(cat)[0])}:</b> ${esc(text)}</span>`; n.hidden = false;
+  noteTimer = setTimeout(() => { n.hidden = true; }, 9000);
+}
 async function answer(qid, text) {
   if (!text.trim() || PM.reacting) return;
   const q = S.nodes[qid];
@@ -923,7 +1058,7 @@ async function answer(qid, text) {
   PM.changed = new Set(); PM.front = null;
   if (!engineReady()) return load();
   // The answer is saved. Now the bee that asked reads it: a vague one gets a follow-up, a clear one changes the board.
-  PM.reacting = bee(q?.category)[0];
+  PM.reacting = bee(q?.category)[0]; store.set("bb_coach", "1");
   PM.sketch = q ? { target: q.target_node_id, step: Number(q.metadata?.step || 0) } : null;
   if (q) { q.question_status = "ANSWERED"; q.answer_text = text; }
   render();
@@ -931,6 +1066,7 @@ async function answer(qid, text) {
     const r = await api(`/api/questions/${encodeURIComponent(qid)}/react?${eq()}`, { method: "POST" });
     PM.changed = new Set(r.changed);
     PM.front = r.follow_up[0] || null;
+    if (r.note) beeNote(q?.category, r.note);
   } catch (err) { PM.error = err.message; }
   PM.reacting = ""; PM.sketch = null;
   await load();
@@ -950,7 +1086,8 @@ document.addEventListener("click", (e) => {
   if (t.dataset.engine) { S.engine = t.dataset.engine; store.set("bb_engine", S.engine); say(""); return renderEngine(); }
   if (t.dataset.opt) return answer(t.dataset.q, t.dataset.opt).catch(fail);
   if (t.dataset.skip) { PM.skipped.add(t.dataset.skip); return render(); }
-  if (t.dataset.bee) { PM.bee = PM.bee === t.dataset.bee ? null : t.dataset.bee; return render(); }
+  if (t.dataset.bee) { PM.bee = PM.bee === t.dataset.bee ? null : t.dataset.bee; dockMin(false); return render(); }
+  if ("scout" in t.dataset) { convo(true); return requestAnimationFrame(() => { const d = $("thread").querySelector("details.read"); if (d) { d.open = true; d.scrollIntoView({ block: "center", behavior: "smooth" }); } }); }
   if (t.dataset.reopen) {
     PM.skipped.delete(t.dataset.reopen); PM.front = t.dataset.reopen; PM.bee = null;
     return api(`/api/questions/${encodeURIComponent(t.dataset.reopen)}/reopen`, { method: "POST" }).then(load).catch(fail);
@@ -966,6 +1103,8 @@ document.addEventListener("click", (e) => {
   if (t.dataset.id) { S.selected = t.dataset.id; return render(); }
 });
 document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("menu").hidden) return menu(false);
+  if (e.key === "Escape" && $("pm").classList.contains("open")) return convo(false);
   if (e.key === "Enter" && e.target.dataset.answer) answer(e.target.dataset.answer, e.target.value).catch(fail);
   else if (e.key === "Enter" && e.target.matches(".scr, .cta")) { S.selected = e.target.dataset.id; render(); }
   else if (e.key === "Escape" && !$("brief").hidden) { $("brief").hidden = true; }
@@ -1081,7 +1220,7 @@ async function initAuth(cfg) {
     AUTH.sdk = sdk; AUTH.fb = sdk.getAuth(initializeApp(cfg));
     sdk.onAuthStateChanged(AUTH.fb, (u) => {
       AUTH.user = u;
-      $("signBtn").hidden = !!u; $("boardsBtn").hidden = !u;
+      $("signBtn").hidden = !!u; $("boardsBtn").hidden = !u; syncMenu();
       if (u) api("/api/me/boards", { method: "POST" }).catch(() => {});  // the board open now joins their list
     });
   } catch (e) { AUTH.sdk = null; }  // offline or blocked: everything else still works without sign-in
@@ -1106,12 +1245,24 @@ $("boardsClose").onclick = () => { $("boards").hidden = true; };
 $("signOut").onclick = async () => { await AUTH.sdk.signOut(AUTH.fb); $("boards").hidden = true; toast("Signed out."); };
 
 // Secondary parts of the panel fold away; they slide open only when asked for.
-const fold = (btn, open, label) => { btn.setAttribute("aria-expanded", open); if (label) btn.textContent = label; };
-$("beesToggle").onclick = () => { const o = $("hiveFold").classList.toggle("open"); fold($("beesToggle"), o, o ? "Hide bees" : "Bees"); };
-$("chatToggle").onclick = () => {
-  const o = $("pm").classList.toggle("chat-open"); fold($("chatToggle"), o, o ? "Show less" : "Show the whole conversation");
-  requestAnimationFrame(() => { $("thread").scrollTop = $("thread").scrollHeight; });
+const convo = (open) => {
+  if (open !== $("pm").classList.contains("open") && $("map").offsetWidth > 900) { VIEW.x += open ? 300 : -300; applyView(true); }
+  $("pm").classList.toggle("open", open); $("chatToggle").setAttribute("aria-expanded", open);
+  if (open) requestAnimationFrame(() => { $("thread").scrollTop = $("thread").scrollHeight; });
 };
+$("chatToggle").onclick = () => convo(!$("pm").classList.contains("open"));
+$("convoClose").onclick = () => convo(false);
+const menu = (open) => { $("menu").hidden = !open; $("menuBtn").setAttribute("aria-expanded", open); };
+// The menu button only shows when the menu has something in it.
+const syncMenu = () => { $("menuBtn").hidden = ![...$("menu").children].some((c) => !c.hidden); };
+$("menuBtn").onclick = (e) => { e.stopPropagation(); menu($("menu").hidden); };
+$("menu").addEventListener("click", () => menu(false));
+document.addEventListener("pointerdown", (e) => { if (!$("menu").hidden && !e.target.closest("#menu, #menuBtn")) menu(false); });
+$("menuBrief").onclick = () => $("briefBtn").click();
+// The question can fold down to one line, and opens again with a click.
+const dockMin = (min) => { $("dock").classList.toggle("min", min); $("dockPill").hidden = !min; $("dockMin").setAttribute("aria-expanded", !min); };
+$("dockMin").onclick = () => dockMin(true);
+$("dockPill").onclick = () => dockMin(false);
 
 $("newBtn").onclick = async () => {
   if (AUTH.user) {  // signed in: the old board stays in My boards, the new spec gets a board of its own
