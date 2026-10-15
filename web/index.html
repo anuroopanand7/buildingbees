@@ -40,17 +40,17 @@
   .link { background: none; border: none; padding: 0; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
 
   /* Top bar */
-  header { height: 56px; display: flex; align-items: center; gap: 16px; padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  header { height: 48px; display: flex; align-items: center; gap: 16px; padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
   .logo { display: flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: -.01em; }
   .hex { width: 20px; height: 20px; background: var(--accent); clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%); }
   #product { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .meter { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 13px; }
   .meter .track { width: 120px; height: 6px; border-radius: 6px; background: var(--fill); overflow: hidden; }
   .meter .track i { display: block; height: 100%; background: var(--ok); transition: width .3s; }
-  header .btn { min-height: 34px; padding: 0 14px; font-size: 13px; }
+  header .btn { min-height: 30px; padding: 0 12px; font-size: 12.5px; gap: 6px; }
 
   /* Start screen: one prompt, nothing else competing. */
-  #start { min-height: calc(100dvh - 56px); padding: clamp(40px, 9vh, 96px) clamp(20px, 10vw, 160px) 40px; background-image: radial-gradient(var(--line-strong) 1px, transparent 1px); background-size: 22px 22px; }
+  #start { min-height: calc(100dvh - 48px); padding: clamp(40px, 9vh, 96px) clamp(20px, 10vw, 160px) 40px; background-image: radial-gradient(var(--line-strong) 1px, transparent 1px); background-size: 22px 22px; }
   .start-inner { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: clamp(32px, 6vw, 96px); align-items: center; max-width: 1280px; }
   .proof { max-width: 1280px; margin: 56px 0 24px; }
   .proof img { display: block; width: 100%; height: auto; border: 1px solid var(--line-strong); border-radius: 16px; box-shadow: var(--shadow); }
@@ -82,16 +82,24 @@
   .err { color: var(--bad); }
 
   /* Workspace: the product manager on the left, the map in the centre. */
-  #work { display: grid; grid-template-columns: minmax(340px, 420px) 1fr; height: calc(100dvh - 56px); }
+  #work { display: grid; grid-template-columns: minmax(290px, 330px) 1fr; height: calc(100dvh - 48px); }
   #pm { display: flex; flex-direction: column; border-right: 1px solid var(--line); background: var(--panel); min-height: 0; }
-  .pm-head { padding: 16px 20px 12px; border-bottom: 1px solid var(--line); }
+  .pm-head { padding: 10px 16px 9px; border-bottom: 1px solid var(--line); }
+  .pm-row { display: flex; align-items: baseline; gap: 10px; }
+  .pm-row .sub { flex: 1; min-width: 0; }
+  .mini { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .fold { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .35s var(--ease-out), opacity .25s; }
+  .fold > * { min-height: 0; overflow: hidden; }
+  .fold.open { grid-template-rows: 1fr; opacity: 1; }
   .pm-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
-  .pm-head .sub { font-size: 13px; color: var(--muted); }
-  .progress { height: 4px; background: var(--fill); border-radius: 4px; overflow: hidden; margin-top: 10px; }
+  .pm-head .sub { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .progress { height: 3px; background: var(--fill); border-radius: 3px; overflow: hidden; margin-top: 7px; }
   .progress i { display: block; height: 100%; background: var(--ok); transition: width .3s; }
-  #thread { flex: 1; overflow: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; -webkit-mask-image: linear-gradient(transparent, #000 22px); mask-image: linear-gradient(transparent, #000 22px); }
+  .chat-toggle { align-self: flex-end; margin: 8px 16px 0; }
+  #thread { flex: 0 1 auto; max-height: 158px; transition: max-height .45s var(--ease-out); overflow: auto; padding: 10px 16px 14px; display: flex; flex-direction: column; gap: 12px; -webkit-mask-image: linear-gradient(transparent, #000 22px); mask-image: linear-gradient(transparent, #000 22px); }
   #thread > :first-child { margin-top: auto; }
-  .hive { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  #pm.chat-open #thread { flex: 1 1 auto; max-height: 100vh; }
+  .hive { display: flex; gap: 5px; flex-wrap: wrap; padding-top: 9px; }
   .hive button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 10px 4px 5px; font-size: 12px; font-weight: 500; }
   .hive button[aria-pressed="true"] { border-color: var(--text); background: var(--fill); }
   .hive button:disabled { opacity: .45; }
@@ -112,18 +120,18 @@
   .past .q { color: var(--muted); }
   .past .a { display: inline-flex; gap: 6px; align-items: baseline; margin-top: 4px; padding: 6px 12px; border-radius: 12px; background: var(--fill); }
   .past .a i { color: var(--ok); }
-  #ask { border-top: 2px solid var(--accent); padding: 18px 20px 20px; }
+  #ask { border-top: 2px solid var(--accent); padding: 14px 16px 16px; flex: 1; overflow: auto; }
   .about { font-size: 13px; color: var(--muted); }
   .sources { margin: 8px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.5; color: var(--muted); }
   .read summary { cursor: pointer; font-size: 13px; color: var(--muted); margin-top: 6px; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
   .cite { font-size: 12.5px; color: var(--muted, #6b7280); margin: -4px 0 10px; }
   .sources a, .cite a { color: inherit; text-decoration: underline; overflow-wrap: anywhere; }
-  .question { font-size: 17px; line-height: 1.4; font-weight: 600; letter-spacing: -.01em; margin: 2px 0 10px; }
+  .question { font-size: 16px; line-height: 1.4; font-weight: 600; letter-spacing: -.01em; margin: 2px 0 10px; }
   .tag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; padding: 2px 9px; border-radius: 999px; background: var(--bad-soft); color: var(--bad); }
   .tag.soft { background: var(--warn-soft); color: var(--warn); }
   .tag.good { background: var(--ok-soft); color: var(--ok); }
   .options { display: grid; gap: 8px; margin: 14px 0 10px; }
-  .option { text-align: left; background: var(--panel); border: 1px solid var(--line-strong); border-radius: var(--r-input); padding: 11px 14px; font-size: 14px; transition: border-color .15s, background .15s; }
+  .option { text-align: left; background: var(--panel); border: 1px solid var(--line-strong); border-radius: var(--r-input); padding: 9px 12px; font-size: 13.5px; transition: border-color .15s, background .15s; }
   .option:hover { border-color: var(--text); background: var(--fill); }
   .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
   .field input { width: 100%; height: 42px; background: var(--panel); color: var(--text); border: 1px solid var(--line-strong); border-radius: var(--r-input); padding: 0 12px; font: inherit; }
@@ -137,7 +145,14 @@
   @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } * { transition: none !important; scroll-behavior: auto !important; } }
 
   /* The map: every flow is a row of screens, in order. Each screen lists its buttons and the APIs they call. */
-  #map { position: relative; overflow: auto; padding: 24px 28px 60px; background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 22px 22px; }
+  /* The board is a canvas: drag empty space or scroll to pan, pinch or Ctrl/Cmd+scroll to zoom. */
+  #canvas { position: absolute; left: 0; top: 0; width: 100%; padding: 18px 24px 120px; transform-origin: 0 0; will-change: transform; }
+  #canvas.glide { transition: transform .5s var(--ease-out); }
+  #map.panning, #map.panning * { cursor: grabbing !important; user-select: none; }
+  .zoombar { position: absolute; right: 16px; bottom: 16px; z-index: 4; display: flex; align-items: center; gap: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 3px; box-shadow: var(--shadow); }
+  .zoombar button { min-width: 34px; height: 32px; padding: 0 8px; border: 0; background: none; border-radius: 9px; font-size: 12.5px; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-variant-numeric: tabular-nums; }
+  .zoombar button:hover { background: var(--fill); }
+  #map { position: relative; overflow: hidden; touch-action: none; cursor: grab; padding: 0; background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 22px 22px; }
   .flow { margin-bottom: 40px; }
   .flow-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; width: fit-content; background: var(--bg); padding: 2px 10px 2px 0; border-radius: 6px; }
   .flow-head h3 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
@@ -285,7 +300,7 @@
   #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 40; max-width: min(560px, calc(100% - 32px)); background: var(--ink); color: var(--on-ink); border-radius: 12px; padding: 12px 16px; font-size: 14px; box-shadow: var(--shadow); }
 
   /* Working overlay: shown for every slow call, with what is happening and how long it has taken. */
-  #working { position: fixed; inset: 56px 0 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 88%, transparent); z-index: 20; }
+  #working { position: fixed; inset: 48px 0 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 88%, transparent); z-index: 20; }
   .working-card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: 26px 30px; min-width: 300px; text-align: center; }
   .working-card .spinner { margin: 0 auto 14px; width: 28px; height: 28px; }
   .sketch { display: block; width: 168px; margin: 0 auto 16px; overflow: visible; }
@@ -305,16 +320,16 @@
     #product, #engineBtn { display: none; }
     #pm { border-right: none; border-bottom: 1px solid var(--line); }
     #thread { max-height: 22dvh; }
-    #map { order: -1; position: sticky; top: 0; z-index: 5; max-height: 42dvh; overflow: auto; padding: 14px 16px 18px; border-bottom: 1px solid var(--line-strong); background-color: var(--bg); }
+    #map { order: -1; position: sticky; top: 0; z-index: 5; height: 42dvh; overflow: hidden; padding: 0; border-bottom: 1px solid var(--line-strong); background-color: var(--bg); }
     .flow { margin-bottom: 18px; }
-    .flow-row, .steps { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 216px; gap: 0 44px; overflow-x: auto; padding: 14px 2px 8px; }
+    .flow-row, .steps { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 216px; gap: 0 44px; padding: 14px 2px 8px; }
     .flow-row { grid-auto-columns: 264px; }
     .stage-note { display: none; }
     .pin { left: 36px; right: auto; max-width: calc(100% - 44px); }
     #hive button, header .btn { min-height: 44px; }
     .ask-foot .link, .mine .link { padding: 13px 0; }
     .scr { width: 100%; }
-    #details { position: fixed; top: 56px; }
+    #details { position: fixed; top: 48px; }
     .meter { display: none !important; }
     .logo { margin-right: auto; }
     .composer-foot .btn.primary { margin-left: 0; width: 100%; }
@@ -370,12 +385,20 @@
 
 <main id="work" hidden>
   <aside id="pm" aria-label="Your product team">
-    <div class="pm-head"><h2>Your product team</h2><div class="sub" id="pmSub"></div><div class="progress"><i id="pmBar"></i></div><div class="hive" id="hive" role="group" aria-label="Filter questions by bee"></div></div>
+    <div class="pm-head"><div class="pm-row"><div class="sub" id="pmSub"></div><button class="link mini" id="beesToggle" aria-expanded="false" aria-controls="hiveFold">Bees</button></div><div class="progress"><i id="pmBar"></i></div>
+      <div class="fold" id="hiveFold"><div><div class="hive" id="hive" role="group" aria-label="Filter questions by bee"></div></div></div></div>
+    <button class="link mini chat-toggle" id="chatToggle" aria-expanded="false" aria-controls="thread">Show the whole conversation</button>
     <div id="thread"></div>
     <div id="ask" aria-live="polite"></div>
   </aside>
   <section id="map" aria-label="Product map">
-    <div id="flows"></div>
+    <div id="canvas"><div id="flows"></div></div>
+    <div class="zoombar" role="group" aria-label="Zoom the board">
+      <button id="zoomOut" aria-label="Zoom out"><i class="ph ph-minus" aria-hidden="true"></i></button>
+      <button id="zoomPct" aria-label="Reset zoom to 100%">100%</button>
+      <button id="zoomIn" aria-label="Zoom in"><i class="ph ph-plus" aria-hidden="true"></i></button>
+      <button id="zoomFit" aria-label="Fit the whole board"><i class="ph ph-arrows-out" aria-hidden="true"></i> Fit</button>
+    </div>
     <aside id="details" hidden aria-label="Details"></aside>
   </section>
 </main>
@@ -517,7 +540,7 @@ function render() {
   // Bring the node the PM is asking about into view, once per question.
   if (PM.focus && PM.focus !== PM.lastFocus) {
     const at = document.querySelector("#flows .step.focus, #flows .scr.focus, #flows .focus");
-    at?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" }); at?.classList.add("nudge");
+    reveal(at); at?.classList.add("nudge");
   }
   PM.lastFocus = PM.focus;
 }
@@ -590,7 +613,7 @@ function renderMap() {
   const loose = byLayer("SCREEN").map((s) => s.id).filter((i) => !placed.has(i));
   if (loose.length) rows.push({ title: "Other screens", who: "", goal: "", ids: loose });
   const focusStep = Number(pmQueue()[0]?.metadata?.step || 0);
-  const note = S.stage === "flows" ? '<p class="stage-note">This is how I understood your idea, as flows. No screens yet: answer the bees on the left and I redraw this as we talk. Screens are drawn from your decisions, not from my guesses.</p>' : "";
+  const note = S.stage === "flows" && !byLayer("QUESTION").some((q) => q.question_status !== "OPEN") ? '<p class="stage-note">This is how I understood your idea, as flows. No screens yet: answer the bees on the left and I redraw this as we talk. Screens are drawn from your decisions, not from my guesses.</p>' : "";
   const asking = pmQueue()[0];
   const redraw = S.needsRedraw ? '<div class="redraw" role="status"><span>You changed a decision after the screens were drawn, so some screens no longer match it.</span><button class="btn primary" id="drawBtn">Redraw the screens</button></div>' : "";
   const lastFlow = rows.filter((f) => f.id && !f.ids.length).pop();
@@ -647,7 +670,7 @@ function drawWires() {
     svg.setAttribute("width", box.scrollWidth); svg.setAttribute("height", box.scrollHeight);
     nodes.slice(0, -1).forEach((a, i) => {
       const r = a.getBoundingClientRect(), n = nodes[i + 1].getBoundingClientRect();
-      const x = (v) => Math.round(v - o.left + box.scrollLeft), y = (v) => Math.round(v - o.top + box.scrollTop);  // the strip scrolls sideways on a phone
+      const x = (v) => Math.round((v - o.left) / VIEW.z), y = (v) => Math.round((v - o.top) / VIEW.z);  // screen px to board px at any zoom
       let d, tip;
       if (Math.abs(n.top - r.top) < 6 && n.left > r.right) {          // same row
         const yy = y(r.top) + IN; d = `M${x(r.right) + 3} ${yy} H${x(n.left) - 5}`; tip = [x(n.left) - 5, yy, 0];
@@ -668,6 +691,66 @@ function drawWires() {
   wired = sig;
 }
 addEventListener("resize", () => requestAnimationFrame(drawWires));
+
+// ---------- the board canvas ----------
+const VIEW = { x: 0, y: 0, z: 1 };
+function applyView(glide) {
+  const c = $("canvas"), m = $("map");
+  c.classList.toggle("glide", !!glide);
+  c.style.transform = `translate(${VIEW.x}px, ${VIEW.y}px) scale(${VIEW.z})`;
+  m.style.backgroundPosition = `${VIEW.x}px ${VIEW.y}px`;  // the dot grid moves with the board
+  m.style.backgroundSize = `${22 * VIEW.z}px ${22 * VIEW.z}px`;
+  $("zoomPct").textContent = `${Math.round(VIEW.z * 100)}%`;
+}
+function zoomAt(z, cx, cy, glide) {
+  z = Math.min(2, Math.max(0.3, z));
+  const k = z / VIEW.z; VIEW.x = cx - (cx - VIEW.x) * k; VIEW.y = cy - (cy - VIEW.y) * k; VIEW.z = z; applyView(glide);
+}
+function fitView() {
+  const m = $("map").getBoundingClientRect(), c = $("canvas");
+  const w = Math.max(c.scrollWidth, $("flows").scrollWidth + 48), h = c.scrollHeight;
+  VIEW.z = Math.min(1, Math.max(0.3, Math.min(m.width / w, m.height / h)));
+  VIEW.x = Math.max(0, (m.width - w * VIEW.z) / 2); VIEW.y = 0; applyView(true);
+}
+// Bring a node into view, the canvas version of scrollIntoView.
+function reveal(el) {
+  if (!el || !$("map").offsetWidth) return;
+  const m = $("map").getBoundingClientRect(), r = el.getBoundingClientRect(), pad = 48;
+  let dx = 0, dy = 0;
+  if (r.right > m.right - pad) dx = m.right - pad - r.right;
+  if (r.left + dx < m.left + pad) dx = m.left + pad - r.left;
+  if (r.bottom > m.bottom - pad) dy = m.bottom - pad - r.bottom;
+  if (r.top + dy < m.top + pad) dy = m.top + pad - r.top;
+  if (dx || dy) { VIEW.x += dx; VIEW.y += dy; applyView(true); }
+}
+(() => {
+  const m = $("map"); let drag = null;
+  m.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || e.target.closest("button, a, input, textarea, select, summary, [data-id], #details, .zoombar")) return;
+    drag = { x: e.clientX, y: e.clientY, vx: VIEW.x, vy: VIEW.y, moved: false, id: e.pointerId };
+  });
+  m.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 4) return;  // a small wobble is still a click
+    if (!drag.moved) { drag.moved = true; m.setPointerCapture(e.pointerId); m.classList.add("panning"); }
+    VIEW.x = drag.vx + dx; VIEW.y = drag.vy + dy; applyView(false);
+  });
+  const end = () => { drag = null; m.classList.remove("panning"); };
+  m.addEventListener("pointerup", end); m.addEventListener("pointercancel", end);
+  m.addEventListener("wheel", (e) => {
+    if (e.target.closest("#details")) return;
+    e.preventDefault();
+    const b = m.getBoundingClientRect();
+    if (e.ctrlKey || e.metaKey) zoomAt(VIEW.z * Math.exp(-e.deltaY * 0.01), e.clientX - b.left, e.clientY - b.top, false);  // trackpad pinch arrives as ctrl+wheel
+    else { VIEW.x -= e.deltaX; VIEW.y -= e.deltaY; applyView(false); }
+  }, { passive: false });
+  const mid = () => { const b = m.getBoundingClientRect(); return [b.width / 2, b.height / 2]; };
+  $("zoomIn").onclick = () => zoomAt(VIEW.z * 1.2, ...mid(), true);
+  $("zoomOut").onclick = () => zoomAt(VIEW.z / 1.2, ...mid(), true);
+  $("zoomPct").onclick = () => zoomAt(1, ...mid(), true);
+  $("zoomFit").onclick = fitView;
+})();
 document.fonts?.ready.then(() => requestAnimationFrame(drawWires));
 
 // ---------- product manager ----------
@@ -701,6 +784,7 @@ function renderPM() {
   const open = openQuestions();
   const done = all.filter((q) => q.question_status !== "OPEN").sort((a, b) => String(a.answered_at).localeCompare(String(b.answered_at)));
   $("pmSub").textContent = all.length ? `${done.length} of ${all.length} answered. A one-shot tool would have guessed all ${all.length}.` : "No questions yet";
+  $("chatToggle").hidden = !done.length;
   $("pmBar").style.width = `${all.length ? (done.length / all.length) * 100 : 0}%`;
 
   // The hive: who has questions waiting. Click a bee to hear only from that one.
@@ -850,7 +934,7 @@ async function answer(qid, text) {
   } catch (err) { PM.error = err.message; }
   PM.reacting = ""; PM.sketch = null;
   await load();
-  document.querySelector("#flows .changed")?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+  reveal(document.querySelector("#flows .changed"));
 }
 let toastTimer = null;
 function toast(text) {
@@ -1020,6 +1104,14 @@ $("boardsBtn").onclick = async () => {
 $("boardsBody").onclick = (e) => { const b = e.target.closest("[data-board]"); if (b && b.dataset.board !== BOARD) openBoard(b.dataset.board); else if (b) $("boards").hidden = true; };
 $("boardsClose").onclick = () => { $("boards").hidden = true; };
 $("signOut").onclick = async () => { await AUTH.sdk.signOut(AUTH.fb); $("boards").hidden = true; toast("Signed out."); };
+
+// Secondary parts of the panel fold away; they slide open only when asked for.
+const fold = (btn, open, label) => { btn.setAttribute("aria-expanded", open); if (label) btn.textContent = label; };
+$("beesToggle").onclick = () => { const o = $("hiveFold").classList.toggle("open"); fold($("beesToggle"), o, o ? "Hide bees" : "Bees"); };
+$("chatToggle").onclick = () => {
+  const o = $("pm").classList.toggle("chat-open"); fold($("chatToggle"), o, o ? "Show less" : "Show the whole conversation");
+  requestAnimationFrame(() => { $("thread").scrollTop = $("thread").scrollHeight; });
+};
 
 $("newBtn").onclick = async () => {
   if (AUTH.user) {  // signed in: the old board stays in My boards, the new spec gets a board of its own
