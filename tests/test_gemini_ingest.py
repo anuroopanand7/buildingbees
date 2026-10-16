@@ -554,3 +554,22 @@ def test_sign_off_is_recorded_and_flags_a_later_change(monkeypatch):
     q = next(n for n in c.get("/api/graph", headers=h).json()["nodes"] if n["layer"] == "QUESTION")
     c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "Yes"}, headers=h)
     assert "has changed since: 0 decisions then, 1 now" in c.get("/api/brief", headers=h).text
+
+
+def test_solo_and_team_boards_are_asked_differently(monkeypatch):
+    seen = []
+
+    class Listening(FakeGemini):
+        def extract_flows(self, text="", pdf_bytes=None):
+            seen.append(text)
+            return super().extract_flows(text=text, pdf_bytes=pdf_bytes)
+
+    monkeypatch.setitem(server.engines, "gemini", Listening())
+    c = TestClient(server.app)
+    solo = c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers={"X-Board": "mode-solo"}).json()
+    team = c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop", "mode": "team"}, headers={"X-Board": "mode-team"}).json()
+    assert "ONE PERSON" in seen[0] and "A PRODUCT TEAM" in seen[1]
+    assert solo["mode"] == "solo" and team["mode"] == "team"
+    assert server.boards["mode-solo"].spec_text == "shop"  # the instruction never becomes part of the founder's spec
+    assert c.post("/api/mode", json={"mode": "team"}, headers={"X-Board": "mode-solo"}).json() == {"mode": "team"}
+    assert c.post("/api/mode", json={"mode": "crowd"}, headers={"X-Board": "mode-solo"}).status_code == 400

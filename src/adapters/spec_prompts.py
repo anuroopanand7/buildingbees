@@ -69,6 +69,23 @@ class XQuestion(BaseModel):
     suggested_options: List[str]
     step: int = 0  # 1-based step of the flow this is about; 0 = the whole flow, user, screen or API
     source: int = 0  # number of the RESEARCH page this question came from; 0 = not from research
+    why: str = ""  # one plain sentence: why the answer matters (shown under the question)
+
+
+# Who is answering changes how the bees ask. Put in front of every engine call (see server.audience()).
+AUDIENCE = {
+    "solo": """AUDIENCE (an instruction from BuildingBees, not part of the idea): ONE PERSON is answering, usually a
+founder who may not be technical. Ask at most 6 questions at this stage, in everyday words with no technical
+terms. Ask about the idea itself: who it is for, the problem, what they do today, what success looks like,
+money and rules. Never ask them a technical question: decide it yourself with the standard choice. Put your
+recommended answer first in suggested_options, and in "why" say in one plain sentence why it matters and, when
+it helps, what you recommend and why. Help them see the right way to build it.""",
+    "team": """AUDIENCE (an instruction from BuildingBees, not part of the idea): A PRODUCT TEAM is answering (a product
+manager, a client, a designer, frontend and backend engineers, a tester). Each question goes to the bee whose
+person owns that decision, and is worded for that expert: a backend question may use backend terms, a client
+question uses business words. You may ask up to 12 questions at this stage, spread across the bees. Put your
+recommended answer first in suggested_options, and in "why" say in one sentence what the answer changes.""",
+}
 
 
 class SpecExtract(BaseModel):
@@ -163,7 +180,7 @@ Rules:
 - Assumption is not approval: never invent business rules. Wherever the spec is silent on a product decision
   an engineer would need (who may do what, a business rule, a failure that is a product choice), add a question
   targeted at the exact node id. Mark it blocking if code cannot be written safely without the answer.
-  Where the industry has a standard answer, use the standard and do not ask. Ask at most 8 questions in all.
+  Where the industry has a standard answer, use the standard and do not ask. Ask no more questions than the AUDIENCE allows.
 - If the spec lists agreed flows, draw screens for every one of them, each screen under its own flow id.
 - Keep it to at most 12 screens.
 - Do not ask the same thing twice in different words.
@@ -228,7 +245,7 @@ Do NOT design screens, buttons or APIs yet. First agree the user flows.
    leave branches empty when the flow has no real split.
 3. Then ask what a senior PM would need answered before anyone draws a screen: exactly who the user is,
    what they bring in, what they get out, what is in and out of scope, what happens when it goes wrong,
-   how we know it worked. Ask 3-6 questions, most important first. Target each at the flow id or user id
+   how we know it worked. Ask as many questions as the AUDIENCE allows, most important first. Target each at the flow id or user id
    it is about. Give 2-4 short suggested answers for each. Mark it blocking if the flow cannot be designed
    without the answer. Assumption is not approval: when the input is silent, ask, do not decide.
 

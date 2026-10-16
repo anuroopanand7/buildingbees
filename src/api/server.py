@@ -45,7 +45,7 @@ from src.core.question_engine import SocraticQuestionEngine
 from src.adapters.gemini_adapter import GoogleGeminiAdapter
 from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.adapters.nvidia_adapter import pdf_to_text
-from src.adapters.spec_prompts import REACT_PROMPT
+from src.adapters.spec_prompts import AUDIENCE, REACT_PROMPT
 from src.adapters import tavily
 from src.core.brief import build_brief, decision_count
 from src.core.ingest import add_gap_questions, add_questions, apply_gap_default, strip_guesses, build_flows_graph, build_graph_from_extract, clean_branches, ask_open_branches, add_gap_defaults
@@ -230,6 +230,13 @@ class PostQuestionRequest(BaseModel):
 
 class IngestPRDRequest(BaseModel):
     prd_markdown: str
+    mode: str = "solo"  # "solo": one founder, plain questions; "team": several people answer by role
+
+
+def audience(g_or_mode) -> str:
+    """The AUDIENCE instruction for a board (or a mode name): how many questions, and in whose words."""
+    mode = g_or_mode if isinstance(g_or_mode, str) else getattr(g_or_mode, "mode", "solo")
+    return AUDIENCE.get(mode, AUDIENCE["solo"])
 
 
 app.mount("/examples", StaticFiles(directory=os.path.join(WEB_DIR, "examples")), name="examples")
@@ -257,6 +264,7 @@ def _state(graph: BuildingBeesEngine) -> Dict[str, Any]:
         "entities": getattr(graph, "entities", []),
         "sources": getattr(graph, "sources", []),
         "signoffs": getattr(graph, "signoffs", []),
+        "mode": getattr(graph, "mode", "solo"),
         # Stage one agrees the flows; screens are only drawn after that.
         "stage": "screens" if any(n.layer.value == "SCREEN" for n in graph.nodes.values()) else "flows",
         "needs_redraw": bool(getattr(graph, "needs_redraw", False)),
@@ -408,7 +416,7 @@ def react_to_answer(question_id: str, engine: str) -> Dict[str, Any]:
         if isinstance(d, QuestionNode) and d.question_status == QuestionStatus.ANSWERED and d.id != q.id
     ) or "(none)"
     step = int(q.metadata.get("step") or 0)
-    prompt = REACT_PROMPT.format(
+    prompt = audience(g) + "\n\n" + REACT_PROMPT.format(
         stage=stage, board=json.dumps(board, default=str)[:14000], decisions=decisions[:4000],
         category=q.category.value, target=(target.title if target else q.target_node_id),
         step=(f", step {step}" if step else "") + (f", the \"{q.metadata['branch'].split('|', 1)[1]}\" path that splits off there"
@@ -520,6 +528,7 @@ class RestoreRequest(BaseModel):
     entities: List[Dict[str, Any]] = []
     sources: List[Dict[str, str]] = []
     signoffs: List[Dict[str, Any]] = []
+    mode: str = "solo"
     needs_redraw: bool = False
     nodes: List[Dict[str, Any]]
     edges: List[Dict[str, str]]
@@ -540,6 +549,7 @@ def _rebuild(d: Dict[str, Any]) -> BuildingBeesEngine:
     g.entities = d.get("entities", [])[:50]
     g.sources = d.get("sources", [])[:tavily.MAX_SOURCES]
     g.signoffs = d.get("signoffs", [])[:20]
+    g.mode = d.get("mode") if d.get("mode") in AUDIENCE else "solo"
     g.needs_redraw = bool(d.get("needs_redraw"))
     for n in d["nodes"][:2000]:
         cls = LAYER_CLASSES.get(n.get("layer"))
@@ -586,15 +596,18 @@ def _engine(name: str):
 SPEC_LIMIT = 60_000
 
 
-def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None) -> Dict[str, Any]:
+def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None, mode: str = "solo") -> Dict[str, Any]:
     """Stage one: flows and the questions about them. No screens are drawn yet."""
+    mode = mode if mode in AUDIENCE else "solo"
     sources = tavily.research(text)  # Scout Bee; empty without a key, and for PDFs
+    lead = audience(mode) + "\n\nTHE IDEA:\n"  # how to ask, then what the founder actually said
     try:
-        x = eng.extract_flows(text=text + tavily.as_prompt(sources), pdf_bytes=pdf_bytes)
+        x = eng.extract_flows(text=lead + text + tavily.as_prompt(sources), pdf_bytes=pdf_bytes)
         if sources and not any(q.source for q in x.questions):
             # The pages were read but no question used them: ask once more rather than waste the research.
-            x = eng.extract_flows(text=text + tavily.as_prompt(sources), pdf_bytes=pdf_bytes)
+            x = eng.extract_flows(text=lead + text + tavily.as_prompt(sources), pdf_bytes=pdf_bytes)
         g = build_flows_graph(x, eng.label)
+        g.mode = mode
         # The spec is only what the founder said: research never counts as a decision.
         g.spec_text = (text or pdf_to_text(pdf_bytes))[:SPEC_LIMIT]
     except Exception as e:
@@ -615,19 +628,19 @@ def ingest_prd(payload: IngestPRDRequest, engine: str) -> Dict[str, Any]:
     eng = _engine(engine)
     if not payload.prd_markdown.strip():
         raise HTTPException(status_code=400, detail="PRD text is empty")
-    return _start_board(eng, text=payload.prd_markdown)
+    return _start_board(eng, text=payload.prd_markdown, mode=payload.mode)
 
 
 @app.post("/api/ingest-file")
-async def ingest_file(engine: str, file: UploadFile = File(...)) -> Dict[str, Any]:
+async def ingest_file(engine: str, file: UploadFile = File(...), mode: str = "solo") -> Dict[str, Any]:
     """Uploaded PDF or text/markdown in, user flows and flow-level questions out."""
     eng = _engine(engine)
     data = await file.read()
     if len(data) > 20 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="File is over 20 MB")
     if data[:4] == b"%PDF":
-        return _start_board(eng, pdf_bytes=data)
-    return _start_board(eng, text=data.decode("utf-8", errors="ignore"))
+        return _start_board(eng, pdf_bytes=data, mode=mode)
+    return _start_board(eng, text=data.decode("utf-8", errors="ignore"), mode=mode)
 
 
 @app.post("/api/expand")
@@ -642,6 +655,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     asked = [n for n in old.nodes.values() if isinstance(n, QuestionNode)]
     decisions = [q for q in asked if q.question_status == QuestionStatus.ANSWERED]
     brief = "\n".join([
+        audience(old) + "\n\nTHE SPEC:",
         getattr(old, "spec_text", ""),
         "\nAGREED USERS AND FLOWS (keep exactly these ids, and give every screen one of these flow ids):",
         json.dumps({
@@ -661,6 +675,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     g.product_name = getattr(old, "product_name", "") or g.product_name  # the name the founder already saw stays
     g.sources = getattr(old, "sources", [])
     g.signoffs = getattr(old, "signoffs", [])
+    g.mode = getattr(old, "mode", "solo")
     strip_guesses(g, g.spec_text + " " + " ".join(q.answer_text or "" for q in decisions))
     for f in flows:  # the steps the user agreed to stay on the flow
         if f.id in g.nodes:
@@ -702,6 +717,19 @@ def list_screen_readiness() -> List[Dict[str, Any]]:
     """Readiness for every screen branch, for the dashboard."""
     return [graph.evaluate_branch_readiness(n.id).model_dump()
             for n in graph.nodes.values() if n.layer.value == "SCREEN"]
+
+
+class ModeRequest(BaseModel):
+    mode: str
+
+
+@app.post("/api/mode")
+def set_mode(payload: ModeRequest) -> Dict[str, Any]:
+    """Switches a board between one founder ("solo") and a team; inviting a teammate makes a board a team board."""
+    if payload.mode not in AUDIENCE:
+        raise HTTPException(status_code=400, detail="Mode is solo or team")
+    _board().mode = payload.mode
+    return {"mode": payload.mode}
 
 
 class SignoffRequest(BaseModel):

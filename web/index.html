@@ -116,6 +116,8 @@
   .mine { align-self: flex-end; max-width: 86%; text-align: right; }
   .mine .by { margin-right: 8px; font-size: 11.5px; color: var(--muted); }
   .send-row { display: flex; gap: 6px; }
+  .why { margin: 4px 0 8px; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+  .option .rec { margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: var(--focus); color: #6b4e00; font-size: 11px; font-weight: 600; }
   .send-row input { flex: 1; min-width: 0; }
   .send-row .btn { flex: 0 0 auto; width: 42px; padding: 0; display: grid; place-items: center; }
   .mine .bubble { display: inline-block; text-align: left; background: var(--ink); color: var(--on-ink); border-radius: 14px 14px 4px 14px; }
@@ -488,6 +490,10 @@
       <textarea id="prd" placeholder="Paste a PRD, a feature brief, or two lines about what you want to build."></textarea>
       <div class="composer-foot">
         <div class="seg" id="engineSeg" role="group" aria-label="AI engine (required)"></div>
+        <div class="seg" id="modeSeg" role="group" aria-label="Who will answer the questions">
+          <button data-mode="solo" data-tip="One person: fewer, plain questions, with the bees' advice" data-tip-pos="bottom">Just me</button>
+          <button data-mode="team" data-tip="A team: each person answers their own role's questions" data-tip-pos="bottom">A team</button>
+        </div>
         <label class="btn ghost file-btn"><i class="ph ph-paperclip" aria-hidden="true"></i>Upload PDF or .md<input type="file" id="file" accept=".pdf,.md,.txt"></label>
         <button class="btn primary" id="buildBtn">Map it<i class="ph ph-arrow-right" aria-hidden="true"></i></button>
       </div>
@@ -603,7 +609,7 @@ let BOARD = LINKED || store.get("bb_board");
 // A client (an agency's customer) answers only the business questions: who it is for, scope, rules, money, legal.
 const ROLES = { PM: "Product manager", CLIENT: "Client", DESIGN: "Designer", FRONTEND: "Frontend", BACKEND: "Backend", TESTER: "Tester" };
 let ROLE = store.get("bb_role") || "", WHO = store.get("bb_name") || "";
-const mine = (q) => !ROLE || ROLE === "PM" || q.category === ROLE || (ROLE === "CLIENT" && (q.category === "PM" || q.category === "COMPLIANCE"));
+const mine = (q) => S.mode !== "team" || !ROLE || ROLE === "PM" || q.category === ROLE || (ROLE === "CLIENT" && (q.category === "PM" || q.category === "COMPLIANCE"));
 const byLine = () => (ROLES[ROLE] || "") + (WHO ? ": " + WHO : "");
 const boardLink = () => `${location.origin}/?board=${encodeURIComponent(BOARD)}`;
 if (!BOARD) { BOARD = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2)); store.set("bb_board", BOARD); }
@@ -636,7 +642,7 @@ async function load() {
     finally { restoring = false; }
   }
   if (!LINKED) store.set("bb_graph", g.total_nodes ? JSON.stringify({ product_name: g.product_name, spec_text: g.spec_text, entities: g.entities, sources: g.sources, needs_redraw: g.needs_redraw, nodes: g.nodes, edges: g.edges }) : "");
-  S.stage = g.stage; S.needsRedraw = g.needs_redraw; S.sources = g.sources || [];
+  S.stage = g.stage; S.needsRedraw = g.needs_redraw; S.sources = g.sources || []; S.mode = g.mode || "solo";
   S.nodes = {}; S.fwd = {}; S.rev = {}; S.screens = {};
   g.nodes.forEach((n) => (S.nodes[n.id] = n));
   g.edges.forEach((e) => {
@@ -1042,7 +1048,7 @@ function renderPM() {
     ask.innerHTML = `<div class="thinking"><div class="spinner"></div><div><b>The bees are looking deeper</b><div class="about">Checking "${esc(PM.thinking)}" for gaps...</div></div></div>`;
     return;
   }
-  if (!ROLE) {  // first visit to this board from this browser: who is answering?
+  if (S.mode === "team" && !ROLE) {  // first visit to a team board from this browser: who is answering?
     ask.innerHTML = `<div class="question">Who is answering here?</div>
       <div class="about" style="margin-bottom:10px">Your team shares this board. Each person answers their own bees; the product manager sees every question, and a client sees only the business ones.</div>
       <div class="options">${Object.entries(ROLES).map(([k, v]) => `<button class="option" data-role="${k}">${esc(v)}</button>`).join("")}</div>
@@ -1056,18 +1062,19 @@ function renderPM() {
     ask.innerHTML = `
       <div class="msg-row" style="margin-bottom:8px">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(bee(q.category)[0])} <span>about ${stepOf(q) ? `<span class="num on">${q.metadata.step}</span> <b class="about">${esc(stepOf(q))}</b>` : `<button class="link open" data-id="${esc(q.target_node_id)}">${esc(t ? (t.label || t.title) : q.target_node_id)}</button>`}</span></div></div></div>
       <div class="question">${esc(q.question_text)}</div>
+      ${q.metadata?.why ? `<div class="why"><i class="ph ph-lightbulb" aria-hidden="true"></i> ${esc(q.metadata.why)}</div>` : ""}
       ${cite(q)}
       <span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Blocks the build" : "Good to know"}</span>
-      ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o) => `<button class="option" data-q="${esc(q.id)}" data-opt="${esc(o)}">${esc(o)}</button>`).join("")}</div>` : '<div style="height:12px"></div>'}
+      ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o, i) => `<button class="option" data-q="${esc(q.id)}" data-opt="${esc(o)}">${esc(o)}${i === 0 && q.metadata?.why ? '<span class="rec">Recommended</span>' : ""}</button>`).join("")}</div>` : '<div style="height:12px"></div>'}
       <div class="field"><label for="own">Or answer in your own words</label><div class="send-row"><input id="own" data-answer="${esc(q.id)}" placeholder="Or type your own answer and press Enter" autocomplete="off"><button class="btn primary" data-send="${esc(q.id)}" aria-label="Send your answer"><i class="ph ph-paper-plane-right" aria-hidden="true"></i></button></div></div>
       <div class="ask-foot"><button class="link" data-skip="${esc(q.id)}">Not sure yet, ask me later</button><span class="muted">${pmQueue().length - 1} more for you</span></div>
-      <div class="ask-foot"><span class="muted">Answering as ${esc(byLine())}</span><button class="link" data-role-change>Change</button></div>
+      ${S.mode === "team" ? `<div class="ask-foot"><span class="muted">Answering as ${esc(byLine())}</span><button class="link" data-role-change>Change</button></div>` : ""}
       ${S.stage === "flows" ? '<div class="ask-foot"><button class="link" id="drawBtn">Skip the rest and draw the screens</button></div>' : ""}
       ${details > 1 && q.metadata?.source === "BuildingBees" ? `<div class="ask-foot"><button class="btn" id="defaultsBtn" style="width:100%">Use the first suggestion for all ${details} remaining details</button></div>` : ""}`;
     if (PM.lastAsk !== q.id) { [...ask.children].forEach((c, i) => { c.classList.add("enter"); c.style.setProperty("--i", i); }); PM.lastAsk = q.id; }  // a new question rises in
     return;
   }
-  if (ROLE !== "PM" && open.length) {  // the rest belong to teammates
+  if (S.mode === "team" && ROLE !== "PM" && open.length) {  // the rest belong to teammates
     ask.innerHTML = `<div class="question">Nothing for you as ${esc(ROLES[ROLE])} right now.</div>
       <div class="about" style="margin-bottom:10px">${open.length} question${open.length === 1 ? " is" : "s are"} waiting for your teammates. The board updates as they answer.</div>
       <div class="ask-foot"><button class="link" data-invite>Copy the link for your team</button><button class="link" data-role-change>Change your role</button></div>`;
@@ -1194,6 +1201,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.engine) { S.engine = t.dataset.engine; store.set("bb_engine", S.engine); say(""); return renderEngine(); }
   if (t.dataset.opt) return answer(t.dataset.q, t.dataset.opt).catch(fail);
   if (t.dataset.skip) { PM.skipped.add(t.dataset.skip); return render(); }
+  if (t.dataset.mode) { store.set("bb_mode", t.dataset.mode); return renderMode(); }
   if (t.dataset.role) {
     ROLE = t.dataset.role; WHO = ($("who")?.value || "").trim().slice(0, 40);
     store.set("bb_role", ROLE); store.set("bb_name", WHO); PM.bee = null; return render();
@@ -1201,6 +1209,7 @@ document.addEventListener("click", (e) => {
   if ("roleChange" in t.dataset || t.id === "roleBtn") { ROLE = ""; menu(false); dockMin(false); return render(); }
   if ("invite" in t.dataset || t.id === "teamBtn") {
     menu(false);
+    if (S.mode !== "team") api("/api/mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "team" }) }).then(load).catch(fail);
     return navigator.clipboard.writeText(boardLink()).then(() => toast("Link copied. Send it to your team: each person picks their role when they open it."), () => toast(boardLink()));
   }
   if (t.dataset.send) { const i = $("own"); return answer(t.dataset.send, i?.value || "").catch(fail); }
@@ -1258,12 +1267,16 @@ async function drawScreens() {
   catch (err) { PM.error = err.message; render(); }
   finally { working(""); }
 }
+// "Just me" or "A team" for the next board; remembered per browser.
+const newMode = () => store.get("bb_mode") || "solo";
+const renderMode = () => document.querySelectorAll("#modeSeg [data-mode]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.mode === newMode()));
+renderMode();
 $("buildBtn").onclick = () => {
   const text = $("prd").value.trim();
   if (!text) { say("Write or paste something first.", true); return $("prd").focus(); }
   store.set("bb_spec", text);
   ingest(() => api(`/api/ingest-prd?${eq()}`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prd_markdown: text }),
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prd_markdown: text, mode: newMode() }),
   }), `${ENGINE_COPY[S.engine]} is reading your spec`);
 };
 $("file").onchange = (e) => {
@@ -1271,7 +1284,7 @@ $("file").onchange = (e) => {
   e.target.value = "";
   if (!engineReady()) return say("Pick an engine to continue.", true);
   const fd = new FormData(); fd.append("file", f);
-  ingest(() => api(`/api/ingest-file?${eq()}`, { method: "POST", body: fd }), `${ENGINE_COPY[S.engine]} is reading ${f.name}`);
+  ingest(() => api(`/api/ingest-file?${eq()}&mode=${newMode()}`, { method: "POST", body: fd }), `${ENGINE_COPY[S.engine]} is reading ${f.name}`);
 };
 $("exampleBtn").onclick = async () => {
   try { $("prd").value = await (await fetch("/examples/food-delivery-prd.md")).text(); say("Example loaded. Press Map it."); }
