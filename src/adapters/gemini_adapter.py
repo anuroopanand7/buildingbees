@@ -5,6 +5,7 @@ Google Gemini adapter.
 With no GEMINI_API_KEY set, `enabled` is False and callers must say so; nothing is faked.
 """
 
+import time
 import os
 from typing import List, Optional
 
@@ -46,15 +47,20 @@ class GoogleGeminiAdapter:
             response_mime_type="application/json", response_schema=schema, temperature=0.2,
         )
         resp, last_error = None, None
-        for model in dict.fromkeys([self.model, *FALLBACK_MODELS]):
-            try:
-                resp = self._client.models.generate_content(model=model, contents=contents, config=config)
-                self.last_model = model
+        for attempt in range(2):  # a busy spell often passes in seconds: one more round after a short pause
+            if attempt:
+                time.sleep(4)
+            for model in dict.fromkeys([self.model, *FALLBACK_MODELS]):
+                try:
+                    resp = self._client.models.generate_content(model=model, contents=contents, config=config)
+                    self.last_model = model
+                    break
+                except Exception as e:  # overloaded (503), rate limited (429) or timed out: try the next model
+                    last_error = e
+                    if not any(t in str(e) for t in ("503", "429", "404", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "overloaded", "imed out", "DEADLINE")):
+                        raise
+            if resp is not None:
                 break
-            except Exception as e:  # overloaded (503), rate limited (429) or timed out: try the next model
-                last_error = e
-                if not any(t in str(e) for t in ("503", "429", "404", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "overloaded", "imed out", "DEADLINE")):
-                    raise
         if resp is None:
             raise RuntimeError(f"Gemini is busy right now, please try again in a minute. ({str(last_error)[:120]})")
         if resp.parsed is None:

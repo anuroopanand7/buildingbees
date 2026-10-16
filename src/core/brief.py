@@ -18,6 +18,12 @@ def _or_open(value) -> str:
     return str(value) if value not in ("", None, 0) else "NOT DECIDED"
 
 
+def decision_count(g: BuildingBeesEngine) -> int:
+    """Decisions people made (not vague answers, not standard defaults): what a sign-off approves."""
+    return sum(1 for n in g.nodes.values() if isinstance(n, QuestionNode) and n.question_status == QuestionStatus.ANSWERED
+               and not n.metadata.get("vague") and not n.metadata.get("default"))
+
+
 def build_brief(g: BuildingBeesEngine) -> str:
     out: List[str] = []
     add = out.append
@@ -42,6 +48,17 @@ def build_brief(g: BuildingBeesEngine) -> str:
     else:
         add(f"**Status:** flows are being agreed, no screens drawn yet. {count(len(decided), 'decision')} made, "
             f"{count(len(still_open), 'question')} open.")
+    add("")
+
+    add("## Sign-off")
+    signoffs = getattr(g, "signoffs", [])
+    if not signoffs:
+        add("Not signed off yet. Each person who owns part of the scope (the client, the product manager, the leads) signs off here before the build starts.")
+    for s in signoffs:
+        changed = s.get("decisions") != len(decided)
+        add(f"- Signed off by **{s['by']}** on {s['at'][:10]}"
+            + (f", with {count(s['open'], 'question')} still open" if s.get("open") else "")
+            + (f" (the scope has changed since: {s.get('decisions')} decisions then, {len(decided)} now; sign off again)" if changed else ""))
     add("")
     add(f"A tool that draws from one prompt would have guessed {count(len(questions), 'thing')} here. "
         f"BuildingBees asked instead: {len(decided)} decided, {len(still_open)} still open.")

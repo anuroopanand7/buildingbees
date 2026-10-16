@@ -554,6 +554,7 @@
 <div id="brief" hidden role="dialog" aria-modal="true" aria-label="Product brief">
   <div class="brief-sheet">
     <div class="brief-bar"><b>Product brief</b>
+      <button class="btn primary" id="briefSign" title="Approve this scope as it stands"><i class="ph ph-seal-check" aria-hidden="true"></i>Sign off</button>
       <button class="btn" id="briefCopy"><i class="ph ph-copy" aria-hidden="true"></i>Copy</button>
       <button class="btn" id="briefAgent" title="A link your coding agent can read"><i class="ph ph-robot" aria-hidden="true"></i>Copy agent link</button>
       <button class="btn" id="briefDownload"><i class="ph ph-download-simple" aria-hidden="true"></i>Download .md</button>
@@ -599,9 +600,10 @@ const LINKED = new URLSearchParams(location.search).get("board");
 let BOARD = LINKED || store.get("bb_board");
 // A board is answered by a team. Each person says who they are once; they then hear only from their own bees.
 // The product manager hears from every bee, and owns the Compliance Bee's questions.
-const ROLES = { PM: "Product manager", DESIGN: "Designer", FRONTEND: "Frontend", BACKEND: "Backend", TESTER: "Tester" };
+// A client (an agency's customer) answers only the business questions: who it is for, scope, rules, money, legal.
+const ROLES = { PM: "Product manager", CLIENT: "Client", DESIGN: "Designer", FRONTEND: "Frontend", BACKEND: "Backend", TESTER: "Tester" };
 let ROLE = store.get("bb_role") || "", WHO = store.get("bb_name") || "";
-const mine = (q) => !ROLE || ROLE === "PM" || q.category === ROLE;
+const mine = (q) => !ROLE || ROLE === "PM" || q.category === ROLE || (ROLE === "CLIENT" && (q.category === "PM" || q.category === "COMPLIANCE"));
 const byLine = () => (ROLES[ROLE] || "") + (WHO ? ": " + WHO : "");
 const boardLink = () => `${location.origin}/?board=${encodeURIComponent(BOARD)}`;
 if (!BOARD) { BOARD = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2)); store.set("bb_board", BOARD); }
@@ -1042,7 +1044,7 @@ function renderPM() {
   }
   if (!ROLE) {  // first visit to this board from this browser: who is answering?
     ask.innerHTML = `<div class="question">Who is answering here?</div>
-      <div class="about" style="margin-bottom:10px">Your team shares this board. Each person answers their own bees; the product manager sees every question.</div>
+      <div class="about" style="margin-bottom:10px">Your team shares this board. Each person answers their own bees; the product manager sees every question, and a client sees only the business ones.</div>
       <div class="options">${Object.entries(ROLES).map(([k, v]) => `<button class="option" data-role="${k}">${esc(v)}</button>`).join("")}</div>
       <div class="field"><label for="who">Your name (optional, shown next to your answers)</label><input id="who" value="${esc(WHO || AUTH.user?.displayName || "")}" autocomplete="name"></div>
       <div class="ask-foot"><button class="link" data-invite>Copy the link for your team</button></div>`;
@@ -1308,6 +1310,14 @@ $("briefBtn").onclick = async () => {
   } catch (err) { toast(err.message); }
 };
 $("briefClose").onclick = () => { $("brief").hidden = true; };
+$("briefSign").onclick = async () => {
+  const by = byLine() || (prompt("Your name and role, for the sign-off (for example: Priya, client)") || "").trim();
+  if (!by) return;
+  try {
+    await api("/api/signoff", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ by }) });
+    toast("Signed off. The Brief records who approved it and when."); $("briefBtn").click();
+  } catch (err) { toast(err.message); }
+};
 $("brief").onclick = (e) => { if (e.target.id === "brief") $("brief").hidden = true; };
 $("briefCopy").onclick = async () => {
   try { await navigator.clipboard.writeText(briefText); $("briefCopy").lastChild.textContent = "Copied"; setTimeout(() => ($("briefCopy").lastChild.textContent = "Copy"), 1500); }

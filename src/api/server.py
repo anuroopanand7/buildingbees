@@ -47,7 +47,7 @@ from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.adapters.nvidia_adapter import pdf_to_text
 from src.adapters.spec_prompts import REACT_PROMPT
 from src.adapters import tavily
-from src.core.brief import build_brief
+from src.core.brief import build_brief, decision_count
 from src.core.ingest import add_gap_questions, add_questions, apply_gap_default, strip_guesses, build_flows_graph, build_graph_from_extract, clean_branches, ask_open_branches, add_gap_defaults
 
 app = FastAPI(
@@ -248,6 +248,7 @@ def _state(graph: BuildingBeesEngine) -> Dict[str, Any]:
         "spec_text": getattr(graph, "spec_text", ""),
         "entities": getattr(graph, "entities", []),
         "sources": getattr(graph, "sources", []),
+        "signoffs": getattr(graph, "signoffs", []),
         # Stage one agrees the flows; screens are only drawn after that.
         "stage": "screens" if any(n.layer.value == "SCREEN" for n in graph.nodes.values()) else "flows",
         "needs_redraw": bool(getattr(graph, "needs_redraw", False)),
@@ -509,6 +510,7 @@ class RestoreRequest(BaseModel):
     spec_text: str = ""
     entities: List[Dict[str, Any]] = []
     sources: List[Dict[str, str]] = []
+    signoffs: List[Dict[str, Any]] = []
     needs_redraw: bool = False
     nodes: List[Dict[str, Any]]
     edges: List[Dict[str, str]]
@@ -527,6 +529,7 @@ def _rebuild(d: Dict[str, Any]) -> BuildingBeesEngine:
     g.spec_text = d.get("spec_text", "")[:SPEC_LIMIT]
     g.entities = d.get("entities", [])[:50]
     g.sources = d.get("sources", [])[:tavily.MAX_SOURCES]
+    g.signoffs = d.get("signoffs", [])[:20]
     g.needs_redraw = bool(d.get("needs_redraw"))
     for n in d["nodes"][:2000]:
         cls = LAYER_CLASSES.get(n.get("layer"))
@@ -647,6 +650,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     g.spec_text = getattr(old, "spec_text", "")
     g.product_name = getattr(old, "product_name", "") or g.product_name  # the name the founder already saw stays
     g.sources = getattr(old, "sources", [])
+    g.signoffs = getattr(old, "signoffs", [])
     strip_guesses(g, g.spec_text + " " + " ".join(q.answer_text or "" for q in decisions))
     for f in flows:  # the steps the user agreed to stay on the flow
         if f.id in g.nodes:
@@ -688,6 +692,25 @@ def list_screen_readiness() -> List[Dict[str, Any]]:
     """Readiness for every screen branch, for the dashboard."""
     return [graph.evaluate_branch_readiness(n.id).model_dump()
             for n in graph.nodes.values() if n.layer.value == "SCREEN"]
+
+
+class SignoffRequest(BaseModel):
+    by: str
+
+
+@app.post("/api/signoff")
+def sign_off(payload: SignoffRequest) -> Dict[str, Any]:
+    """Someone who owns part of the scope approves the Brief as it stands. Signing again replaces their earlier sign-off."""
+    g = _board()
+    by = payload.by.strip()[:60]
+    if not g.nodes:
+        raise HTTPException(status_code=404, detail="There is nothing on the board yet")
+    if not by:
+        raise HTTPException(status_code=400, detail="Say who is signing off")
+    g.signoffs = [s for s in getattr(g, "signoffs", []) if s["by"] != by] + [
+        {"by": by, "at": datetime.datetime.utcnow().isoformat(), "decisions": decision_count(g),
+         "open": sum(1 for n in g.nodes.values() if isinstance(n, QuestionNode) and n.question_status == QuestionStatus.OPEN)}]
+    return {"signoffs": g.signoffs}
 
 
 @app.get("/api/brief", response_class=PlainTextResponse)

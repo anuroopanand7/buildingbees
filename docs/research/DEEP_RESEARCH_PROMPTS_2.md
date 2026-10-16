@@ -86,3 +86,21 @@ Research:
 
 Format: findings with sources, then the plan. Cite sources inline.
 ```
+
+## 12. Teaming people on one board: asking each person the right questions by role, skill and experience
+
+Why: Roger, 16 Oct: "ask multiple users questions based on their roles and their experience in a skill... profile based contribution from each... this is true intelligence, understanding the user."
+
+```
+I am building a B2B SaaS tool where several people (a product manager, a client, a designer, frontend and backend engineers, a tester, sometimes security or legal) work on one shared board, and AI role agents ask each person questions to define a new product. I want each person to get the questions that fit their role, their skill level and their expertise, the way a great product lead knows whom to ask what.
+
+Research the standard methods and evidence for:
+1. Expertise-based routing: how systems route questions to the right person (expert finding in Q&A communities like Stack Overflow, enterprise expert finders, ticket routing in support desks, code review assignment by CODEOWNERS and ownership, reviewer recommendation research), and what signals they use (declared role, skills, past answers, seniority, domain).
+2. Building a contributor profile: what to capture on joining (role, years of experience, skills, domains, decision authority) and what to learn from behaviour (answer quality, speed, areas), with examples from tools such as LinkedIn skills, GitHub, Linear, Jira and talent platforms. Keep it light: what is the minimum profile that works.
+3. Adapting questions to the person: changing wording, depth and defaults for a junior versus a senior engineer, or a non-technical client versus a technical lead (adaptive testing, progressive disclosure, audience-aware explanation), and the evidence that it helps.
+4. Group elicitation methods for requirements with several stakeholders: JAD sessions, the Delphi method, nominal group technique, RACI and DACI, decision rights, and how to combine several people's answers, handle disagreement, and decide who has the final say.
+5. Teaming and assignment on a shared board: how collaborative tools assign work (Figma, Miro, Notion, Linear, Jira), mentions, ownership, review and sign-off, notifications that do not annoy, and how to show who still owes an answer.
+6. A recommended design for a first version: the profile fields, the routing rule (role first, then skill, then load), how questions change by experience, how conflicts are surfaced, and the product manager's controls. Include pitfalls (overloading the best person, people gaming profiles, privacy of skill data).
+
+Format: findings with sources, then the recommended design. Cite sources inline.
+```

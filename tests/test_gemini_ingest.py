@@ -540,3 +540,17 @@ def test_standard_details_become_defaults_and_answers_name_who_gave_them(monkeyp
     assert g.nodes["API_PAY"].timeout_ms == 3000
     brief = c.get("/api/brief", headers=h).text
     assert "answered by Backend: Ravi" in brief and "## Standard defaults applied" in brief
+
+
+def test_sign_off_is_recorded_and_flags_a_later_change(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", FakeGemini())
+    c, h = TestClient(server.app), {"X-Board": "signoff"}
+    c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h)
+    assert "Not signed off yet" in c.get("/api/brief", headers=h).text
+    assert c.post("/api/signoff", json={"by": " "}, headers=h).status_code == 400
+    c.post("/api/signoff", json={"by": "Client: Priya"}, headers=h)
+    brief = c.get("/api/brief", headers=h).text
+    assert "Signed off by **Client: Priya**" in brief and "has changed since" not in brief
+    q = next(n for n in c.get("/api/graph", headers=h).json()["nodes"] if n["layer"] == "QUESTION")
+    c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "Yes"}, headers=h)
+    assert "has changed since: 0 decisions then, 1 now" in c.get("/api/brief", headers=h).text
