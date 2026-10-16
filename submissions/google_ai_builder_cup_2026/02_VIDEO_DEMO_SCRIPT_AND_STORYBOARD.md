@@ -1,17 +1,25 @@
-# Demo video script (under 3 minutes)
+# Demo video script (under 3 minutes), updated 16 Oct 2026 for the canvas and team version
 
-Record the live site in a 1440 px wide browser window. Use the "Book a haircut" starter idea: it is simple, so the questions are easy to follow.
+Record the live site in a 1440 px wide browser window, zoom 100%. Idea to type: "A B2B tool where clients book and pay for consultations with advisors in a firm." (Clear B2B story, and the bees draw a "Slot still free?" split on it.)
+
+Story: an agency's team scopes a client project together. The point to land: other tools guess, we ask the right person, and the client signs the scope before anyone builds.
 
 | Time | On screen | Say |
 |---|---|---|
-| 0:00 to 0:20 | A one-prompt design tool producing screens from one sentence | "AI can turn one sentence into an app. But one sentence leaves most decisions out, so the tool guesses. You find the guesses later, in production." |
-| 0:20 to 0:35 | BuildingBees start screen: "Other tools guess. We ask." and the six bees | "BuildingBees does what a good product team does. It asks first. Six bees, each owning one part of the product." |
-| 0:35 to 0:55 | Click "Book a haircut", then "Map it". The flow appears as steps. No screens | "I give it one line. It draws the user flow first. No screens yet, because nothing is agreed yet." |
-| 0:55 to 1:25 | A bee asks about a highlighted step. Click a suggested answer. The step changes and pulses green; the bee replies | "Each bee asks about one step. I answer, and Gemini redraws the board. The bee tells me what it changed." |
-| 1:25 to 1:45 | Type a vague answer ("whatever is normal"). The bee does not accept it: it asks again, usually more sharply | "If I am vague, it does not accept it. It asks again, more precisely." |
-| 1:45 to 2:15 | Click "Draw the screens". Screens appear with wireframes, buttons and API calls. Open one screen's details | "Now the flows are agreed, it draws the screens: wireframes, buttons, and the API behind each button. Drawn from the flows we agreed and the decisions I made." |
-| 2:15 to 2:35 | Answer a screen question (for example the payment vendor). The field fills in. The readiness meter moves | "The bees keep asking, screen by screen. A screen is ready to build only when nothing is left to guess." |
-| 2:35 to 2:50 | Click "Brief". Scroll: flows, screens, decisions, still open. Click "Copy agent link" | "And this is what I hand over: every decision, and everything still undecided. One link for my engineers or my coding agent." |
-| 2:50 to 3:00 | Logo, live URL, GitHub link | "BuildingBees. Other tools guess. We ask. Built on Gemini and Google Cloud Run." |
+| 0:00 to 0:15 | The empty BuildingBees board, title visible | "Agencies lose margin on fixed-price projects because the scope was never really agreed. AI app builders make it worse: they guess everything a one-line idea leaves out." |
+| 0:15 to 0:30 | Type the idea, press Map it. The drawing loader, then the flow rises in step by step | "BuildingBees asks first. I give it one line. Gemini draws the user flow, not screens, because nothing is agreed yet." |
+| 0:30 to 0:50 | Point at the diamond "Slot still free?" and the dashed "Not decided yet" path below it | "It draws where the flow can split, and leaves the path nobody has decided empty. That empty box is what a spec forgets." |
+| 0:50 to 1:10 | Role picker: choose Client. The dock shows only a business question | "A team shares the board. Each person picks their role and hears only from their own bees. The client gets business questions, never technical ones." |
+| 1:10 to 1:30 | Answer it with a suggested option. The node shows the live sketch, then "From your answer" | "I answer, and the bee redraws the board from my answer." |
+| 1:30 to 1:45 | Type a vague answer ("whatever is normal"). The bee asks one sharper question | "If an answer is vague, it does not accept it. It asks once more, more precisely." |
+| 1:45 to 2:05 | Menu, Change your role, pick Backend. Then click "Draw the screens". Screens appear with wireframes, buttons and APIs | "The backend lead sees their own questions. When the flows are agreed, it draws the screens, the buttons and the API behind each one." |
+| 2:05 to 2:20 | Open the Brief, scroll to "Standard defaults applied" | "Timeouts, retries, double taps: those have standard answers, so it applies them and shows them instead of asking. Our tester went from seventy questions to nine." |
+| 2:20 to 2:40 | Scroll to Decisions (answered by Client, Backend), then press Sign off | "Every decision says who made it. The client signs off the scope, and if anything changes later the Brief says so." |
+| 2:40 to 2:52 | Copy agent link, paste it into a coding agent (or just show the copied text) | "One link hands the agreed scope to engineers or a coding agent, with the open questions marked, so nothing is guessed." |
+| 2:52 to 3:00 | Logo, live URL, GitHub link, "Gemini on Cloud Run, Firestore, Firebase sign-in" | "BuildingBees. Other tools guess. We ask. Built on Gemini and Google Cloud Run." |
 
-Before recording: rehearse the vague-answer step once, hard-refresh the page, click "New spec" so the board is empty, turn notifications off, browser zoom at 100%.
+Before recording:
+- Hard-refresh, start a new board, rehearse the vague answer once.
+- The role picker appears on a new board; if it does not, use Menu, Change your role.
+- Notifications off, one browser tab, cursor slow and deliberate.
+- If Gemini is busy (rare), wait a minute and press Map it again; do not cut to Nemotron in this video (the Google track must show Gemini).
