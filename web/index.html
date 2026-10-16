@@ -114,6 +114,10 @@
   .who .about { color: var(--text); font-weight: 600; }
   .bubble { background: var(--fill); border-radius: 4px 14px 14px 14px; padding: 9px 13px; font-size: 14px; }
   .mine { align-self: flex-end; max-width: 86%; text-align: right; }
+  .mine .by { margin-right: 8px; font-size: 11.5px; color: var(--muted); }
+  .send-row { display: flex; gap: 6px; }
+  .send-row input { flex: 1; min-width: 0; }
+  .send-row .btn { flex: 0 0 auto; width: 42px; padding: 0; display: grid; place-items: center; }
   .mine .bubble { display: inline-block; text-align: left; background: var(--ink); color: var(--on-ink); border-radius: 14px 14px 4px 14px; }
   .mine .link { font-size: 12px; color: var(--muted); margin-top: 3px; }
   .past { font-size: 13px; }
@@ -462,6 +466,8 @@
 </div>
 <div class="island menu" id="menu" hidden>
   <button id="newBtn" hidden><i class="ph ph-plus" aria-hidden="true"></i>New spec</button>
+  <button id="teamBtn" hidden><i class="ph ph-users-three" aria-hidden="true"></i>Invite your team</button>
+  <button id="roleBtn" hidden><i class="ph ph-identification-badge" aria-hidden="true"></i>Change your role</button>
   <button id="boardsBtn" hidden><i class="ph ph-squares-four" aria-hidden="true"></i>My boards</button>
   <button id="engineBtn" hidden></button>
   <button id="menuBrief" hidden><i class="ph ph-file-text" aria-hidden="true"></i>Open the Brief</button>
@@ -591,6 +597,13 @@ const store = {
 // Each browser gets its own board; the server keys boards by this id.
 const LINKED = new URLSearchParams(location.search).get("board");
 let BOARD = LINKED || store.get("bb_board");
+// A board is answered by a team. Each person says who they are once; they then hear only from their own bees.
+// The product manager hears from every bee, and owns the Compliance Bee's questions.
+const ROLES = { PM: "Product manager", DESIGN: "Designer", FRONTEND: "Frontend", BACKEND: "Backend", TESTER: "Tester" };
+let ROLE = store.get("bb_role") || "", WHO = store.get("bb_name") || "";
+const mine = (q) => !ROLE || ROLE === "PM" || q.category === ROLE;
+const byLine = () => (ROLES[ROLE] || "") + (WHO ? ": " + WHO : "");
+const boardLink = () => `${location.origin}/?board=${encodeURIComponent(BOARD)}`;
 if (!BOARD) { BOARD = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2)); store.set("bb_board", BOARD); }
 S.engine = store.get("bb_engine");
 
@@ -642,7 +655,7 @@ const byLayer = (layer) => Object.values(S.nodes).filter((n) => n.layer === laye
 const questionsFor = (id) => byLayer("QUESTION").filter((q) => q.target_node_id === id);
 const openQuestions = () => byLayer("QUESTION").filter((q) => q.question_status === "OPEN");
 const openBlocking = (id) => questionsFor(id).filter((q) => q.question_status === "OPEN" && q.is_blocking).length;
-const pmQueue = () => openQuestions().filter((q) => !PM.skipped.has(q.id) && (!PM.bee || q.category === PM.bee))
+const pmQueue = () => openQuestions().filter((q) => !PM.skipped.has(q.id) && (PM.bee ? q.category === PM.bee : mine(q)))
   .sort((a, b) => (b.id === PM.front) - (a.id === PM.front) || b.is_blocking - a.is_blocking); // a reopened answer is asked again first
 const color = (score) => (score >= 0.8 ? "var(--ok)" : score > 0 ? "var(--warn)" : "var(--bad)");
 
@@ -658,7 +671,7 @@ function screenOf(id) {
 function render() {
   const has = Object.keys(S.nodes).length > 0;
   $("start").hidden = has; $("work").hidden = !has;
-  $("newBtn").hidden = !has; $("meter").hidden = !has; $("briefBtn").hidden = !has; $("menuBrief").hidden = !has; syncMenu();
+  $("newBtn").hidden = !has; $("meter").hidden = !has; $("briefBtn").hidden = !has; $("menuBrief").hidden = !has; $("teamBtn").hidden = !has; $("roleBtn").hidden = !has || !ROLE; syncMenu();
   renderEngine();
   if (!has) return;
 
@@ -1010,7 +1023,7 @@ function renderPM() {
   const cite = (q) => q.metadata?.cite?.url ? `<div class="cite"><i class="ph ph-binoculars" aria-hidden="true"></i> From the Scout Bee's reading: <a href="${esc(q.metadata.cite.url)}" target="_blank" rel="noopener noreferrer">${esc(q.metadata.cite.title)}</a></div>` : "";
   thread.innerHTML = hello + scout + done.map((q) => `
     <div class="msg-row">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(bee(q.category)[0])}</div><div class="bubble">${esc(q.question_text)}</div></div></div>
-    <div class="mine"><div class="bubble">${esc(q.answer_text)}</div><div><button class="link" data-reopen="${esc(q.id)}">Change</button></div></div>
+    <div class="mine"><div class="bubble">${esc(q.answer_text)}</div><div>${q.metadata?.default ? '<span class="by">Standard default</span>' : q.metadata?.answered_by ? `<span class="by">${esc(q.metadata.answered_by)}</span>` : ""}<button class="link" data-reopen="${esc(q.id)}">Change</button></div></div>
     ${q.metadata?.note ? `<div class="msg-row">${beeIcon(q.category)}<div class="msg-body"><div class="bubble">${esc(q.metadata.note)}</div></div></div>` : ""}`).join("");
   [...thread.children].slice(PM.seenThread ?? 0).forEach((m, i) => { m.classList.add("enter"); m.style.setProperty("--i", i); });
   PM.seenThread = thread.children.length;
@@ -1027,6 +1040,14 @@ function renderPM() {
     ask.innerHTML = `<div class="thinking"><div class="spinner"></div><div><b>The bees are looking deeper</b><div class="about">Checking "${esc(PM.thinking)}" for gaps...</div></div></div>`;
     return;
   }
+  if (!ROLE) {  // first visit to this board from this browser: who is answering?
+    ask.innerHTML = `<div class="question">Who is answering here?</div>
+      <div class="about" style="margin-bottom:10px">Your team shares this board. Each person answers their own bees; the product manager sees every question.</div>
+      <div class="options">${Object.entries(ROLES).map(([k, v]) => `<button class="option" data-role="${k}">${esc(v)}</button>`).join("")}</div>
+      <div class="field"><label for="who">Your name (optional, shown next to your answers)</label><input id="who" value="${esc(WHO || AUTH.user?.displayName || "")}" autocomplete="name"></div>
+      <div class="ask-foot"><button class="link" data-invite>Copy the link for your team</button></div>`;
+    return;
+  }
   if (q) {
     const t = S.nodes[q.target_node_id];
     const details = open.filter((o) => o.metadata?.source === "BuildingBees").length; // routine gaps, not a bee's question
@@ -1036,11 +1057,18 @@ function renderPM() {
       ${cite(q)}
       <span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Blocks the build" : "Good to know"}</span>
       ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o) => `<button class="option" data-q="${esc(q.id)}" data-opt="${esc(o)}">${esc(o)}</button>`).join("")}</div>` : '<div style="height:12px"></div>'}
-      <div class="field"><label for="own">Or answer in your own words</label><input id="own" data-answer="${esc(q.id)}" placeholder="Or type your own answer and press Enter" autocomplete="off"></div>
-      <div class="ask-foot"><button class="link" data-skip="${esc(q.id)}">Not sure yet, ask me later</button><span class="muted">${open.length - 1} more waiting</span></div>
+      <div class="field"><label for="own">Or answer in your own words</label><div class="send-row"><input id="own" data-answer="${esc(q.id)}" placeholder="Or type your own answer and press Enter" autocomplete="off"><button class="btn primary" data-send="${esc(q.id)}" aria-label="Send your answer"><i class="ph ph-paper-plane-right" aria-hidden="true"></i></button></div></div>
+      <div class="ask-foot"><button class="link" data-skip="${esc(q.id)}">Not sure yet, ask me later</button><span class="muted">${pmQueue().length - 1} more for you</span></div>
+      <div class="ask-foot"><span class="muted">Answering as ${esc(byLine())}</span><button class="link" data-role-change>Change</button></div>
       ${S.stage === "flows" ? '<div class="ask-foot"><button class="link" id="drawBtn">Skip the rest and draw the screens</button></div>' : ""}
       ${details > 1 && q.metadata?.source === "BuildingBees" ? `<div class="ask-foot"><button class="btn" id="defaultsBtn" style="width:100%">Use the first suggestion for all ${details} remaining details</button></div>` : ""}`;
     if (PM.lastAsk !== q.id) { [...ask.children].forEach((c, i) => { c.classList.add("enter"); c.style.setProperty("--i", i); }); PM.lastAsk = q.id; }  // a new question rises in
+    return;
+  }
+  if (ROLE !== "PM" && open.length) {  // the rest belong to teammates
+    ask.innerHTML = `<div class="question">Nothing for you as ${esc(ROLES[ROLE])} right now.</div>
+      <div class="about" style="margin-bottom:10px">${open.length} question${open.length === 1 ? " is" : "s are"} waiting for your teammates. The board updates as they answer.</div>
+      <div class="ask-foot"><button class="link" data-invite>Copy the link for your team</button><button class="link" data-role-change>Change your role</button></div>`;
     return;
   }
   if (S.stage === "flows") {
@@ -1131,7 +1159,7 @@ async function answer(qid, text) {
   if (!text.trim() || PM.reacting) return;
   const q = S.nodes[qid];
   await api(`/api/questions/${encodeURIComponent(qid)}/resolve`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answer_text: text }),
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answer_text: text, by: byLine() }),
   });
   PM.changed = new Set(); PM.front = null;
   if (!engineReady()) return load();
@@ -1164,6 +1192,16 @@ document.addEventListener("click", (e) => {
   if (t.dataset.engine) { S.engine = t.dataset.engine; store.set("bb_engine", S.engine); say(""); return renderEngine(); }
   if (t.dataset.opt) return answer(t.dataset.q, t.dataset.opt).catch(fail);
   if (t.dataset.skip) { PM.skipped.add(t.dataset.skip); return render(); }
+  if (t.dataset.role) {
+    ROLE = t.dataset.role; WHO = ($("who")?.value || "").trim().slice(0, 40);
+    store.set("bb_role", ROLE); store.set("bb_name", WHO); PM.bee = null; return render();
+  }
+  if ("roleChange" in t.dataset || t.id === "roleBtn") { ROLE = ""; menu(false); dockMin(false); return render(); }
+  if ("invite" in t.dataset || t.id === "teamBtn") {
+    menu(false);
+    return navigator.clipboard.writeText(boardLink()).then(() => toast("Link copied. Send it to your team: each person picks their role when they open it."), () => toast(boardLink()));
+  }
+  if (t.dataset.send) { const i = $("own"); return answer(t.dataset.send, i?.value || "").catch(fail); }
   if (t.dataset.bee) { PM.bee = PM.bee === t.dataset.bee ? null : t.dataset.bee; dockMin(false); return render(); }
   if ("scout" in t.dataset) { convo(true); return requestAnimationFrame(() => { const d = $("thread").querySelector("details.read"); if (d) { d.open = true; d.scrollIntoView({ block: "center", behavior: "smooth" }); } }); }
   if (t.dataset.reopen) {
@@ -1332,6 +1370,17 @@ $("chatToggle").onclick = () => convo(!$("pm").classList.contains("open"));
 $("convoClose").onclick = () => convo(false);
 const menu = (open) => { $("menu").hidden = !open; $("menuBtn").setAttribute("aria-expanded", open); };
 // The menu button only shows when the menu has something in it.
+// Teammates answer on their own screens: pick up their answers without a reload, unless this person is mid-answer.
+let teamSig = "";
+setInterval(async () => {
+  if (document.hidden || PM.reacting || PM.thinking || !Object.keys(S.nodes).length || $("own")?.value || document.activeElement?.id === "who") return;
+  try {
+    const g = await api("/api/graph");
+    const sig = g.nodes.length + ":" + g.nodes.filter((n) => n.question_status === "ANSWERED").length;
+    const here = Object.keys(S.nodes).length + ":" + byLayer("QUESTION").filter((q) => q.question_status === "ANSWERED").length;
+    if (sig !== here && sig !== teamSig) { teamSig = sig; await load(); }
+  } catch (e) {}
+}, 15000);
 const syncMenu = () => { $("menuBtn").hidden = ![...$("menu").children].some((c) => !c.hidden); };
 $("menuBtn").onclick = (e) => { e.stopPropagation(); menu($("menu").hidden); };
 $("menu").addEventListener("click", () => menu(false));

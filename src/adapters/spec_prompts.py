@@ -160,9 +160,10 @@ Rules:
 - Never fill in a vendor, a timeout, a limit or a price that the spec and the decisions do not state.
   Unstated timeout is timeout_ms 0. Unstated vendor is "". They will be asked about, not guessed.
 - product_name is a short name for the founder's product. Never put "BuildingBees" in it.
-- Assumption is not approval: never invent business rules. Wherever the spec is silent on something an
-  engineer would need (failure paths, timeouts, retries, empty states, validation, permissions), add a question
+- Assumption is not approval: never invent business rules. Wherever the spec is silent on a product decision
+  an engineer would need (who may do what, a business rule, a failure that is a product choice), add a question
   targeted at the exact node id. Mark it blocking if code cannot be written safely without the answer.
+  Where the industry has a standard answer, use the standard and do not ask. Ask at most 8 questions in all.
 - If the spec lists agreed flows, draw screens for every one of them, each screen under its own flow id.
 - Keep it to at most 12 screens.
 - Do not ask the same thing twice in different words.
@@ -174,7 +175,17 @@ THE HIVE. Every question is asked by one bee. Set "category" to exactly one of:
 - BACKEND: data, integrations, vendors, timeouts, retries, limits, cost
 - TESTER: edge cases, abuse, what happens when it goes wrong, how we know it works
 - COMPLIANCE: privacy, consent, medical, legal or money rules, who is liable
-Spread the questions across at least four different bees when the input allows it.
+ONLY ASK WHAT ONLY THIS TEAM CAN DECIDE. A product team answers these questions (a product manager,
+a designer, frontend and backend engineers, a tester), and every question costs them time.
+- Never ask about anything with an industry-standard answer: timeouts and retries, double taps and duplicate
+  submits, loading spinners and generic error messages, sign-in and password basics, identity checks,
+  pagination, basic validation, basic accessibility. Those take the standard; the board lists them as
+  defaults the team can change.
+- Never ask what the input or the decisions so far already answer, and never ask the same thing twice in
+  other words. Read every earlier answer first.
+- Ask only what depends on this product: who it is for, what is in and out of scope, the steps of the flow,
+  how it should feel, its own business rules, money, legal and privacy.
+Spread the questions across the bees that own them.
 Write each question the way a friendly colleague would ask it out loud: one short sentence, plain words,
 no ids, no jargon the founder would not use. Suggested answers are short plain phrases.
 If a question is about one step of a flow, set "step" to that step's number (1 = the first step); otherwise 0.
@@ -209,13 +220,15 @@ Do NOT design screens, buttons or APIs yet. First agree the user flows.
    If the input says what happens on the other path, write its 1-3 steps in the same "Short title: one
    short sentence" form, and set rejoin_step to the main step it returns to (0 if it ends there).
    If the input does not say, still draw the split where a real product clearly can fail (a payment, a
-   slot or stock someone else can take, an upload, a check that can say no), leave its steps empty, and
-   ask what should happen there as a question on that flow with "step" set to at_step. An empty branch
-   is how the founder sees what the spec forgot: never fill it with a guess. At most 2 branches per flow;
+   slot or stock someone else can take, an upload, a check that can say no). When that other path has a
+   standard handling (a failed payment: show why and let them try another card), draw those standard
+   steps and do not ask. Leave the steps empty, and ask as a question on that flow with "step" set to
+   at_step, only when the other path is a real product choice (the slot was taken: offer the next one, or
+   a waiting list?). An empty branch is how the team sees what the spec forgot: never fill it with a guess. At most 2 branches per flow;
    leave branches empty when the flow has no real split.
 3. Then ask what a senior PM would need answered before anyone draws a screen: exactly who the user is,
    what they bring in, what they get out, what is in and out of scope, what happens when it goes wrong,
-   how we know it worked. Ask 4-8 questions, most important first. Target each at the flow id or user id
+   how we know it worked. Ask 3-6 questions, most important first. Target each at the flow id or user id
    it is about. Give 2-4 short suggested answers for each. Mark it blocking if the flow cannot be designed
    without the answer. Assumption is not approval: when the input is silent, ask, do not decide.
 
@@ -226,7 +239,17 @@ THE HIVE. Every question is asked by one bee. Set "category" to exactly one of:
 - BACKEND: data, integrations, vendors, timeouts, retries, limits, cost
 - TESTER: edge cases, abuse, what happens when it goes wrong, how we know it works
 - COMPLIANCE: privacy, consent, medical, legal or money rules, who is liable
-Spread the questions across at least four different bees when the input allows it.
+ONLY ASK WHAT ONLY THIS TEAM CAN DECIDE. A product team answers these questions (a product manager,
+a designer, frontend and backend engineers, a tester), and every question costs them time.
+- Never ask about anything with an industry-standard answer: timeouts and retries, double taps and duplicate
+  submits, loading spinners and generic error messages, sign-in and password basics, identity checks,
+  pagination, basic validation, basic accessibility. Those take the standard; the board lists them as
+  defaults the team can change.
+- Never ask what the input or the decisions so far already answer, and never ask the same thing twice in
+  other words. Read every earlier answer first.
+- Ask only what depends on this product: who it is for, what is in and out of scope, the steps of the flow,
+  how it should feel, its own business rules, money, legal and privacy.
+Spread the questions across the bees that own them.
 Write each question the way a friendly colleague would ask it out loud: one short sentence, plain words,
 no ids, no jargon the founder would not use. Suggested answers are short plain phrases.
 If a question is about one step of a flow, set "step" to that step's number (1 = the first step); otherwise 0.
@@ -245,9 +268,9 @@ INPUT:
 """
 
 INTERROGATE_PROMPT = """You are the BuildingBees Socratic Question Engine. Assumption is not approval.
-Review this one spec node and its neighbours. List 2-4 questions an engineer would have to guess at
-if they built it today: missing failure paths, timeouts, retries, idempotency, empty/error states,
-validation, race conditions. Do not repeat the already-asked questions. Target every question at
+Review this one spec node and its neighbours. List 0-2 questions about product decisions an engineer would
+have to guess at if they built it today. Return an empty list when everything left has a standard answer.
+Do not repeat the already-asked questions. Target every question at
 node id "{node_id}". Mark blocking only if code cannot be written safely without the answer.
 
 THE HIVE. Every question is asked by one bee. Set "category" to exactly one of:
@@ -257,7 +280,17 @@ THE HIVE. Every question is asked by one bee. Set "category" to exactly one of:
 - BACKEND: data, integrations, vendors, timeouts, retries, limits, cost
 - TESTER: edge cases, abuse, what happens when it goes wrong, how we know it works
 - COMPLIANCE: privacy, consent, medical, legal or money rules, who is liable
-Spread the questions across at least four different bees when the input allows it.
+ONLY ASK WHAT ONLY THIS TEAM CAN DECIDE. A product team answers these questions (a product manager,
+a designer, frontend and backend engineers, a tester), and every question costs them time.
+- Never ask about anything with an industry-standard answer: timeouts and retries, double taps and duplicate
+  submits, loading spinners and generic error messages, sign-in and password basics, identity checks,
+  pagination, basic validation, basic accessibility. Those take the standard; the board lists them as
+  defaults the team can change.
+- Never ask what the input or the decisions so far already answer, and never ask the same thing twice in
+  other words. Read every earlier answer first.
+- Ask only what depends on this product: who it is for, what is in and out of scope, the steps of the flow,
+  how it should feel, its own business rules, money, legal and privacy.
+Spread the questions across the bees that own them.
 Write each question the way a friendly colleague would ask it out loud: one short sentence, plain words,
 no ids, no jargon the founder would not use. Suggested answers are short plain phrases.
 If a question is about one step of a flow, set "step" to that step's number (1 = the first step); otherwise 0.

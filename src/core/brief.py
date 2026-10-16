@@ -25,6 +25,9 @@ def build_brief(g: BuildingBeesEngine) -> str:
     decided = sorted((q for q in questions if q.question_status == QuestionStatus.ANSWERED
                       and not q.metadata.get("vague")), key=lambda q: q.answered_at or "")
     still_open = [q for q in questions if q.question_status == QuestionStatus.OPEN]
+    defaults = [q for q in decided if q.metadata.get("default")]
+    decided = [q for q in decided if not q.metadata.get("default")]
+    by = lambda q: f", answered by {q.metadata['answered_by']}" if q.metadata.get("answered_by") else ""  # noqa: E731
     screens = _layer(g, "SCREEN")
     title = lambda node_id: getattr(g.nodes.get(node_id), "title", node_id)  # noqa: E731
     cited = lambda q: f", prompted by {q.metadata['cite']['url']}" if isinstance(q.metadata.get('cite'), dict) else ""  # noqa: E731
@@ -116,8 +119,14 @@ def build_brief(g: BuildingBeesEngine) -> str:
     if not decided:
         add("None yet.")
     for q in decided:
-        add(f"- **{q.question_text}** {q.answer_text} _(asked by {BEE_NAMES.get(q.category.value, 'the team')}, about {title(q.target_node_id)}{cited(q)})_")
+        add(f"- **{q.question_text}** {q.answer_text} _(asked by {BEE_NAMES.get(q.category.value, 'the team')}, about {title(q.target_node_id)}{cited(q)}{by(q)})_")
     add("")
+
+    if defaults:
+        add("## Standard defaults applied (change any on the board)")
+        for q in defaults:
+            add(f"- {title(q.target_node_id)}: {q.answer_text}")
+        add("")
 
     add("## Still open")
     if not still_open:

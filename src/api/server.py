@@ -48,7 +48,7 @@ from src.adapters.nvidia_adapter import pdf_to_text
 from src.adapters.spec_prompts import REACT_PROMPT
 from src.adapters import tavily
 from src.core.brief import build_brief
-from src.core.ingest import add_gap_questions, add_questions, apply_gap_default, strip_guesses, build_flows_graph, build_graph_from_extract, clean_branches, ask_open_branches
+from src.core.ingest import add_gap_questions, add_questions, apply_gap_default, strip_guesses, build_flows_graph, build_graph_from_extract, clean_branches, ask_open_branches, add_gap_defaults
 
 app = FastAPI(
     title="BuildingBees API",
@@ -211,6 +211,7 @@ engines = {e.key: e for e in (GoogleGeminiAdapter(), NvidiaNemotronAdapter())}
 
 class QuestionResolveRequest(BaseModel):
     answer_text: str
+    by: str = ""  # who answered, as the team sees it ("Backend: Ravi"); several people share one board
 
 
 class PostQuestionRequest(BaseModel):
@@ -284,6 +285,8 @@ def resolve_question(question_id: str, payload: QuestionResolveRequest) -> Dict[
     node.question_status = QuestionStatus.ANSWERED
     node.answer_text = payload.answer_text
     node.answered_at = datetime.datetime.utcnow().isoformat()
+    node.metadata["answered_by"] = payload.by.strip()[:60]
+    node.metadata.pop("default", None)  # a person chose it now
     
     # Target node status can be updated to READY if no other blocking questions exist
     target_node = graph.get_node(node.target_node_id)
@@ -421,7 +424,7 @@ def react_to_answer(question_id: str, engine: str) -> Dict[str, Any]:
     if stage == "screens" and q.metadata.get("previous_answer") and not r.is_vague:
         g.needs_redraw = True  # a decision changed after the screens were drawn; field edits cannot fix structure
     if stage == "screens":
-        add_gap_questions(g)  # anything the answer left unfilled gets asked
+        add_gap_defaults(g)  # anything the answer left unfilled takes the standard, shown as a default
     else:
         ask_open_branches(g, eng.label)  # a split the answer drew but did not settle gets asked
     q.metadata["note"] = r.note[:300]
@@ -653,7 +656,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
         if q.target_node_id in g.nodes:
             g.add_node(q)
             g.add_edge(q.target_node_id, q.id)
-    add_gap_questions(g)
+    add_gap_defaults(g)
     _set_graph(g)
     return get_graph_state()
 

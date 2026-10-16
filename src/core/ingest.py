@@ -1,5 +1,6 @@
 """Turns an engine SpecExtract into a BuildingBeesEngine graph, and attaches generated questions."""
 
+import datetime
 from typing import Iterable
 
 from src.adapters.spec_prompts import FlowsExtract, SpecExtract, XQuestion
@@ -159,7 +160,7 @@ def ask_open_branches(g: BuildingBeesEngine, source: str = "ai") -> list:
             if b["steps"] or key in asked:
                 continue
             q = XQuestion(target_id=f.id, category="TESTER", is_blocking=True, step=b["at_step"],
-                          question=f'If the answer to "{b["decision"]}" is {b["label"].lower()}, what should happen next?',
+                          question=f'What happens on the "{b["label"]}" path after "{b["decision"]}"?',
                           suggested_options=["Let them try again", "Show a message and stop", "Someone follows up"])
             for node in add_questions(g, [q], source, dedupe=False):
                 node.metadata["branch"] = key
@@ -216,6 +217,16 @@ def add_gap_questions(g: BuildingBeesEngine) -> list:
     return add_questions(g, asks, "BuildingBees")
 
 
+def add_gap_defaults(g: BuildingBeesEngine) -> list:
+    """Details with an industry-standard answer are filled in, not asked: the team sees them as defaults it can change."""
+    added = add_gap_questions(g)
+    now = datetime.datetime.utcnow().isoformat()
+    for q in added:
+        if apply_gap_default(g, q):
+            q.answered_at = now
+    return added
+
+
 def apply_gap_default(g: BuildingBeesEngine, q: QuestionNode) -> bool:
     """Answers one gap question with its first suggestion and writes it onto the board. No model call.
     Only for the detail questions written by add_gap_questions; the bees' own questions always need the founder."""
@@ -235,5 +246,6 @@ def apply_gap_default(g: BuildingBeesEngine, q: QuestionNode) -> bool:
     else:
         return False
     q.question_status, q.answer_text = QuestionStatus.ANSWERED, choice
-    q.metadata["note"] = "Applied as the default for this detail."
+    q.metadata["note"] = "Standard default applied. Change it if your team wants something else."
+    q.metadata["default"] = True
     return True

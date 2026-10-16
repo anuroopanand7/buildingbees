@@ -524,3 +524,19 @@ def test_signed_in_people_get_a_list_of_their_boards(monkeypatch):
 def test_a_bad_token_is_nobody(monkeypatch):
     monkeypatch.setattr(server, "FIREBASE", {"projectId": "p"})
     assert server._uid("Bearer not-a-real-token") is None and server._uid("") is None
+
+
+def test_standard_details_become_defaults_and_answers_name_who_gave_them(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", FakeGemini())
+    c, h = TestClient(server.app), {"X-Board": "team-defaults"}
+    c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h)
+    c.post("/api/expand?engine=gemini", headers=h)
+    g = server.boards["team-defaults"]
+    bee_q = g.get_questions_for_node("API_PAY")[0]
+    c.post(f"/api/questions/{bee_q.id}/resolve", json={"answer_text": "Retry once", "by": "Backend: Ravi"}, headers=h)
+    from src.core.ingest import add_gap_defaults
+    filled = add_gap_defaults(g)  # the timeout is still missing: it takes the standard instead of being asked
+    assert [q.target_node_id for q in filled] == ["API_PAY"] and filled[0].question_status == "ANSWERED"
+    assert g.nodes["API_PAY"].timeout_ms == 3000
+    brief = c.get("/api/brief", headers=h).text
+    assert "answered by Backend: Ravi" in brief and "## Standard defaults applied" in brief
