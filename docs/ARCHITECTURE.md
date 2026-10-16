@@ -43,6 +43,7 @@ sequenceDiagram
 | `src/core/brief.py` | Writes the Brief from the board. No model call. | `build_brief`, `decision_count` |
 | `src/api/server.py` | FastAPI app: one board per `X-Board` id, Firestore persistence, sign-in, rate limits. | `_apply_reaction`, `react_to_answer`, `expand`, `sign_off` |
 | `web/index.html` | The whole UI, vanilla JS: canvas board, bee rail, question dock, roles, Brief viewer. | `renderMap`, `branchRows`, `drawWires`, `pmQueue`, `answer` |
+| `src/api/feedback.py` | Testers' feedback board (Firestore `feedback`): reports, votes, comments, statuses, three confirmations resolve. | `create_report`, `toggle_vote`, `confirm_fixed` |
 | `scripts/eval_questions.py` | Question-quality check on four sample ideas. Run after every prompt change. | `run` |
 
 ## The question rules (what the bees may and may not ask)
@@ -53,6 +54,10 @@ sequenceDiagram
 4. **Branches.** A flow can split after a step (`XBranch`). A path with a standard handling is drawn; a path that is a real product choice is left empty and `ask_open_branches` adds one Testing Bee question tagged `metadata.branch = "at_step|label"`.
 5. **Vague answers** get exactly one sharper follow-up from the same bee and change nothing.
 6. **Assumption is not approval.** Values nobody stated (a vendor, a timeout) are blanked by `strip_guesses` and then defaulted or asked.
+
+## Who is answering (solo or team)
+
+`AUDIENCE` in `spec_prompts.py` is put in front of every engine call (`server.audience()`): solo means at most 6 plain questions per stage with a recommendation and a "why"; team means up to 12, routed and worded by role. The board's `mode` is stored with it and can be switched with `POST /api/mode` (inviting a teammate does this).
 
 ## Teams
 

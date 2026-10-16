@@ -45,6 +45,10 @@ flowchart LR
 
 **Flows split.** A step can be a decision ("Payment went through?") drawn as a diamond, with the other path underneath. A path nobody has decided is drawn as "Not decided yet" and a bee asks about it; a path with a standard handling is drawn, not asked.
 
+**Solo or team.** The start screen asks who will answer. One founder gets at most 6 questions per stage in everyday words, with the bees' recommended answer first and a plain "why"; the bees decide the technical points themselves. A team gets up to 12 per stage, each routed to the role that owns it and worded for that expert.
+
+**Testers' feedback.** The Feedback button opens a public board for beta testers: report a bug or an idea with screenshots, upvote and comment; the team marks a fix deployed and three testers' "Confirm fixed" resolve it.
+
 **Sign-off.** Anyone who owns part of the scope signs off the Brief. It records who and when, how many questions were still open, and says so if later decisions changed the scope.
 
 A screen is "ready to build" only when it has no open blocking question, its loading and error states are decided, every API it calls has a timeout, and every button that calls an API says where a failure leads.
@@ -137,6 +141,9 @@ Every call takes the board id in an `X-Board` header or a `?board=` query parame
 | GET | `/api/graph`, `/api/screens` | The board and each screen's readiness |
 | GET | `/api/brief` | The Brief, as Markdown |
 | POST | `/api/signoff` | Sign off the scope as it stands (`by` says who) |
+| POST | `/api/mode` | Switch a board between one founder (`solo`) and a `team` |
+| GET, POST | `/api/feedback` | Testers' feedback board: list, report (with up to 3 screenshots) |
+| POST | `/api/feedback/{id}/vote`, `/comment`, `/confirm`, `/status` | Upvote, comment, confirm a fix; status changes are team-only (`ADMIN_UIDS`) |
 | POST | `/api/restore`, `/api/reset` | Put a saved board back; clear the board |
 
 ## Known limits

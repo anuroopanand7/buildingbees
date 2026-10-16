@@ -116,6 +116,21 @@
   .mine { align-self: flex-end; max-width: 86%; text-align: right; }
   .mine .by { margin-right: 8px; font-size: 11.5px; color: var(--muted); }
   .send-row { display: flex; gap: 6px; }
+  .fb-body { padding: 16px 18px; overflow: auto; }
+  .fb-form { display: grid; gap: 10px; padding-bottom: 16px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+  .fb-form textarea, .fb-form select { width: 100%; border: 1px solid var(--line-strong); border-radius: var(--r-input); padding: 8px 10px; font: inherit; background: var(--panel); color: var(--text); }
+  .fb-item { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+  .fb-item.resolved { opacity: .6; }
+  .fb-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+  .fb-chip { padding: 1px 8px; border-radius: 999px; background: var(--fill); font-weight: 600; }
+  .fb-chip.fix_deployed { background: var(--ok-soft); color: var(--ok); }
+  .fb-chip.in_progress { background: var(--focus); color: #6b4e00; }
+  .fb-item p { margin: 6px 0; font-size: 14px; white-space: pre-wrap; }
+  .fb-shots { display: flex; gap: 6px; margin: 6px 0; }
+  .fb-shots img { width: 96px; height: 64px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+  .fb-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
+  .fb-comment { font-size: 13px; margin: 4px 0 0 10px; }
+  .fb-comment.official b { color: var(--ok); }
   .why { margin: 4px 0 8px; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
   .option .rec { margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: var(--focus); color: #6b4e00; font-size: 11px; font-weight: 600; }
   .send-row input { flex: 1; min-width: 0; }
@@ -288,7 +303,7 @@
   .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; border: none; background: var(--fill); font-size: 16px; }
 
   /* The Brief: the board as a document. Prints cleanly, so "Save as PDF" works from the browser. */
-  #brief, #boards { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--text) 35%, transparent); display: grid; place-items: center; padding: 24px; }
+  #brief, #boards, #fb { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--text) 35%, transparent); display: grid; place-items: center; padding: 24px; }
   .brief-sheet { background: var(--panel); border-radius: 18px; box-shadow: var(--shadow); width: min(820px, 100%); max-height: 100%; display: flex; flex-direction: column; }
   .brief-bar { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
   .brief-bar b { margin-right: auto; }
@@ -476,6 +491,7 @@
 </div>
 <div class="island stage" id="meter" hidden><span id="meterText"></span><div class="track"><i id="meterBar"></i></div><span id="pmSub"></span></div>
 <div class="topright">
+  <button class="island btn sm" id="fbBtn" data-tip="Report a bug or an idea, and see what other testers said" data-tip-pos="bottom-end"><i class="ph ph-megaphone" aria-hidden="true"></i>Feedback</button>
   <button class="island tool" id="signBtn" hidden aria-label="Sign in" data-tip="Sign in to keep your boards" data-tip-pos="bottom-end"><i class="ph ph-user" aria-hidden="true"></i></button>
   <button class="island btn sm brief-btn" id="briefBtn" hidden data-tip="Every decision and open question, for engineers" data-tip-pos="bottom-end"><i class="ph ph-file-text" aria-hidden="true"></i>Brief</button>
 </div>
@@ -555,6 +571,21 @@
       <button class="icon-btn" id="boardsClose" aria-label="Close my boards"><i class="ph ph-x" aria-hidden="true"></i></button>
     </div>
     <div id="boardsBody"></div>
+  </div>
+</div>
+<div id="fb" hidden role="dialog" aria-modal="true" aria-label="Testers' feedback">
+  <div class="brief-sheet">
+    <div class="brief-bar"><b>Testers' feedback</b><button class="icon-btn" id="fbClose" aria-label="Close feedback"><i class="ph ph-x" aria-hidden="true"></i></button></div>
+    <div id="fbBody" class="fb-body">
+      <form id="fbForm" class="fb-form">
+        <div class="field"><label for="fbSection">Which part?</label><select id="fbSection"></select></div>
+        <div class="field"><label for="fbText">What happened, or what would you like?</label><textarea id="fbText" rows="3" required></textarea></div>
+        <div class="field"><label for="fbShots">Screenshots (up to 3, optional)</label><input id="fbShots" type="file" accept="image/*" multiple></div>
+        <div class="field"><label for="fbName">Your name (optional)</label><input id="fbName" autocomplete="name"></div>
+        <button class="btn primary" id="fbSend" type="submit">Send</button>
+      </form>
+      <div id="fbList"></div>
+    </div>
   </div>
 </div>
 <div id="brief" hidden role="dialog" aria-modal="true" aria-label="Product brief">
@@ -1323,6 +1354,62 @@ $("briefBtn").onclick = async () => {
   } catch (err) { toast(err.message); }
 };
 $("briefClose").onclick = () => { $("brief").hidden = true; };
+
+// Testers' feedback board, the AIRs way: report, upvote, comment; the team marks a fix deployed and
+// three testers' "Confirm fixed" resolve it. Server side: src/api/feedback.py.
+const TESTER = store.get("bb_tester") || (() => { const id = Math.random().toString(36).slice(2) + Date.now().toString(36); store.set("bb_tester", id); return id; })();
+const STATUS_WORDS = { new: "New", in_progress: "In progress", shelved: "Parked", fix_deployed: "Fix deployed", resolved: "Resolved" };
+async function fbApi(path, opts = {}) {  // like api(), plus the tester id; feedback is not tied to a board
+  return api(path, { ...opts, headers: { ...(opts.headers || {}), "X-Tester": TESTER } });
+}
+// Phone screenshots are large: shrink each to 1280 px wide as JPEG before it is sent.
+const shrink = (file) => new Promise((ok, bad) => {
+  const img = new Image(); img.onerror = () => bad(new Error("That screenshot could not be read."));
+  img.onload = () => { const k = Math.min(1, 1280 / img.width), c = document.createElement("canvas");
+    c.width = img.width * k; c.height = img.height * k; c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(img.src); ok(c.toDataURL("image/jpeg", 0.7)); };
+  img.src = URL.createObjectURL(file);
+});
+async function fbLoad() {
+  const r = await fbApi("/api/feedback");
+  if (!$("fbSection").options.length) $("fbSection").innerHTML = r.sections.map((x) => `<option>${esc(x)}</option>`).join("");
+  $("fbList").innerHTML = r.reports.length ? r.reports.map((f) => `<div class="fb-item ${f.status}">
+    <div class="fb-meta"><span class="fb-chip ${f.status}">${STATUS_WORDS[f.status]}</span><span>${esc(f.section)}</span><span>${esc(f.name)}, ${esc(f.created.slice(0, 10))}</span></div>
+    <p>${esc(f.description)}</p>
+    ${f.screenshots?.length ? `<div class="fb-shots">${f.screenshots.map((u) => `<a href="${u}" target="_blank" rel="noopener"><img src="${u}" alt="Screenshot from ${esc(f.name)}"></a>`).join("")}</div>` : ""}
+    ${f.comments.map((c) => `<div class="fb-comment ${c.official ? "official" : ""}"><b>${esc(c.name)}:</b> ${esc(c.text)}</div>`).join("")}
+    <div class="fb-actions">
+      <button class="btn sm" data-fb-vote="${f.id}" aria-pressed="${f.voted}"><i class="ph ph-arrow-fat-up" aria-hidden="true"></i>${f.votes}</button>
+      ${f.status === "fix_deployed" ? `<button class="btn sm primary" data-fb-confirm="${f.id}" ${f.confirmed ? "disabled" : ""}>${f.confirmed ? "You confirmed" : "Confirm fixed"} (${f.confirms}/3)</button>` : ""}
+      <input class="fb-reply" data-fb-reply="${f.id}" placeholder="Add a comment and press Enter" aria-label="Comment">
+      ${r.team ? `<select data-fb-status="${f.id}" aria-label="Status">${Object.entries(STATUS_WORDS).map(([k, v]) => `<option value="${k}" ${k === f.status ? "selected" : ""}>${v}</option>`).join("")}</select>` : ""}
+    </div></div>`).join("") : '<p class="muted">No reports yet. Be the first.</p>';
+}
+$("fbBtn").onclick = () => { $("fbName").value ||= WHO || AUTH.user?.displayName || ""; $("fb").hidden = false; fbLoad().catch(fail); $("fbText").focus(); };
+$("fbClose").onclick = () => { $("fb").hidden = true; };
+$("fb").onclick = (e) => { if (e.target.id === "fb") $("fb").hidden = true; };
+$("fbForm").onsubmit = async (e) => {
+  e.preventDefault(); $("fbSend").disabled = true;
+  try {
+    const shots = await Promise.all([...$("fbShots").files].slice(0, 3).map(shrink));
+    await fbApi("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ section: $("fbSection").value, description: $("fbText").value, name: $("fbName").value, board: BOARD || "", screenshots: shots }) });
+    $("fbText").value = ""; $("fbShots").value = ""; toast("Thanks. Your report is on the board; others can upvote it."); await fbLoad();
+  } catch (err) { toast(err.message); } finally { $("fbSend").disabled = false; }
+};
+$("fbList").onclick = async (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  const id = b.dataset.fbVote || b.dataset.fbConfirm; if (!id) return;
+  try { await fbApi(`/api/feedback/${id}/${b.dataset.fbVote ? "vote" : "confirm"}`, { method: "POST" }); await fbLoad(); } catch (err) { toast(err.message); }
+};
+$("fbList").onkeydown = async (e) => {
+  if (e.key !== "Enter" || !e.target.dataset.fbReply || !e.target.value.trim()) return;
+  try { await fbApi(`/api/feedback/${e.target.dataset.fbReply}/comment`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: e.target.value, name: $("fbName").value }) }); await fbLoad(); } catch (err) { toast(err.message); }
+};
+$("fbList").onchange = async (e) => {
+  if (!e.target.dataset.fbStatus) return;
+  try { await fbApi(`/api/feedback/${e.target.dataset.fbStatus}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: e.target.value }) }); await fbLoad(); } catch (err) { toast(err.message); }
+};
 $("briefSign").onclick = async () => {
   const by = byLine() || (prompt("Your name and role, for the sign-off (for example: Priya, client)") || "").trim();
   if (!by) return;

@@ -46,6 +46,7 @@ from src.adapters.gemini_adapter import GoogleGeminiAdapter
 from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.adapters.nvidia_adapter import pdf_to_text
 from src.adapters.spec_prompts import AUDIENCE, REACT_PROMPT
+from src.api import feedback
 from src.adapters import tavily
 from src.core.brief import build_brief, decision_count
 from src.core.ingest import add_gap_questions, add_questions, apply_gap_default, strip_guesses, build_flows_graph, build_graph_from_extract, clean_branches, ask_open_branches, add_gap_defaults
@@ -202,18 +203,20 @@ graph = _BoardProxy()
 
 @app.middleware("http")
 async def _select_board(request, call_next):
-    # The web app sends a header; a coding agent given a link uses ?board=.
     """Reads the board id from the X-Board header or ?board= and makes it current for this request."""
+    # The web app sends a header; a coding agent given a link uses ?board=.
     bid = (request.headers.get("x-board") or request.query_params.get("board") or "default")[:64]
     _board_id.set(bid)
     response = await call_next(request)
-    if request.method == "POST" and request.url.path.startswith("/api/") and response.status_code < 400:
+    if (request.method == "POST" and request.url.path.startswith("/api/") and response.status_code < 400
+            and not request.url.path.startswith("/api/feedback")):  # feedback is not part of any board
         await run_in_threadpool(_save_board, bid)
         auth = request.headers.get("authorization", "")
         if auth:
             await run_in_threadpool(lambda: _remember_board(_uid(auth), bid))
     return response
 engines = {e.key: e for e in (GoogleGeminiAdapter(), NvidiaNemotronAdapter())}
+app.include_router(feedback.router)  # the beta testers' feedback board (src/api/feedback.py)
 
 
 class QuestionResolveRequest(BaseModel):

@@ -573,3 +573,26 @@ def test_solo_and_team_boards_are_asked_differently(monkeypatch):
     assert server.boards["mode-solo"].spec_text == "shop"  # the instruction never becomes part of the founder's spec
     assert c.post("/api/mode", json={"mode": "team"}, headers={"X-Board": "mode-solo"}).json() == {"mode": "team"}
     assert c.post("/api/mode", json={"mode": "crowd"}, headers={"X-Board": "mode-solo"}).status_code == 400
+
+
+def test_feedback_board_works_the_airs_way(monkeypatch):
+    from src.api import feedback
+    monkeypatch.setattr(feedback, "_mem", {})
+    monkeypatch.setattr(server, "_uid", lambda auth: {"Bearer roger": "ROGER"}.get(auth))
+    monkeypatch.setenv("ADMIN_UIDS", "ROGER")
+    c = TestClient(server.app)
+    t = lambda n: {"X-Tester": n}  # noqa: E731
+    assert c.post("/api/feedback", json={"description": "x"}, headers=t("a")).status_code == 400
+    r = c.post("/api/feedback", json={"section": "Bee questions", "description": "Too many questions"}, headers=t("a")).json()
+    assert r["votes"] == 1 and r["mine"] and r["status"] == "new"  # the reporter's own vote counts
+    fid = r["id"]
+    assert c.post(f"/api/feedback/{fid}/vote", headers=t("b")).json()["votes"] == 2
+    assert c.post(f"/api/feedback/{fid}/status", json={"status": "fix_deployed"}, headers=t("b")).status_code == 403
+    c.post(f"/api/feedback/{fid}/comment", json={"text": "Fixed in 92cb8e6"}, headers={"Authorization": "Bearer roger"})
+    out = c.post(f"/api/feedback/{fid}/status", json={"status": "fix_deployed"}, headers={"Authorization": "Bearer roger"}).json()
+    assert out["comments"][0]["official"] and out["status"] == "fix_deployed"
+    for n in ("a", "b"):
+        assert c.post(f"/api/feedback/{fid}/confirm", headers=t(n)).json()["status"] == "fix_deployed"
+    assert c.post(f"/api/feedback/{fid}/confirm", headers=t("c")).json()["status"] == "resolved"  # third confirmation
+    listed = c.get("/api/feedback", headers=t("a")).json()
+    assert listed["reports"][0]["id"] == fid and "voters" not in listed["reports"][0] and not listed["team"]
