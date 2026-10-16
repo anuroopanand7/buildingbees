@@ -11,10 +11,12 @@ BEE_NAMES = {"PM": "Queen Bee", "DESIGN": "Design Bee", "FRONTEND": "Frontend Be
 
 
 def _layer(g: BuildingBeesEngine, name: str) -> list:
+    """All nodes of one layer (USER, FLOW, SCREEN, CTA, API), in board order."""
     return [n for n in g.nodes.values() if n.layer.value == name]
 
 
 def _or_open(value) -> str:
+    """The value, or NOT DECIDED so a builder asks instead of assuming."""
     return str(value) if value not in ("", None, 0) else "NOT DECIDED"
 
 
@@ -25,6 +27,7 @@ def decision_count(g: BuildingBeesEngine) -> int:
 
 
 def build_brief(g: BuildingBeesEngine) -> str:
+    """Writes the whole board as one Markdown Brief: sign-off, users, flows and splits, screens, decisions, defaults, still open."""
     out: List[str] = []
     add = out.append
     questions = [n for n in g.nodes.values() if isinstance(n, QuestionNode)]

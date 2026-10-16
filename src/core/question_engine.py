@@ -24,6 +24,7 @@ class SocraticQuestionEngine:
         self.graph = graph
 
     def inspect_screen(self, screen: ScreenNode) -> List[QuestionNode]:
+        """Rule-based checks on one screen (missing states, buttons without outcomes)."""
         questions: List[QuestionNode] = []
 
         # Check empty state
@@ -51,6 +52,7 @@ class SocraticQuestionEngine:
         return questions
 
     def inspect_cta(self, cta: CTANode) -> List[QuestionNode]:
+        """Rule-based checks on one button (no API, no failure destination)."""
         questions: List[QuestionNode] = []
 
         # Check failure screen and field preservation
@@ -77,6 +79,7 @@ class SocraticQuestionEngine:
         return questions
 
     def inspect_api(self, api: APINode) -> List[QuestionNode]:
+        """Rule-based checks on one API (no timeout, no vendor)."""
         questions: List[QuestionNode] = []
 
         # Check vendor dependency & timeout fallback

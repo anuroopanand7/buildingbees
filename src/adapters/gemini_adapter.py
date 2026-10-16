@@ -32,9 +32,11 @@ class GoogleGeminiAdapter:
 
     @property
     def enabled(self) -> bool:
+        """True when a Gemini API key is set."""
         return bool(self.api_key)
 
     def _generate(self, contents, schema):
+        """Calls Gemini for structured JSON matching `schema`, falling over across models and retrying once after a pause when Gemini is busy."""
         if not self.enabled:
             raise EngineNotConfigured("GEMINI_API_KEY is not set")
         from google import genai
@@ -68,6 +70,7 @@ class GoogleGeminiAdapter:
         return resp.parsed
 
     def extract_spec(self, text: str = "", pdf_bytes: Optional[bytes] = None) -> SpecExtract:
+        """Draws screens, buttons and APIs from the agreed flows and decisions (stage two)."""
         contents = [INGEST_PROMPT + (text or "(see attached PDF)")]
         if pdf_bytes:
             from google.genai import types
@@ -75,6 +78,7 @@ class GoogleGeminiAdapter:
         return self._generate(contents, SpecExtract)
 
     def extract_flows(self, text: str = "", pdf_bytes: Optional[bytes] = None) -> FlowsExtract:
+        """Turns an idea or PDF into users, flows, branches and the first questions (stage one)."""
         contents = [FLOWS_PROMPT + (text or "(see attached PDF)")]
         if pdf_bytes:
             from google.genai import types
@@ -82,9 +86,11 @@ class GoogleGeminiAdapter:
         return self._generate(contents, FlowsExtract)
 
     def react(self, prompt: str) -> Reaction:
+        """A bee reads one answer: a sharper follow-up if it is vague, otherwise changes to the board."""
         return self._generate([prompt], Reaction)
 
     def interrogate(self, node_id: str, context_json: str, asked: List[str]) -> List[XQuestion]:
+        """Looks for further product questions on one screen, button or API."""
         prompt = INTERROGATE_PROMPT.format(
             node_id=node_id, context=context_json, asked="\n".join(f"- {q}" for q in asked) or "(none)"
         )

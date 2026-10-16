@@ -21,6 +21,7 @@ BEE_FOR_CATEGORY = {
 
 
 def _state(value: str) -> str:
+    """Maps an engine's screen-state text to the board value; UNSPECIFIED becomes empty so it gets decided."""
     # An unspecified state is treated as missing so readiness flags it.
     return "" if not value or value.strip().upper() == "UNSPECIFIED" else value
 
@@ -30,6 +31,7 @@ _FILLER = {"the", "a", "an", "is", "are", "do", "does", "should", "what", "how",
 
 
 def _words(text: str) -> set:
+    """The meaningful words of a question, for spotting near-duplicates."""
     return {w for w in "".join(ch.lower() if ch.isalnum() else " " for ch in text).split() if w not in _FILLER}
 
 
@@ -46,6 +48,7 @@ def _already_asked(engine: BuildingBeesEngine, text: str) -> bool:
 
 def add_questions(engine: BuildingBeesEngine, questions: Iterable[XQuestion], source: str = "ai",
                   dedupe: bool = True) -> list:
+    """Pins the engine's questions to their nodes, skipping unknown targets and near-duplicates; returns the ones added."""
     added = []
     for q in questions:
         if q.target_id not in engine.nodes or (dedupe and _already_asked(engine, q.question)):
@@ -73,6 +76,7 @@ def add_questions(engine: BuildingBeesEngine, questions: Iterable[XQuestion], so
 
 
 def build_graph_from_extract(x: SpecExtract, source: str = "ai") -> BuildingBeesEngine:
+    """Stage two: builds the full board (users, flows, screens, buttons, APIs, entities, questions) from the engine's output."""
     g = BuildingBeesEngine()
     g.product_name = clean_name(x.product_name)
     g.entities = [e.model_dump() for e in x.entities]

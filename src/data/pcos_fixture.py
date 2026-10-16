@@ -21,6 +21,7 @@ from src.core.graph import BuildingBeesEngine
 
 
 def build_pcos_graph() -> BuildingBeesEngine:
+    """A fixed sample board used by tests and the offline demo."""
     engine = BuildingBeesEngine()
 
     # 1. User Persona

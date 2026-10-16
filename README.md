@@ -6,6 +6,20 @@ Tools that turn one prompt into screens or diagrams have to guess everything the
 
 Live demo: https://buildingbees-853213660594.asia-south1.run.app
 
+**Who it is for:** product teams in B2B software, first of all software agencies scoping fixed-price client work. A team shares one board: the client, the product manager, the designer, the engineers and the tester each answer only the questions that belong to them, and the client signs off the scope before anyone builds.
+
+```mermaid
+flowchart LR
+  idea[One-line idea or PDF] --> flows[Gemini draws user flows<br/>with decision splits]
+  flows --> bees{Bees ask each<br/>teammate their questions}
+  bees -->|clear answer| redraw[Board redrawn]
+  bees -->|vague answer| follow[One sharper follow-up]
+  redraw --> bees
+  bees -->|flows agreed| screens[Screens, buttons, APIs]
+  screens --> brief[Brief: decisions, defaults,<br/>open questions, sign-off]
+  brief --> agent[Engineers or a coding agent]
+```
+
 ## How it works
 
 1. **Say what you want to build.** Two lines are enough. A PRD or a PDF works too.
@@ -24,6 +38,14 @@ Live demo: https://buildingbees-853213660594.asia-south1.run.app
 4. **Every answer is read.** A vague answer ("everyone", "whatever is normal") gets one sharper follow-up and changes nothing. A clear answer rewrites the board: steps are added, changed or removed, a new flow appears if you asked for one, and the bee says what it did. You can change any answer; the bee takes back what the first one did.
 5. **Draw the screens.** The agreed flows and every decision become screens with wireframes, buttons, and the APIs each button calls. The bees then ask again, screen by screen, and answers fill in the missing details (a timeout, a vendor, an empty state).
 6. **Take the Brief.** One document with the flows, screens, every decision and what is still open. Copy it, download it, print it, or give your coding agent the link. It is a starting point an engineer or agent can work from, not a full technical design. Anything not decided is printed as `NOT DECIDED`, so the builder asks instead of assuming.
+
+**Teams.** Everyone opens the same board link and picks a role: product manager (hears every bee), client (business and compliance questions only), designer, frontend, backend or tester. Each answer records who gave it, the board picks up teammates' answers every 15 seconds, and the Brief shows who decided what.
+
+**Standard answers are not asked.** Timeouts, retries, double taps, loading and error states have industry-standard answers, so they are filled in and listed in the Brief under "Standard defaults applied", where the team can change any of them. The bees ask only what depends on this product. (A tester answered 70+ questions on an early version; the same idea now gets 9.)
+
+**Flows split.** A step can be a decision ("Payment went through?") drawn as a diamond, with the other path underneath. A path nobody has decided is drawn as "Not decided yet" and a bee asks about it; a path with a standard handling is drawn, not asked.
+
+**Sign-off.** Anyone who owns part of the scope signs off the Brief. It records who and when, how many questions were still open, and says so if later decisions changed the scope.
 
 A screen is "ready to build" only when it has no open blocking question, its loading and error states are decided, every API it calls has a timeout, and every button that calls an API says where a failure leads.
 
@@ -93,6 +115,9 @@ gcloud run deploy buildingbees --source . --region asia-south1 --allow-unauthent
 | `src/core/ingest.py` | Turns engine output into the board |
 | `src/core/graph.py` | The board and the readiness rule |
 | `src/core/brief.py` | Writes the Brief (no model call) |
+| `scripts/eval_questions.py` | Question-quality check: runs four sample ideas and flags standard-topic and duplicate questions |
+| `docs/ARCHITECTURE.md` | How the pieces fit, for engineers and coding agents |
+| `docs/research/` | The research prompts behind the product decisions |
 
 ## API
 
@@ -103,7 +128,7 @@ Every call takes the board id in an `X-Board` header or a `?board=` query parame
 | GET | `/api/status` | Which engines are connected |
 | POST | `/api/ingest-prd?engine=` | Idea or spec text in, flows and questions out |
 | POST | `/api/ingest-file?engine=` | The same from a PDF or Markdown upload |
-| POST | `/api/questions/{id}/resolve` | Record an answer |
+| POST | `/api/questions/{id}/resolve` | Record an answer (`by` says who gave it) |
 | POST | `/api/questions/{id}/react?engine=` | The bee reads the answer: follow up, or update the board |
 | POST | `/api/questions/{id}/reopen` | Change an answer |
 | POST | `/api/questions/accept-defaults` | Take the first suggestion for every routine detail still open |
@@ -111,12 +136,13 @@ Every call takes the board id in an `X-Board` header or a `?board=` query parame
 | POST | `/api/nodes/{id}/interrogate?engine=` | Look for more gaps on one screen, button or API |
 | GET | `/api/graph`, `/api/screens` | The board and each screen's readiness |
 | GET | `/api/brief` | The Brief, as Markdown |
+| POST | `/api/signoff` | Sign off the scope as it stands (`by` says who) |
 | POST | `/api/restore`, `/api/reset` | Put a saved board back; clear the board |
 
 ## Known limits
 
 - Boards are saved to Firestore on Cloud Run, so a board and its Brief link survive the server sleeping. Run locally, boards live in memory and the browser keeps the backup copy. Sign in with Google (Firebase Authentication) is optional: signed in, every board you work on is listed under "My boards" on any device.
-- A board link still opens that board for anyone who has it; boards are not private to their owner yet. No shared editing yet.
+- A board link still opens that board for anyone who has it; boards are not private to their owner yet. Teammates see each other's answers on a 15 second refresh, not live cursors.
 
 ## Built with
 

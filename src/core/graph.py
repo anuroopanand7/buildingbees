@@ -31,6 +31,7 @@ class BuildingBeesEngine:
         self.reverse_edges: Dict[str, Set[str]] = {}
 
     def add_node(self, node: BaseGraphNode) -> BaseGraphNode:
+        """Adds or replaces a node on the board and returns it."""
         self.nodes[node.id] = node
         if node.id not in self.forward_edges:
             self.forward_edges[node.id] = set()
@@ -39,6 +40,7 @@ class BuildingBeesEngine:
         return node
 
     def add_edge(self, source_id: str, target_id: str) -> None:
+        """Links two nodes (user to flow, flow to screen, screen to button, button to API, node to question)."""
         if source_id not in self.forward_edges:
             self.forward_edges[source_id] = set()
         if target_id not in self.reverse_edges:
@@ -48,9 +50,11 @@ class BuildingBeesEngine:
         self.reverse_edges[target_id].add(source_id)
 
     def get_node(self, node_id: str) -> Optional[BaseGraphNode]:
+        """The node with this id, or None."""
         return self.nodes.get(node_id)
 
     def get_questions_for_node(self, node_id: str) -> List[QuestionNode]:
+        """Every question pinned to this node."""
         questions = []
         for n in self.nodes.values():
             if isinstance(n, QuestionNode) and n.target_node_id == node_id:

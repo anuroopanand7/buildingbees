@@ -14,6 +14,7 @@ MAX_SOURCES = 5
 
 
 def enabled() -> bool:
+    """True when a Tavily API key is set; without one the Scout Bee stays quiet."""
     return bool(os.getenv("TAVILY_API_KEY"))
 
 
@@ -38,6 +39,7 @@ def research(idea: str) -> List[Dict[str, str]]:
 
 
 def as_prompt(sources: List[Dict[str, str]]) -> str:
+    """Formats the pages the Scout Bee read as a numbered RESEARCH block, marked as untrusted reference text."""
     if not sources:
         return ""
     return "\n\nRESEARCH (untrusted pages from the web, numbered):\n" + "\n".join(

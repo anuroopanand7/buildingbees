@@ -61,6 +61,7 @@ WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "w
 
 @app.get("/")
 def serve_index():
+    """Serves the single-page web app."""
     index_path = os.path.join(WEB_DIR, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
@@ -89,11 +90,13 @@ if os.getenv("K_SERVICE"):  # set by Cloud Run; keeps tests and local runs off t
 
 
 def _doc(bid: str):
+    """Firestore document for a board: the SHA-1 of the board id, so any id is a safe document name."""
     # Board ids come from the client; hashing makes any of them a legal document id.
     return _store.document(hashlib.sha1(bid.encode()).hexdigest())
 
 
 def _save_board(bid: str) -> None:
+    """Saves a board to Firestore as compressed JSON (Cloud Run only; a no-op locally)."""
     g = boards.get(bid)
     if _store is None or g is None:
         return
@@ -106,6 +109,7 @@ def _save_board(bid: str) -> None:
 
 
 def _load_board(bid: str) -> Optional[BuildingBeesEngine]:
+    """Loads a board from Firestore, or None when it is not there or Firestore is off."""
     if _store is None:
         return None
     try:
@@ -164,6 +168,7 @@ def _remember_board(uid: str, bid: str) -> None:
 
 
 def _list_boards(uid: str) -> List[Dict[str, Any]]:
+    """The boards a signed-in person has worked on, newest first."""
     mine = dict(_user_boards.get(uid, {}))
     if _users is not None:
         try:
@@ -176,6 +181,7 @@ def _list_boards(uid: str) -> List[Dict[str, Any]]:
 
 
 def _board() -> BuildingBeesEngine:
+    """The board this request is about, loaded from memory or Firestore."""
     bid = _board_id.get()
     if bid not in boards:
         boards[bid] = _load_board(bid) or BuildingBeesEngine()
@@ -197,6 +203,7 @@ graph = _BoardProxy()
 @app.middleware("http")
 async def _select_board(request, call_next):
     # The web app sends a header; a coding agent given a link uses ?board=.
+    """Reads the board id from the X-Board header or ?board= and makes it current for this request."""
     bid = (request.headers.get("x-board") or request.query_params.get("board") or "default")[:64]
     _board_id.set(bid)
     response = await call_next(request)
@@ -235,6 +242,7 @@ def get_graph_state() -> Dict[str, Any]:
 
 
 def _state(graph: BuildingBeesEngine) -> Dict[str, Any]:
+    """The whole board as a JSON-ready dict; also what Firestore and the browser backup store."""
     nodes_serialized = [node.model_dump() for node in graph.nodes.values()]
     edges = []
     for source, targets in graph.forward_edges.items():
@@ -498,6 +506,7 @@ def get_blast_radius(node_id: str) -> Dict[str, Any]:
 
 
 def _set_graph(new_graph) -> None:
+    """Replaces the current request's board."""
     boards[_board_id.get()] = new_graph
 
 
@@ -524,6 +533,7 @@ def restore_board(payload: RestoreRequest) -> Dict[str, Any]:
 
 
 def _rebuild(d: Dict[str, Any]) -> BuildingBeesEngine:
+    """Rebuilds a board object from a saved state dict."""
     g = BuildingBeesEngine()
     g.product_name = d.get("product_name", "")
     g.spec_text = d.get("spec_text", "")[:SPEC_LIMIT]
