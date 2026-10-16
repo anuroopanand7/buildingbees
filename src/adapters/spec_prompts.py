@@ -179,7 +179,7 @@ ONLY ASK WHAT ONLY THIS TEAM CAN DECIDE. A product team answers these questions 
 a designer, frontend and backend engineers, a tester), and every question costs them time.
 - Never ask about anything with an industry-standard answer: timeouts and retries, double taps and duplicate
   submits, loading spinners and generic error messages, sign-in and password basics, identity checks,
-  pagination, basic validation, basic accessibility. Those take the standard; the board lists them as
+  pagination, basic validation, file size and format limits, basic accessibility. Those take the standard; the board lists them as
   defaults the team can change.
 - Never ask what the input or the decisions so far already answer, and never ask the same thing twice in
   other words. Read every earlier answer first.
@@ -243,7 +243,7 @@ ONLY ASK WHAT ONLY THIS TEAM CAN DECIDE. A product team answers these questions 
 a designer, frontend and backend engineers, a tester), and every question costs them time.
 - Never ask about anything with an industry-standard answer: timeouts and retries, double taps and duplicate
   submits, loading spinners and generic error messages, sign-in and password basics, identity checks,
-  pagination, basic validation, basic accessibility. Those take the standard; the board lists them as
+  pagination, basic validation, file size and format limits, basic accessibility. Those take the standard; the board lists them as
   defaults the team can change.
 - Never ask what the input or the decisions so far already answer, and never ask the same thing twice in
   other words. Read every earlier answer first.
@@ -284,7 +284,7 @@ ONLY ASK WHAT ONLY THIS TEAM CAN DECIDE. A product team answers these questions 
 a designer, frontend and backend engineers, a tester), and every question costs them time.
 - Never ask about anything with an industry-standard answer: timeouts and retries, double taps and duplicate
   submits, loading spinners and generic error messages, sign-in and password basics, identity checks,
-  pagination, basic validation, basic accessibility. Those take the standard; the board lists them as
+  pagination, basic validation, file size and format limits, basic accessibility. Those take the standard; the board lists them as
   defaults the team can change.
 - Never ask what the input or the decisions so far already answer, and never ask the same thing twice in
   other words. Read every earlier answer first.
