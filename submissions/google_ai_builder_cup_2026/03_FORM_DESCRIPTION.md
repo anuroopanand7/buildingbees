@@ -1,11 +1,11 @@
 # Submission form: brief description (limit 1,024 characters)
 
-Updated 17 Oct 2026 (986 characters). The form asks how we use Firebase, Firestore, Cloud Run and Gemini. Paste the block below as is.
+Updated 18 Oct 2026 (    1020 characters). The form asks how we use Firebase, Firestore, Cloud Run and Gemini. Paste the block below as is.
 
 ```
-BuildingBees is agentic product planning: an AI product owner that asks before anything is built. It first asks if you work solo or with a team. Gemini draws the user flows with every branch and failure path, then six bees (product, design, frontend, backend, testing, compliance) ask only what your team must decide, routed to each person's role. Standard details become defaults in an assumption log. The output is a plan people and coding agents can build from: screens and APIs, user stories with Given-When-Then tests, a must/should/later feature list, a build order and sign-off, as Markdown or PDF.
+BuildingBees is agentic product planning: humans and AI agents build from a plan with no gaps. A consultant's 7-day ritual (Codex drawing flows on Figma, the team commenting by day, redrawing by night) on one board, in hours. Gemini 3.1 Pro on Agent Platform draws user flows with every split, a feature list and short ids. Six bees (product, design, frontend, backend, testing, compliance) ask only what the team must decide, in rounds of up to 6. Everyone comments on any card; the board redraws once per round; misalignments go to the product owner. Then screens as specs, a plan check, user stories with tests, a build order, a share page and an MCP server for coding agents.
 
-Gemini (structured output, PDF and sketch photo input, five-model fail-over) draws flows, reads each answer, draws screens and writes the plan. Cloud Run hosts it, scaled to zero, built by Cloud Build. Firestore saves every board and tester feedback. Firebase Authentication (Google sign-in) gives each person their boards on any device.
+Gemini on Agent Platform (structured output, PDF and sketch input, fail-over across models) does all reasoning; Cloud Run hosts it, scaled to zero; Firestore stores boards and tester feedback; Firebase Authentication gives each person their boards. Every reply is schema-validated; guessed vendors become questions.
 
-Live, 44 automated tests, MIT licensed.
+Live, open, 54 tests.
 ```

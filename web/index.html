@@ -690,7 +690,7 @@
   .meter .track i, .stage .track i, .tray-meter i { background: var(--ink); }
   :focus-visible { outline: 2.5px solid var(--ink); outline-offset: 2px; }
   @media (prefers-reduced-motion: reduce) { .btn.primary:hover:not(:disabled), .btn.primary:active:not(:disabled) { transform: none; } }
-  .dock .dock-min { top: 6px; right: 8px; background: var(--panel); border: 1.5px solid var(--ink); height: 26px; }  /* inside the panel, not over its edge */
+  .dock .dock-min { top: 6px; right: 8px; background: var(--panel); border: 1.5px solid var(--ink); height: 26px; width: auto; padding: 0 8px 0 5px; }  /* inside the panel, not over its edge */
   #coach { padding-right: 84px; }
   .dock .dock-min[data-tip] { position: absolute; }
   .set-q.clash { border-top: 0; border: 1.5px solid var(--ink); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; background: var(--focus); }  /* [data-tip] sets position: relative; keep the button pinned inside */

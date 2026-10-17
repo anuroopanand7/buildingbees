@@ -1,22 +1,24 @@
-# Demo video script, 2:40 (17 Oct 2026)
+# Demo video: script and storyboard (rewritten 18 Oct 2026)
 
-Built from Gemini's second-by-second draft, checked against what the product really does. Every claim below is true on the live site.
+**Length: 3:30 to 3:50.** The organisers ask for "at least 3 to four minutes" (Ask the Expert, 15 Oct, 4:41). Speak loud and close to the mic: in an earlier hackathon low-volume videos lost points (32:39). Record the live site in Chrome at 1440 by 900, zoom 100%, signed out (the demo is open). Use the "Just me" mode.
 
-**Setup:** live site in Chrome, window 1440 px wide, page zoom 110%, one tab, notifications off. Start on a new board (Menu, New spec). Rehearse once. The first map takes about 20 seconds: keep it in the video (it is real Gemini), or speed that stretch up 2x in editing and say so with a small "2x" label. Thumbnail: "BuildingBees: Other tools guess. We ask. Built with Gemini on Cloud Run".
+**Before you record (10 minutes):**
+1. Open the live link in a fresh Chrome window, clear the board (menu, New spec).
+2. Open a second tab already showing a finished board (in case Gemini is slow: the expert suggests keeping a ready tab, 39:22). Ready board: `?board=smoke-plan2-18oct` (the Pune tuition centre).
+3. Close every other tab and notification. Phone on silent.
 
-| Time | On screen | Say |
+| Time | On screen | Say (word for word, about 140 words a minute) |
 |---|---|---|
-| 0:00 to 0:08 | The start screen: "Other tools guess. We ask." | "BuildingBees is agentic product planning on Google Gemini and Cloud Run. Other tools guess. We ask." |
-| 0:08 to 0:18 | Hover the "Try a sample" button | "When an agency quotes a fixed price from a one-line idea, the edge cases nobody wrote down, a double booking, a failed payment, eat the margin later." |
-| 0:18 to 0:40 | Click "With my team" then "Try a sample in one click" (or type the B2B consultation idea). The flow rises in; point at the stage bar (Idea, Flows) and the engine pill (model name, seconds, schema validated) | "Gemini reads the idea and draws the user flow first, no screens yet. This pill shows which Gemini model answered and that its output passed our schema check." |
-| 0:40 to 0:55 | Point at the diamond "Slot still free?" and the amber "Not decided yet" path | "Where the flow can break, it draws the split, and leaves the path nobody decided empty. That empty box is what a spec forgets." |
-| 0:55 to 1:15 | Role picker: Client. Type a vague answer: "whatever is normal" | "Each teammate hears only their own bees. The client gets business questions. If an answer is vague, the bee does not accept it: it asks one sharper question." |
-| 1:15 to 1:35 | Answer clearly: pick two suggestions (multi-select) and Send. The node sketches, then "From your answer" | "A clear answer redraws the board, and marks what changed." |
-| 1:35 to 1:50 | Answer another with "Later, not in the first version" | "Anything we put off is logged as out of scope, so it cannot creep back in for free." |
-| 1:50 to 2:05 | Menu, Change your role, Backend. Click "Draw the screens". Screens, buttons and APIs appear. Click "Flows" in the stage bar, then back | "When the flows are agreed, it draws screens, buttons and the API behind each one. You can go back to the flows any time." |
-| 2:05 to 2:25 | Click "Brief" in the stage bar. Scroll: decisions with who answered, standard defaults applied, out of scope for v1. Press Sign off | "The Brief has every decision and who made it, the standard defaults it applied instead of asking, what is out of scope, and a sign-off that records who approved it and when." |
-| 2:25 to 2:40 | Copy agent link. End card: live URL, GitHub, "Gemini on Cloud Run, Firestore, Firebase" | "Our first tester answered 70 questions on an early version. The same idea now takes 9. BuildingBees: other tools guess, we ask. Try the sample on our live link." |
+| 0:00 to 0:25 | Your face or the start screen | "I'm Anuroop. As a consultant, a client asked me to build his whole product with an AI agent. I learned fast that agents only go straight when the plan has no gaps. So for seven days I ran a ritual: Codex drew the user flows on a Figma board and left questions for every role, the team commented by day, and every evening I fed it all back and redrew. After a week, an agent could build it without guessing. BuildingBees is that ritual, on one board, in hours." |
+| 0:25 to 0:40 | Start screen | "Other tools guess. We ask. I pick Just me, and type my idea in plain words." Type: "A tuition centre app in Pune: parents see attendance and test marks, pay monthly fees, and get a message when the child misses class." Press Map it. |
+| 0:40 to 1:05 | The board appears: flows, the Features strip | "Gemini 3.1 Pro on Google Cloud's Agent Platform draws the user flows first, not screens: every step, and the splits where things can go wrong, like a failed payment. Up top, the feature list a PRD starts with: F1, F2, F3. Every flow, screen and API gets a short id that stays the same everywhere." |
+| 1:05 to 1:40 | The question set in the dock | "Now the bees: product, design, frontend, backend, testing and compliance, plus a Scout Bee that read the web first. They only ask what this team must decide. Round one is six questions, and the count never grows. Look: because it's Pune, it asks how parents pay, and suggests UPI. Standard details, like loading spinners and timeouts, are not asked: they become defaults in an assumption log." Pick UPI, type one answer, press Decide the rest for me. |
+| 1:40 to 2:05 | Tap a step card, its thread opens | "Every card has a thread, like comments in Figma. The bees' questions about this step are here to answer, and I can add my own note: something is missing." Type a note, Add note. Point at the tray: "Nothing on the board changes until I say so. Seven inputs, then Update the board." |
+| 2:05 to 2:30 | Press Update the board: the scan band, the board redraws, "Round 1 done" | "One press, one Gemini call for the whole round, and the board redraws once. Changed steps are marked From your answer, and round two begins. On a team board, each person answers their own role, and the product owner processes the round. If two people disagree, the bees don't pick a side: they flag the misalignment for the owner." |
+| 2:30 to 2:55 | Draw the screens; the screens view | "When the flows are agreed, it draws the screens, as specs, not pictures: every element, what each card holds, every button and the API behind it, and loading and error states only where they're real." |
+| 2:55 to 3:25 | The Brief: Plan check at the top, Write the full plan, Share as a web page | "The Brief is the plan an agent builds from. A plan check first: what still blocks a builder. Then user stories with Given, When, Then tests, a must, should, later feature list, a build order, and every decision with who made it. I can download it, share it as one web page with no sign-in, or plug it straight into Claude Code or Cursor through our MCP server." |
+| 3:25 to 3:45 | Architecture slide or the README | "Under the hood: Cloud Run, Gemini 3.1 Pro on Agent Platform with a fail-over chain across models and quotas, Firestore, Firebase sign-in, and schema validation on every Gemini reply, so nobody's guess reaches the board. Agentic product planning: humans and agents, building from a plan with no gaps. That's BuildingBees." |
 
-Optional 10 seconds if time allows: upload a photo of a whiteboard sketch on the start screen; Gemini vision turns it into flows and the bees ask what it leaves out.
+**After recording:** trim the waits (keep one real wait so judges see it is live), add captions if you can, check the volume, upload to YouTube as Unlisted or Public, put the link into the deck (last slide) and the form.
 
-Do not claim: a cryptographic sign-off, sub-second answers, a fixed number of defaults, or a time from idea to brief that we have not measured.
+**If something breaks while recording:** switch to the ready tab (`smoke-plan2-18oct`) and carry on from the board; say nothing about it.
