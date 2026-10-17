@@ -2,7 +2,7 @@
 
 **Other tools guess. BuildingBees asks.**
 
-Tools that turn one prompt into screens or diagrams have to guess everything the prompt leaves out. BuildingBees works the way a product team does: it maps the user flows first, then six bees ask what the idea leaves out (a solo founder answers a set of 3 to 7 at a time; a team answers one at a time, each person for their own role), and the board is redrawn from the answers. New features can be added to the same board later. Screens are drawn only after the flows are agreed.
+Tools that turn one prompt into screens or diagrams have to guess everything the prompt leaves out. BuildingBees works the way a product team does: it maps the user flows first, then six bees ask what the idea leaves out (a solo founder answers a set of 3 to 7 at a time; a team answers one at a time, each person for their own role). Anyone can comment on any card, and the board changes only when you press Update the board. New features can be added to the same board later. Screens are drawn only after the flows are agreed.
 
 Live demo: https://buildingbees-853213660594.asia-south1.run.app
 
@@ -138,7 +138,8 @@ Every call takes the board id in an `X-Board` header or a `?board=` query parame
 | POST | `/api/ingest-file?engine=` | The same from a PDF or Markdown upload |
 | POST | `/api/questions/{id}/resolve` | Record an answer (`by` says who gave it) |
 | POST | `/api/questions/{id}/react?engine=` | The bee reads the answer: follow up, or update the board |
-| POST | `/api/questions/react-batch?engine=` | Solo: apply a set of 3 to 7 answers in one call and redraw once |
+| POST | `/api/questions/react-batch?engine=` | "Update the board": apply every waiting answer and note in one call, redraw once |
+| POST | `/api/comments`, `/api/comments/{id}/delete` | A note on any step, split, path or screen; it waits until the board is updated |
 | POST | `/api/questions/{id}/reopen` | Change an answer |
 | POST | `/api/questions/accept-defaults` | Take the first suggestion for every routine detail still open |
 | POST | `/api/expand?engine=` | Draw screens from the agreed flows and decisions |

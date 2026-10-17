@@ -153,6 +153,16 @@ def build_brief(g: BuildingBeesEngine, with_plan: bool = True) -> str:
         add(f"- **{q.question_text}** {q.answer_text} _(asked by {BEE_NAMES.get(q.category.value, 'the team')}, about {title(q.target_node_id)}{cited(q)}{by(q)})_")
     add("")
 
+    notes = getattr(g, "comments", [])
+    if notes:  # what people wrote on the board itself, and whether the bees have applied it yet
+        add("## Notes on the board")
+        for c in notes:
+            where = title(c["target"]) + (", step %d" % c["step"] if c.get("step") else "") + \
+                (', the "%s" path' % c["path"] if c.get("path") else "")
+            state = "applied" if c["status"] == "applied" else "waiting for Update the board"
+            add(f"- **About {where}:** {c['text']} _({c.get('by') or 'the founder'}; {state})_")
+        add("")
+
     out_of_scope = [q for q in decided if _deferred(q.question_text, q.answer_text or "")]
     if out_of_scope:
         add("## Out of scope for v1 (agreed)")

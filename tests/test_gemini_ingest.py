@@ -757,3 +757,29 @@ def test_a_set_of_answers_is_applied_in_one_call(monkeypatch):
     flow = next(n for n in c.get("/api/graph", headers=h).json()["nodes"] if n["id"] == "F_BUY")
     assert flow["metadata"]["steps"][0] == "Sign in"
     assert c.post("/api/questions/react-batch?engine=gemini", json={"question_ids": ["nope"]}, headers=h).status_code == 404
+
+
+def test_notes_and_saved_answers_wait_until_the_board_is_updated(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", Reactor())
+    c, h = TestClient(server.app), {"X-Board": "notes"}
+    board = c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h).json()
+    q = next(n for n in board["nodes"] if n["layer"] == "QUESTION")
+    c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "No, sign-in required", "later": True}, headers=h)
+    g = c.post("/api/comments", json={"target": "F_BUY", "step": 2, "text": "Also take bank transfer here"}, headers=h).json()
+    note = g["comments"][0]
+    assert note["status"] == "open" and note["step"] == 2
+    flow = next(n for n in g["nodes"] if n["id"] == "F_BUY")
+    assert flow["metadata"]["steps"] == ["Open cart", "Pay", "See confirmation"]  # nothing moved yet
+    assert c.post("/api/comments", json={"target": "NOPE", "text": "x"}, headers=h).status_code == 404
+    Reactor.reaction = Reaction(
+        is_vague=False, note="Added sign-in and bank transfer.", follow_up=[], user_updates=[], field_updates=[],
+        flow_updates=[XFlowUpdate(flow_id="F_BUY", title="Buy", goal="Purchase",
+                                  steps=["Sign in", "Open cart", "Pay by card or bank transfer", "See confirmation"])])
+    r = c.post("/api/questions/react-batch?engine=gemini", json={}, headers=h)
+    assert r.status_code == 200 and r.json()["changed"] == ["F_BUY"]
+    assert "Also take bank transfer here" in Reactor.prompt and "step 2" in Reactor.prompt
+    after = c.get("/api/graph", headers=h).json()
+    assert after["comments"][0]["status"] == "applied"
+    assert not next(n for n in after["nodes"] if n["id"] == q["id"])["metadata"].get("pending")
+    assert c.post("/api/questions/react-batch?engine=gemini", json={}, headers=h).status_code == 404  # nothing left waiting
+    assert "## Notes on the board" in c.get("/api/brief", headers=h).text

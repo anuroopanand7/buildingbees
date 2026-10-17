@@ -263,6 +263,32 @@
   .changed { animation: changed 2.4s ease-out 1; }
   @keyframes changed { 0%, 35% { box-shadow: 0 0 0 3px var(--ok); background: var(--ok-soft); } 100% { box-shadow: 0 0 0 0 transparent; } }
   @media (prefers-reduced-motion: reduce) { .changed { animation: none; outline: 2px solid var(--ok); } }
+  .note-btn { position: absolute; top: -11px; right: -9px; z-index: 3; box-shadow: 0 1px 3px rgba(17, 17, 16, .12); display: inline-flex; align-items: center; gap: 3px; height: 24px; min-width: 24px; padding: 0 5px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--panel); color: var(--muted); font-size: 13px; opacity: 0; transition: opacity var(--t-state, .15s), background .15s, color .15s; }
+  .step .note-btn[data-tip], .scr .note-btn[data-tip] { position: absolute; }  /* beats [data-tip]'s position: relative */
+  .note-btn span { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .step:hover .note-btn, .step:focus-within .note-btn, .scr:hover .note-btn, .scr:focus-within .note-btn, .note-btn.has { opacity: 1; }
+  .note-btn:hover { color: var(--text); background: var(--fill); }
+  .note-btn.open { border-color: var(--accent); background: var(--focus); color: var(--text); }
+  .step.decision .note-btn { top: -12px; right: 22px; }  /* pins sit on the card's corner, as in Figma, never over its text */
+  .scr { position: relative; }
+  @media (hover: none) { .note-btn { opacity: .75; } }
+  .note-item { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin-bottom: 8px; font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+  .note-item p { flex: 1 1 100%; margin: 0; }
+  .note-item.ask { display: block; border-color: var(--line-strong); }
+  .note-item.ask .who { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-bottom: 4px; }
+  .note-item.ask .who .tag { margin-left: auto; }
+  .note-item.ask .q { font-size: 14px; font-weight: 500; margin: 2px 0 4px; }
+  .note-item.ask .why { color: var(--muted); font-size: 12.5px; margin-bottom: 6px; }
+  .note-item.ask .options { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .note-item.ask .option { border-radius: 999px; padding: 5px 11px; font-size: 12.5px; }
+  .note-item.ask .send-row { align-items: center; gap: 8px; }
+  .note-item.ask .send-row input { flex: 1; min-width: 0; border: 1px solid var(--line-strong); border-radius: 999px; padding: 7px 12px; font: inherit; font-size: 13px; background: var(--panel); color: var(--text); }
+  .note-btn.ask { opacity: 1; padding: 0 6px 0 2px; border-color: var(--accent); background: var(--focus); color: var(--text); }
+  .note-btn.ask .bee { width: 18px; height: 18px; font-size: 10px; }
+  .tray { position: fixed; right: 16px; top: 64px; z-index: 27; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 14px; font-size: 13px; max-width: calc(100vw - 32px); }
+  .tray #trayText { display: grid; line-height: 1.3; }
+  .tray #trayText .muted { font-size: 12px; }
+  @media (max-width: 640px) { .tray { top: auto; bottom: calc(40dvh + 20px); right: 8px; left: 8px; } }
   .dock.set { max-height: min(64vh, 620px); }
   .dock.set #ask { overflow-x: hidden; }  /* tooltips on the right edge must not make the set scroll sideways */
   .set-head { display: grid; gap: 2px; margin: 2px 30px 10px 0; font-size: 14px; }
@@ -344,7 +370,7 @@
   .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; border: none; background: var(--fill); font-size: 16px; }
 
   /* The Brief: the board as a document. Prints cleanly, so "Save as PDF" works from the browser. */
-  #brief, #boards, #fb, #flowEdit, #featureAdd { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--text) 35%, transparent); display: grid; place-items: center; padding: 24px; }
+  #brief, #boards, #fb, #flowEdit, #featureAdd, #noteAdd { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--text) 35%, transparent); display: grid; place-items: center; padding: 24px; }
   .brief-sheet { background: var(--panel); border-radius: 18px; box-shadow: var(--shadow); width: min(820px, 100%); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; }
   .brief-sheet > :not(.brief-bar) { min-height: 0; }  /* lets the body shrink and scroll inside the capped sheet */
   .brief-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
@@ -621,6 +647,18 @@
     </div>
   </div>
 </div>
+<div id="noteAdd" hidden role="dialog" aria-modal="true" aria-label="Comment on this part of the board">
+  <div class="brief-sheet">
+    <div class="brief-bar"><b id="noteTitle">Comment</b><button class="icon-btn" id="noteClose" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button></div>
+    <div class="fb-body">
+      <div id="noteList"></div>
+      <label class="cap" for="noteText">What is wrong, missing or different here? Say it in your own words.</label>
+      <textarea id="noteText" rows="4" placeholder="Clients should also be able to pay by bank transfer here." style="width:100%;margin-top:8px;font:inherit;padding:10px;border:1px solid var(--line-strong);border-radius:var(--r-input)"></textarea>
+      <div class="ask-foot" style="margin-top:10px"><span class="muted">Your note waits with your other notes until you press Update the board.</span><button class="btn primary" id="noteSave">Add note</button></div>
+    </div>
+  </div>
+</div>
+<div class="island tray" id="tray" hidden role="status"><span id="trayText"></span><button class="btn primary sm" data-update>Update the board<i class="ph ph-arrows-clockwise" aria-hidden="true"></i></button></div>
 <div id="featureAdd" hidden role="dialog" aria-modal="true" aria-label="Add a feature to this board">
   <div class="brief-sheet">
     <div class="brief-bar"><b>Add a feature</b><button class="icon-btn" id="featureClose" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button></div>
@@ -819,8 +857,8 @@ async function load() {
     catch (e) { store.set("bb_graph", ""); }
     finally { restoring = false; }
   }
-  if (!LINKED) store.set("bb_graph", g.total_nodes ? JSON.stringify({ product_name: g.product_name, spec_text: g.spec_text, entities: g.entities, sources: g.sources, needs_redraw: g.needs_redraw, nodes: g.nodes, edges: g.edges }) : "");
-  S.stage = g.stage; S.needsRedraw = g.needs_redraw; S.sources = g.sources || []; S.mode = g.mode || "solo"; S.spec = g.spec_text || ""; S.lastCall = g.last_call;
+  if (!LINKED) store.set("bb_graph", g.total_nodes ? JSON.stringify({ product_name: g.product_name, spec_text: g.spec_text, entities: g.entities, sources: g.sources, needs_redraw: g.needs_redraw, comments: g.comments, signoffs: g.signoffs, nodes: g.nodes, edges: g.edges }) : "");
+  S.stage = g.stage; S.needsRedraw = g.needs_redraw; S.comments = g.comments || []; S.sources = g.sources || []; S.mode = g.mode || "solo"; S.spec = g.spec_text || ""; S.lastCall = g.last_call;
   S.nodes = {}; S.fwd = {}; S.rev = {}; S.screens = {};
   g.nodes.forEach((n) => (S.nodes[n.id] = n));
   g.edges.forEach((e) => {
@@ -937,7 +975,7 @@ function screenCard(id) {
   const ctas = (S.fwd[id] || []).map((c) => S.nodes[c]).filter((c) => c && c.layer === "CTA");
   return `<article class="scr ${PM.focus === id || S.selected === id ? "focus" : ""} ${hit(id)}" data-id="${esc(id)}" data-node tabindex="0">
     ${pmQueue()[0] && screenOf(pmQueue()[0].target_node_id) === id ? `<span class="pin">${beeIcon(pmQueue()[0].category, true)}${esc(bee(pmQueue()[0].category)[0])} is asking</span>` : ""}
-    <h4>${esc(n.title)}</h4>${state}${branchBees(id)}
+    ${noteBtn(id, 0, "", n.title)}<h4>${esc(n.title)}</h4>${state}${branchBees(id)}
     ${n.metadata?.elements?.length ? wireframe(n.metadata.elements, true) : ""}
     ${ctas.length ? `<div class="behind">Behind the buttons</div><ul class="ctas">${ctas.map((c) => {
       const apis = (S.fwd[c.id] || []).map((a) => S.nodes[a]).filter((a) => a && a.layer === "API");
@@ -971,7 +1009,7 @@ function renderMap() {
   const wide = sk && !rows.some((f) => f.id === sk.target);
   const chip = sk ? `<div class="drawing-chip" role="status"><i class="ph ph-pencil-simple-line" aria-hidden="true"></i>${esc(PM.reacting)} is redrawing the board from your answer</div>` : "";
   $("flows").innerHTML = chip + redraw + note + rows.map((f) => { const last = f === lastFlow && S.stage === "flows"; return `<div class="flow ${f.id && ((PM.focus === f.id && !focusStep) || S.selected === f.id) ? "focus" : ""} ${sk && ((sk.target === f.id && !sk.step) || wide) ? "sketching-lane" : ""}">
-    <div class="flow-head"><h3>${f.id ? `<button data-id="${esc(f.id)}">${esc(f.title)}</button>` : esc(f.title)}</h3>${f.who ? `<span class="who">for ${esc(f.who)}</span>` : ""}${f.id && (!f.ids.length || S.view === "flows") ? `<button class="link" data-edit-flow="${esc(f.id)}"><i class="ph ph-pencil-simple" aria-hidden="true"></i> Edit steps</button>` : ""}</div>
+    <div class="flow-head"><h3>${f.id ? `<button data-id="${esc(f.id)}">${esc(f.title)}</button>` : esc(f.title)}</h3>${f.who ? `<span class="who">for ${esc(f.who)}</span>` : ""}${f.id ? `<button class="link" data-note="${esc(f.id)}" data-note-step="0" data-note-path="" data-note-label="${esc(f.title)}"><i class="ph ph-chat-circle-text" aria-hidden="true"></i> Comment</button>` : ""}${f.id && (!f.ids.length || S.view === "flows") ? `<button class="link" data-edit-flow="${esc(f.id)}"><i class="ph ph-pencil-simple" aria-hidden="true"></i> Edit steps</button>` : ""}</div>
     ${f.ids.length && (S.view !== "flows" || !f.id)
       ? `<div class="flow-row wire">${f.ids.map(screenCard).join("")}</div>`
       : `<div class="steps wire">${f.steps.map((t, i) => {
@@ -981,11 +1019,11 @@ function renderMap() {
           const [title, text] = stepParts(t);
           const fork = f.branches.find((b) => b.at_step === i + 1);
           return `<div class="step ${on ? "focus" : ""} ${drawing ? "sketching" : ""} ${fresh ? "changed fresh" : ""}" data-node data-n="${i + 1}" data-key="${esc(f.id + "|" + t)}">
-            <span class="num" aria-hidden="true">${i + 1}</span>${fresh ? '<span class="tag good">From your answer</span>' : ""}
+            <span class="num" aria-hidden="true">${i + 1}</span>${noteBtn(f.id, i + 1, "", title || text)}${fresh ? '<span class="tag good">From your answer</span>' : ""}
             ${title ? `<b>${esc(title)}</b><p>${esc(text)}</p>` : `<p style="grid-column:2;grid-row:1;margin:0;color:var(--text)">${esc(text)}</p>`}
             ${drawing ? `<span class="pin"><i class="ph ph-pencil-simple-line" aria-hidden="true"></i> ${esc(PM.reacting)} is redrawing</span>` : ""}
             ${on && asking ? `<span class="pin">${beeIcon(asking.category, true)}${esc(bee(asking.category)[0])} is asking</span>` : ""}</div>${fork
-            ? `<div class="step decision" data-node data-fork="${i + 1}" data-yes="${esc(fork.main_label)}" data-key="${esc(f.id + "|?" + fork.decision)}"><span class="dia" aria-hidden="true"><i class="ph ph-git-fork"></i></span><p>${esc(fork.decision)}</p></div>` : ""}`;
+            ? `<div class="step decision" data-node data-fork="${i + 1}" data-yes="${esc(fork.main_label)}" data-key="${esc(f.id + "|?" + fork.decision)}"><span class="dia" aria-hidden="true"><i class="ph ph-git-fork"></i></span>${noteBtn(f.id, i + 1, "split", fork.decision)}<p>${esc(fork.decision)}</p></div>` : ""}`;
         }).join("") || '<span class="muted">No steps yet.</span>'}${last && f.steps.length ? `<button class="step next" data-node data-draw><span class="num" aria-hidden="true"><i class="ph ph-pencil-simple-line"></i></span><b>Draw the screens</b><p>Next: I draw every screen, button and API from these flows and your answers.</p></button>` : ""}</div>
         ${branchRows(f)}
         ${PM.changed.has(f.id) && f.was ? f.was.filter((t) => !f.steps.includes(t)).map((t) => `<div class="gone">Before your answer: ${esc(stepParts(t)[1])}</div>`).join("") : ""}`}
@@ -1005,12 +1043,12 @@ function branchRows(f) {
   return [...f.branches].sort((a, b) => b.at_step - a.at_step).map((b) => {
     const nodes = b.steps.map((t, j) => {
       const [title, text] = stepParts(t), fresh = PM.changed.has(f.id) && f.wasBranches && !old.has(t);
-      return `<div class="step ${fresh ? "changed fresh" : ""}" data-node data-key="${esc(f.id + "|" + b.label + "|" + t)}"><span class="num" aria-hidden="true">${b.at_step}${"abc"[j] || ""}</span>${fresh ? '<span class="tag good">From your answer</span>' : ""}
+      return `<div class="step ${fresh ? "changed fresh" : ""}" data-node data-key="${esc(f.id + "|" + b.label + "|" + t)}"><span class="num" aria-hidden="true">${b.at_step}${"abc"[j] || ""}</span>${noteBtn(f.id, b.at_step, b.label, title || text)}${fresh ? '<span class="tag good">From your answer</span>' : ""}
         ${title ? `<b>${esc(title)}</b><p>${esc(text)}</p>` : `<p style="grid-column:2;grid-row:1;margin:0;color:var(--text)">${esc(text)}</p>`}</div>`;
     }).join("");
     return `<div class="steps wire branch" data-at="${b.at_step}" data-to="${b.rejoin_step || 0}" data-label="${esc(b.label)}">${nodes
       ? nodes + (b.rejoin_step ? "" : '<div class="end" data-node>End</div>')
-      : `<div class="step open" data-node data-key="${esc(f.id + "|open|" + b.label)}"><span class="num" aria-hidden="true">?</span><b>Not decided yet</b><p>Nobody has said what happens here yet. A bee will ask.</p></div>`}</div>`;
+      : `<div class="step open" data-node data-key="${esc(f.id + "|open|" + b.label)}"><span class="num" aria-hidden="true">?</span>${noteBtn(f.id, b.at_step, b.label, `the "${b.label}" path`)}<b>Not decided yet</b><p>Nobody has said what happens here yet. A bee will ask.</p></div>`}</div>`;
   }).join("");
 }
 // The step a question points at, by its short title ("" when it is about the whole flow or has no title).
@@ -1200,6 +1238,7 @@ async function pmDigDeeper() {
 }
 
 function renderPM() {
+  renderTray();
   const all = byLayer("QUESTION");
   const open = openQuestions();
   const done = all.filter((q) => q.question_status !== "OPEN").sort((a, b) => String(a.answered_at).localeCompare(String(b.answered_at)));
@@ -1282,7 +1321,8 @@ function renderPM() {
   }
   if (S.stage === "flows") {
     ask.innerHTML = `
-      <div class="question">The flows are clear enough to draw.</div>
+      ${waitingAnswers().length + waitingNotes().length ? `<div class="question">Your answers and notes are waiting.</div><div class="about" style="margin-bottom:14px">Update the board first, so the flows show everything you said. Then draw the screens.</div><button class="btn primary" data-update>Update the board<i class="ph ph-arrows-clockwise" aria-hidden="true"></i></button>` : ""}
+      <div class="question" ${waitingAnswers().length + waitingNotes().length ? "hidden" : ""}>The flows are clear enough to draw.</div>
       <div class="about" style="margin-bottom:14px">I will turn each flow into screens, buttons and APIs using your ${done.length} decision${done.length === 1 ? "" : "s"}, then ask about each screen.</div>
       ${PM.error ? `<div class="err" style="font-size:13px;margin-bottom:8px">${esc(PM.error)}</div>` : ""}
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1364,6 +1404,59 @@ function beeNote(cat, text) {
   n.innerHTML = `${beeIcon(cat)}<span><b>${esc(bee(cat)[0])}:</b> ${esc(text)}</span>`; n.hidden = false;
   noteTimer = setTimeout(() => { n.hidden = true; }, 9000);
 }
+// Notes: anyone can comment on any part of the board (a step, a split, a path, a screen). Notes wait, with
+// answers saved for later, until the person presses "Update the board"; then the bees apply all of it at once.
+const notesOn = (target, step = 0, path = "") => (S.comments || []).filter((c) => c.target === target && (c.step || 0) === step && (c.path || "") === path);
+function noteBtn(target, step, path, label) {
+  const n = notesOn(target, step, path), open = n.filter((c) => c.status === "open").length, qs = questionsOn(target, step, path);
+  if (qs.length) return `<button class="note-btn has ask" data-note="${esc(target)}" data-note-step="${step}" data-note-path="${esc(path)}" data-note-label="${esc(label)}" aria-label="${qs.length} question${qs.length > 1 ? "s" : ""} from the bees about ${esc(label)}" data-tip="${esc(bee(qs[0].category)[0])}: ${esc(qs[0].question_text.slice(0, 90))}" data-tip-pos="top">${beeIcon(qs[0].category, true)}<span>${qs.length + n.length}</span></button>`;
+  return `<button class="note-btn ${n.length ? "has" : ""} ${open ? "open" : ""}" data-note="${esc(target)}" data-note-step="${step}" data-note-path="${esc(path)}" data-note-label="${esc(label)}" aria-label="Comment on ${esc(label)}${n.length ? `, ${n.length} note${n.length > 1 ? "s" : ""}` : ""}" data-tip="Comment: say what is wrong or missing here" data-tip-pos="top"><i class="ph ph-chat-circle-text" aria-hidden="true"></i>${n.length ? `<span>${n.length}</span>` : ""}</button>`;
+}
+function questionsOn(target, step = 0, path = "") {
+  return openQuestions().filter((q) => {
+    const at = Number(q.metadata?.step || 0), br = q.metadata?.branch || "";
+    if (S.nodes[target]?.layer === "SCREEN" && !step) return q.target_node_id === target || screenOf(q.target_node_id) === target;
+    if (q.target_node_id !== target) return false;
+    if (path && path !== "split") return br === `${step}|${path}`;
+    if (path === "split") return false;
+    return !br && at === step;
+  });
+}
+let NOTE_AT = null;  // the part of the board the note dialog is open on
+function openNote(t) {
+  NOTE_AT = { target: t.dataset.note, step: Number(t.dataset.noteStep || 0), path: t.dataset.notePath || "" };
+  $("noteTitle").textContent = `"${t.dataset.noteLabel}": questions and notes`;
+  renderNoteList(); $("noteText").value = ""; $("noteAdd").hidden = false; $("noteText").focus();
+}
+function renderNoteList() {
+  const list = notesOn(NOTE_AT.target, NOTE_AT.step, NOTE_AT.path), qs = questionsOn(NOTE_AT.target, NOTE_AT.step, NOTE_AT.path);
+  $("noteList").innerHTML = qs.map((q) => `<div class="note-item ask"><div class="who">${beeIcon(q.category, true)}<b>${esc(bee(q.category)[0])}</b><span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Blocks the build" : "Good to know"}</span></div>
+      <p class="q">${esc(q.question_text)}</p>${q.metadata?.why ? `<p class="why"><i class="ph ph-lightbulb" aria-hidden="true"></i> ${esc(q.metadata.why)}</p>` : ""}
+      ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o, i) => `<button class="option" data-fill="${esc(q.id)}" data-fopt="${esc(o)}">${esc(o)}${i === 0 && q.metadata?.why ? '<span class="rec">Recommended</span>' : ""}</button>`).join("")}</div>` : ""}
+      <div class="send-row"><input id="reply-${esc(q.id)}" placeholder="Reply to the bee" autocomplete="off" aria-label="Your reply"><button class="btn primary sm" data-reply="${esc(q.id)}">Reply</button>${q.suggested_options?.length ? `<button class="link" data-reply-decide="${esc(q.id)}"><i class="ph ph-magic-wand" aria-hidden="true"></i> Decide for me</button>` : ""}</div></div>`).join("") + list.map((c) => `<div class="note-item"><p>${esc(c.text)}</p><span class="muted">${esc(c.by || "You")} · ${c.status === "open" ? "waiting" : "applied"}</span>${c.status === "open" ? `<button class="link" data-note-del="${esc(c.id)}">Take back</button>` : ""}</div>`).join("");
+}
+const waitingAnswers = () => byLayer("QUESTION").filter((q) => q.question_status === "ANSWERED" && q.metadata?.pending);
+const waitingNotes = () => (S.comments || []).filter((c) => c.status === "open");
+function renderTray() {
+  const a = waitingAnswers().length, n = waitingNotes().length;
+  $("tray").hidden = !(a + n) || !!PM.reacting;
+  const parts = [a && `${a} answer${a > 1 ? "s" : ""}`, n && `${n} note${n > 1 ? "s" : ""}`].filter(Boolean).join(" and ");
+  $("trayText").innerHTML = `<b>${parts} waiting</b><span class="muted">The board changes only when you say so.</span>`;
+}
+async function updateBoard() {
+  if (PM.reacting) return;
+  if (!engineReady()) return toast("Connect an engine first.");
+  PM.changed = new Set(); PM.front = null; PM.error = "";
+  PM.reacting = "The bees"; render();
+  try {
+    const r = await api(`/api/questions/react-batch?${eq()}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    PM.changed = new Set(r.changed);
+    if (r.note) beeNote("PM", r.note);
+  } catch (err) { PM.error = err.message; toast(err.message); }
+  PM.reacting = "";
+  await load();
+  reveal(document.querySelector("#flows .changed"));
+}
 // Solo founders answer in sets: every open question about one flow or screen (3 to 7, topped up from what
 // comes next), then ONE call applies them all and the board redraws once. Teams stay one question at a time,
 // because each person answers their own role's questions on their own screen.
@@ -1378,7 +1471,7 @@ function pmSet() {
 const draftText = (d) => d ? [...d.opts, d.text.trim()].filter(Boolean).join("; ") : "";
 function setLabel(set) {
   const n = set.filter((q) => draftText(PM.draft[q.id])).length;
-  return n ? `Update the board with ${n} answer${n === 1 ? "" : "s"}` : "Answer at least one to update the board";
+  return n ? `Save ${n} answer${n === 1 ? "" : "s"}` : "Answer at least one to save";
 }
 function renderSet(ask, cite) {
   const set = pmSet(), first = set[0], t = S.nodes[first.target_node_id];
@@ -1386,7 +1479,7 @@ function renderSet(ask, cite) {
   const left = pmQueue().length - set.length;
   ask.innerHTML = `
     <div class="set-head"><b>${set.length} questions${set.every((q) => q.target_node_id === first.target_node_id) ? ` about ${esc(about)}` : ""}</b>
-      <span class="muted">Answer what you can, then update the board once.${left > 0 ? ` ${left} more after this set.` : ""}</span></div>
+      <span class="muted">Answer what you can and save. Nothing on the board changes until you press Update the board.${left > 0 ? ` ${left} more after this set.` : ""}</span></div>
     ${set.map((q, n) => { const d = PM.draft[q.id] || { opts: [], text: "" }; return `
       <div class="set-q ${draftText(d) ? "done" : ""}">
         <div class="who">${beeIcon(q.category, true)}<b>${esc(bee(q.category)[0])}</b>${stepOf(q) ? ` <span class="muted">about step ${q.metadata.step}, ${esc(stepOf(q))}</span>` : ""}
@@ -1412,21 +1505,12 @@ async function sendSet(set) {
   for (const q of done) {  // save each answer first, so nothing is lost if the redraw fails
     const d = PM.draft[q.id];
     await api(`/api/questions/${encodeURIComponent(q.id)}/resolve`, { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ answer_text: draftText(d), by: d.decided ? "the bees (recommended)" : byLine(), bees_decided: !!d.decided && !d.text.trim() }) });
+      body: JSON.stringify({ answer_text: draftText(d), by: d.decided ? "the bees (recommended)" : byLine(), bees_decided: !!d.decided && !d.text.trim(), later: true }) });
     q.question_status = "ANSWERED"; q.answer_text = draftText(d); delete PM.draft[q.id];
   }
-  PM.changed = new Set(); PM.front = null; PM.error = "";
-  if (!engineReady()) return load();
-  PM.reacting = "The bees"; store.set("bb_coach", "1"); render();
-  try {
-    const r = await api(`/api/questions/react-batch?${eq()}`, { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question_ids: done.map((q) => q.id) }) });
-    PM.changed = new Set(r.changed);
-    if (r.note) beeNote(done[0].category, r.note);
-  } catch (err) { PM.error = err.message; }
-  PM.reacting = "";
+  store.set("bb_coach", "1");
   await load();
-  reveal(document.querySelector("#flows .changed"));
+  toast("Saved. Keep going, comment on any card, then press Update the board when you are ready.");
 }
 document.addEventListener("input", (e) => {  // typing updates the draft without a re-render, so focus stays put
   const id = e.target.dataset?.sown; if (!id) return;
@@ -1452,7 +1536,7 @@ async function answer(qid, text, beesDecided = false) {
     const r = await api(`/api/questions/${encodeURIComponent(qid)}/react?${eq()}`, { method: "POST" });
     PM.changed = new Set(r.changed);
     PM.front = r.follow_up[0] || null;
-    if (r.note) beeNote(q?.category, r.note);
+    if (r.note) beeNote(q?.category, r.note);  // team answers still apply one at a time
   } catch (err) { PM.error = err.message; }
   PM.reacting = ""; PM.sketch = null;
   await load();
@@ -1494,6 +1578,18 @@ document.addEventListener("click", (e) => {
     return answer(q.id, q.suggested_options[0], true).catch(fail);
   }
   if (t.dataset.addFeature !== undefined) return openFeature();
+  if (t.dataset.note) return openNote(t);
+  if (t.dataset.fill) { const i = $(`reply-${t.dataset.fill}`); i.value = i.value && !i.value.includes(t.dataset.fopt) ? `${i.value}; ${t.dataset.fopt}` : t.dataset.fopt; return i.focus(); }
+  if (t.dataset.reply || t.dataset.replyDecide) {
+    const id = t.dataset.reply || t.dataset.replyDecide, q = S.nodes[id], decide = !!t.dataset.replyDecide;
+    const text = decide ? q.suggested_options[0] : $(`reply-${id}`).value.trim();
+    if (!text) return $(`reply-${id}`).focus();
+    return api(`/api/questions/${encodeURIComponent(id)}/resolve`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answer_text: text, by: decide ? "the bees (recommended)" : byLine(), bees_decided: decide, later: true }) })
+      .then(load).then(() => { renderNoteList(); toast("Reply saved. Press Update the board when you are ready."); }).catch(fail);
+  }
+  if (t.dataset.noteDel) return api(`/api/comments/${encodeURIComponent(t.dataset.noteDel)}/delete`, { method: "POST" }).then(load).then(renderNoteList).catch(fail);
+  if (t.dataset.update !== undefined) return updateBoard();
   if (t.dataset.sq) {  // a suggestion in a set: tap to pick, tap again to drop; several may be picked
     const d = PM.draft[t.dataset.sq] || { opts: [], text: "" };
     d.opts = d.opts.includes(t.dataset.sopt) ? d.opts.filter((o) => o !== t.dataset.sopt) : [...d.opts, t.dataset.sopt];
@@ -1663,6 +1759,15 @@ $("flowEditSave").onclick = async () => {
 // Add a feature to the same board: new flows and questions join the board; nothing agreed is redrawn.
 function openFeature() { menu(false); $("featureAdd").hidden = false; $("featureText").focus(); }
 $("featureBtn").onclick = openFeature;
+$("noteClose").onclick = () => { $("noteAdd").hidden = true; };
+$("noteSave").onclick = async () => {
+  const text = $("noteText").value.trim(); if (!text) return $("noteText").focus();
+  try {
+    await api("/api/comments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...NOTE_AT, text, by: byLine() }) });
+    $("noteAdd").hidden = true; await load();
+    toast("Note added. Add more anywhere, then press Update the board.");
+  } catch (err) { toast(err.message); }
+};
 $("featureClose").onclick = () => { $("featureAdd").hidden = true; };
 $("featureSave").onclick = async () => {
   const text = $("featureText").value.trim();

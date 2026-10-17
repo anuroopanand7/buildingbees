@@ -225,6 +225,7 @@ class QuestionResolveRequest(BaseModel):
     answer_text: str
     by: str = ""  # who answered, as the team sees it ("Backend: Ravi"); several people share one board
     bees_decided: bool = False  # "Decide for me": the bees' recommendation, listed with the defaults so it can be changed
+    later: bool = False  # saved, not applied: it waits until the person presses "Update the board"
 
 
 class PostQuestionRequest(BaseModel):
@@ -270,6 +271,7 @@ def _state(graph: BuildingBeesEngine) -> Dict[str, Any]:
         "entities": getattr(graph, "entities", []),
         "sources": getattr(graph, "sources", []),
         "signoffs": getattr(graph, "signoffs", []),
+        "comments": getattr(graph, "comments", []),
         "mode": getattr(graph, "mode", "solo"),
         "owner": getattr(graph, "owner", ""),
         "plan": getattr(graph, "plan", None),
@@ -313,6 +315,8 @@ def resolve_question(question_id: str, payload: QuestionResolveRequest) -> Dict[
     node.answer_text = payload.answer_text
     node.answered_at = datetime.datetime.utcnow().isoformat()
     node.metadata["answered_by"] = payload.by.strip()[:60]
+    if payload.later:
+        node.metadata["pending"] = True  # applied with everything else waiting, by /api/questions/react-batch
     if payload.bees_decided:
         node.metadata["default"] = True
     else:
@@ -479,27 +483,32 @@ def _react_board(g: BuildingBeesEngine, targets: List[str]):
 
 
 class BatchRequest(BaseModel):
-    question_ids: List[str]
+    question_ids: List[str] = []  # empty: every answer saved for later, plus every open note on the board
 
 
 @app.post("/api/questions/react-batch")
 def react_to_answers(payload: BatchRequest, engine: str) -> Dict[str, Any]:
-    """A solo founder answers a set of 3 to 7 questions, then the bees apply them all in ONE call and redraw once.
-    Fewer, bigger redraws read clearer for one person than a board that moves after every answer."""
+    """"Update the board": the bees apply every waiting answer and note in ONE call and redraw once.
+    The person decides when the board changes; it never moves under them after each answer."""
     eng = _engine(engine)
     g = _board()
-    qs = [g.get_node(i) for i in dict.fromkeys(payload.question_ids)][:7]
+    ids = payload.question_ids or [n.id for n in g.nodes.values() if isinstance(n, QuestionNode) and n.metadata.get("pending")]
+    qs = [g.get_node(i) for i in dict.fromkeys(ids)][:20]
     qs = [q for q in qs if isinstance(q, QuestionNode) and q.question_status == QuestionStatus.ANSWERED]
-    if not qs:
-        raise HTTPException(status_code=404, detail="No answered questions in that set")
-    stage, board = _react_board(g, list(dict.fromkeys(q.target_node_id for q in qs)))
+    notes = [c for c in getattr(g, "comments", []) if c["status"] == "open"][:20] if not payload.question_ids else []
+    if not qs and not notes:
+        raise HTTPException(status_code=404, detail="Nothing is waiting to be applied")
+    stage, board = _react_board(g, list(dict.fromkeys([q.target_node_id for q in qs] + [c["target"] for c in notes if c["target"] in g.nodes])))
     ids = {q.id for q in qs}
     decisions = "\n".join(
         f"- {d.question_text} => {d.answer_text}" for d in g.nodes.values()
         if isinstance(d, QuestionNode) and d.question_status == QuestionStatus.ANSWERED and d.id not in ids
     ) or "(none)"
     answers = "\n".join(f"{i}. ({q.category.value}, about {getattr(g.nodes.get(q.target_node_id), 'title', q.target_node_id)}) "
-                        f"{q.question_text}\n   ANSWER: {q.answer_text}" for i, q in enumerate(qs, 1))
+                        f"{q.question_text}\n   ANSWER: {q.answer_text}" for i, q in enumerate(qs, 1)) or "(no answers this time)"
+    if notes:
+        answers += "\n\nNOTES THE FOUNDER LEFT ON PARTS OF THE BOARD (apply each one like an answer; a note can add, change or remove steps, branches or whole flows):\n" + \
+            "\n".join(f"- {_where(g, c)}: {c['text']}" for c in notes)
     prompt = audience(g) + "\n\n" + BATCH_NOTE + REACT_PROMPT.format(
         stage=stage, board=json.dumps(board, default=str)[:14000], decisions=decisions[:4000],
         category="several", target="the set below", step="", question="(a set of questions, listed with their answers below)",
@@ -519,7 +528,14 @@ def react_to_answers(payload: BatchRequest, engine: str) -> Dict[str, Any]:
     for q in qs:
         q.metadata["vague"] = bool(r.is_vague)
         q.metadata.pop("previous_answer", None)
-    qs[-1].metadata["note"] = r.note[:300]  # one note for the set, shown after its last answer
+        q.metadata.pop("pending", None)
+    if qs:
+        qs[-1].metadata["note"] = r.note[:300]  # one note for the set, shown after its last answer
+    if not r.is_vague:
+        for c in notes:
+            c["status"] = "applied"
+        if notes and stage == "screens":
+            g.needs_redraw = True  # a note can change structure that field edits cannot reach
     return {"is_vague": r.is_vague, "note": r.note[:300], "changed": changed, "follow_up": [a.id for a in added]}
 
 
@@ -600,6 +616,7 @@ class RestoreRequest(BaseModel):
     entities: List[Dict[str, Any]] = []
     sources: List[Dict[str, str]] = []
     signoffs: List[Dict[str, Any]] = []
+    comments: List[Dict[str, Any]] = []
     mode: str = "solo"
     owner: str = ""
     plan: Optional[Dict[str, Any]] = None
@@ -624,6 +641,7 @@ def _rebuild(d: Dict[str, Any]) -> BuildingBeesEngine:
     g.entities = d.get("entities", [])[:50]
     g.sources = d.get("sources", [])[:tavily.MAX_SOURCES]
     g.signoffs = d.get("signoffs", [])[:20]
+    g.comments = d.get("comments", [])[:200]
     g.mode = d.get("mode") if d.get("mode") in AUDIENCE else "solo"
     g.owner = d.get("owner", "")
     g.plan, g.plan_decisions = d.get("plan"), int(d.get("plan_decisions") or 0)
@@ -755,6 +773,8 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
         }),
         "\nDECISIONS THE PRODUCT OWNER HAS ALREADY MADE (part of the spec now, do not ask these again):",
         "\n".join(f"- {q.question_text} => {q.answer_text}" for q in decisions) or "(none yet)",
+        "\nNOTES THE TEAM LEFT ON PARTS OF THE BOARD (follow them like decisions):",
+        "\n".join(f"- {_where(old, c)}: {c['text']}" for c in getattr(old, "comments", [])) or "(none)",
     ])
     started = time.time()
     try:
@@ -766,6 +786,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     g.product_name = getattr(old, "product_name", "") or g.product_name  # the name the founder already saw stays
     g.sources = getattr(old, "sources", [])
     g.signoffs = getattr(old, "signoffs", [])
+    g.comments = getattr(old, "comments", [])
     g.mode = getattr(old, "mode", "solo")
     g.owner = getattr(old, "owner", "")
     g.plan, g.plan_decisions = getattr(old, "plan", None), getattr(old, "plan_decisions", 0)
@@ -774,7 +795,10 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
         if f.id in g.nodes:
             g.nodes[f.id].metadata["steps"] = f.metadata.get("steps", [])
             g.nodes[f.id].metadata["branches"] = f.metadata.get("branches", [])
+    for c in g.comments:  # drawing the screens used every note, so nothing is left waiting
+        c["status"] = "applied"
     for q in asked:  # every earlier question and its answer travels with the board
+        q.metadata.pop("pending", None)  # the screens were drawn from it
         if q.target_node_id in g.nodes:
             g.add_node(q)
             g.add_edge(q.target_node_id, q.id)
@@ -844,6 +868,51 @@ def edit_flow_steps(flow_id: str, payload: StepsRequest) -> Dict[str, Any]:
     f.metadata["branches"] = [b for b in f.metadata.get("branches", []) if b["at_step"] <= len(steps)]
     if any(n.layer.value == "SCREEN" for n in g.nodes.values()):
         g.needs_redraw = True
+    return get_graph_state()
+
+
+class CommentRequest(BaseModel):
+    target: str          # the node the note is about: a flow, screen, button or API
+    step: int = 0        # 1-based step of a flow; 0 = the whole node
+    path: str = ""       # a branch label ("No") when the note is about a path that splits off
+    text: str
+    by: str = ""
+
+
+def _where(g: BuildingBeesEngine, c: Dict[str, Any]) -> str:
+    """Says in words which part of the board a note is about, for the bees and the Brief."""
+    n = g.nodes.get(c["target"])
+    name = (getattr(n, "label", "") or n.title) if n else c["target"]
+    steps = n.metadata.get("steps", []) if n else []
+    where = f'the flow "{name}"' if n is not None and n.layer.value == "FLOW" else f'"{name}"'
+    if c.get("step") and c["step"] <= len(steps):
+        where += f', step {c["step"]} "{steps[c["step"] - 1].split(":")[0]}"'
+    if c.get("path"):
+        where += f', the "{c["path"]}" path that splits off there'
+    return where
+
+
+@app.post("/api/comments")
+def add_comment(payload: CommentRequest) -> Dict[str, Any]:
+    """A note on any part of the board. It waits, with the other notes and answers, until someone updates the board."""
+    g = _board()
+    text = payload.text.strip()[:1000]
+    if not text:
+        raise HTTPException(status_code=400, detail="The note is empty")
+    if payload.target not in g.nodes:
+        raise HTTPException(status_code=404, detail="That part of the board is gone")
+    g.comments = getattr(g, "comments", []) + [{
+        "id": hashlib.sha1(f"{payload.target}{text}{time.time()}".encode()).hexdigest()[:10],
+        "target": payload.target, "step": max(0, payload.step), "path": payload.path[:60], "text": text,
+        "by": payload.by.strip()[:60], "at": datetime.datetime.utcnow().isoformat(), "status": "open"}][-200:]
+    return get_graph_state()
+
+
+@app.post("/api/comments/{comment_id}/delete")
+def delete_comment(comment_id: str) -> Dict[str, Any]:
+    """Takes back a note that has not been applied yet; applied notes stay as the record of why the board changed."""
+    g = _board()
+    g.comments = [c for c in getattr(g, "comments", []) if not (c["id"] == comment_id and c["status"] == "open")]
     return get_graph_state()
 
 
