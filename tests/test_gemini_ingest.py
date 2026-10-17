@@ -487,7 +487,7 @@ def test_nemotron_has_a_daily_ceiling(monkeypatch):
     assert c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h).status_code != 429
 
 
-def test_unused_research_gets_one_more_try(monkeypatch):
+def test_unused_research_does_not_cost_a_second_call(monkeypatch):
     monkeypatch.setattr(server.tavily, "research", lambda idea: [{"title": "T", "url": "https://example.com/t", "snippet": "s"}])
     calls = []
 
@@ -501,7 +501,7 @@ def test_unused_research_gets_one_more_try(monkeypatch):
 
     monkeypatch.setitem(server.engines, "gemini", Forgetful())
     r = TestClient(server.app).post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers={"X-Board": "forgetful"})
-    assert r.status_code == 200 and len(calls) == 2  # once more, then it carries on without citations
+    assert r.status_code == 200 and len(calls) == 1  # one call only: a retry for citations doubled the wait
 
 
 def test_signed_in_people_get_a_list_of_their_boards(monkeypatch):

@@ -622,10 +622,8 @@ def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None, mode: s
     started = time.time()
     try:
         extra = {"image": image} if image else {}  # only Gemini reads images; older engines take no such argument
+        # One call only: a second call to make the bees cite the research doubled the wait (17 Oct, 68 s first map).
         x = eng.extract_flows(text=lead + text + tavily.as_prompt(sources), pdf_bytes=pdf_bytes, **extra)
-        if sources and not any(q.source for q in x.questions):
-            # The pages were read but no question used them: ask once more rather than waste the research.
-            x = eng.extract_flows(text=lead + text + tavily.as_prompt(sources), pdf_bytes=pdf_bytes)
         g = build_flows_graph(x, eng.label)
         g.mode = mode
         _trace(g, eng, started)

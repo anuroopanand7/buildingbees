@@ -45,8 +45,9 @@ class GoogleGeminiAdapter:
         from google.genai import types
 
         if self._client is None:
-            # 45 s per attempt: a slow or overloaded model must fail over, not hang the visitor.
-            self._client = genai.Client(api_key=self.api_key, http_options=types.HttpOptions(timeout=45_000))
+            # 25 s per attempt: a slow or overloaded model must fail over fast, not hang the visitor
+            # (17 Oct: a 45 s wait on a busy model made the first map take 68 s).
+            self._client = genai.Client(api_key=self.api_key, http_options=types.HttpOptions(timeout=25_000))
         config = types.GenerateContentConfig(
             response_mime_type="application/json", response_schema=schema, temperature=0.2,
         )
