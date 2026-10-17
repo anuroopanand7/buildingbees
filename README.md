@@ -2,7 +2,7 @@
 
 **Other tools guess. BuildingBees asks.**
 
-Tools that turn one prompt into screens or diagrams have to guess everything the prompt leaves out. BuildingBees works the way a product team does: it maps the user flows first, then six bees ask what the idea leaves out, one question at a time, and the board is redrawn with every answer. Screens are drawn only after the flows are agreed.
+Tools that turn one prompt into screens or diagrams have to guess everything the prompt leaves out. BuildingBees works the way a product team does: it maps the user flows first, then six bees ask what the idea leaves out (a solo founder answers a set of 3 to 7 at a time; a team answers one at a time, each person for their own role), and the board is redrawn from the answers. New features can be added to the same board later. Screens are drawn only after the flows are agreed.
 
 Live demo: https://buildingbees-853213660594.asia-south1.run.app
 
@@ -138,6 +138,7 @@ Every call takes the board id in an `X-Board` header or a `?board=` query parame
 | POST | `/api/ingest-file?engine=` | The same from a PDF or Markdown upload |
 | POST | `/api/questions/{id}/resolve` | Record an answer (`by` says who gave it) |
 | POST | `/api/questions/{id}/react?engine=` | The bee reads the answer: follow up, or update the board |
+| POST | `/api/questions/react-batch?engine=` | Solo: apply a set of 3 to 7 answers in one call and redraw once |
 | POST | `/api/questions/{id}/reopen` | Change an answer |
 | POST | `/api/questions/accept-defaults` | Take the first suggestion for every routine detail still open |
 | POST | `/api/expand?engine=` | Draw screens from the agreed flows and decisions |
@@ -146,6 +147,7 @@ Every call takes the board id in an `X-Board` header or a `?board=` query parame
 | GET | `/api/brief` | The Brief, as Markdown |
 | POST | `/api/plan?engine=` | Write user stories, features, build order and glossary from the board |
 | POST | `/api/signoff` | Sign off the scope as it stands (`by` says who) |
+| POST | `/api/features?engine=` | Add a feature to the same board: only its new flows, users and questions are added |
 | POST | `/api/flows/{id}/steps` | Edit a flow's steps by hand; after screens exist it flags a redraw |
 | POST | `/api/mode` | Switch a board between one founder (`solo`) and a `team` |
 | POST | `/api/me/boards/{id}/rename`, `/delete` | Rename a board; delete it (for its creator) or leave it (for a teammate) |

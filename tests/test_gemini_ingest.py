@@ -737,3 +737,23 @@ def test_add_feature_keeps_the_board_and_adds_new_flows(monkeypatch):
     after = c.post("/api/features?engine=gemini", json={"text": "Sellers list items"}, headers=h).json()
     assert after["needs_redraw"] is True  # a feature added after screens asks for a redraw
     assert c.post("/api/features?engine=gemini", json={"text": "  "}, headers=h).status_code == 400
+
+
+def test_a_set_of_answers_is_applied_in_one_call(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", Reactor())
+    c, h = TestClient(server.app), {"X-Board": "reactor-set"}
+    board = c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h).json()
+    qs = [n for n in board["nodes"] if n["layer"] == "QUESTION"]
+    for q in qs:
+        c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "No, sign-in required"}, headers=h)
+    Reactor.reaction = Reaction(
+        is_vague=False, note="Got it, I added sign-in.", follow_up=[], user_updates=[], field_updates=[],
+        flow_updates=[XFlowUpdate(flow_id="F_BUY", title="Buy", goal="Purchase",
+                                  steps=["Sign in", "Open cart", "Pay", "See confirmation"])])
+    r = c.post("/api/questions/react-batch?engine=gemini", json={"question_ids": [q["id"] for q in qs]}, headers=h)
+    assert r.status_code == 200 and r.json()["changed"] == ["F_BUY"]
+    assert "ANSWERED A SET OF QUESTIONS AT ONCE" in Reactor.prompt  # one prompt carries every answer
+    assert all(q["question_text"] in Reactor.prompt for q in qs)
+    flow = next(n for n in c.get("/api/graph", headers=h).json()["nodes"] if n["id"] == "F_BUY")
+    assert flow["metadata"]["steps"][0] == "Sign in"
+    assert c.post("/api/questions/react-batch?engine=gemini", json={"question_ids": ["nope"]}, headers=h).status_code == 404

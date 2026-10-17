@@ -59,6 +59,10 @@ sequenceDiagram
 
 `AUDIENCE` in `spec_prompts.py` is put in front of every engine call (`server.audience()`): solo means at most 6 plain questions per stage with a recommendation and a "why"; team means up to 12, routed and worded by role. The board's `mode` is stored with it and can be switched with `POST /api/mode` (inviting a teammate does this).
 
+**Sets for a solo founder.** Solo boards ask in sets (`pmSet()` in `web/index.html`): every open question about one flow or screen, topped up to at least 3 from the queue and capped at 7. The founder answers the set, each answer is saved with `/resolve`, then `POST /api/questions/react-batch` sends all of them in one `REACT_PROMPT` call with `BATCH_NOTE` in front, so the board redraws once per set instead of after every answer. Teams stay one question at a time, because each person answers their own role's questions on their own screen.
+
+**Adding a feature.** `POST /api/features` runs `extract_flows` with the board's users and flows as context and the new feature as the idea, then `merge_feature()` (`src/core/ingest.py`) adds only ids that are new: agreed flows, answers and screens are never rewritten. If screens exist they are flagged for a redraw. A product can have 1 to 6 flows (one per job the input names) and up to 3 branches per flow.
+
 ## Teams
 
 - Roles live in the browser (`localStorage` keys `bb_role`, `bb_name`): `PM` hears every bee, `CLIENT` hears `PM` and `COMPLIANCE`, the others hear their own bee. See `ROLES` and `mine()` in `web/index.html`.

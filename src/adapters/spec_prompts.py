@@ -381,6 +381,15 @@ ALREADY ASKED:
 """
 
 
+# Put in front of REACT_PROMPT when a solo founder answers a whole set at once (one call, one redraw).
+BATCH_NOTE = """THIS TIME THE FOUNDER ANSWERED A SET OF QUESTIONS AT ONCE (listed under THE FOUNDER'S ANSWER).
+Apply every clear answer together in ONE update: return each changed flow once, with all of its changes.
+If some answers are vague, apply the clear ones and ask ONE sharper follow-up for each vague one
+(target_id and category of the question it follows up). Set is_vague true only when EVERY answer is vague.
+note: one or two short sentences saying what you changed across the whole set.
+
+"""
+
 REACT_PROMPT = """You are a bee on the BuildingBees product team. The founder has just answered one of your questions.
 Decide what to do with the answer.
 

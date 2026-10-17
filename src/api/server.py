@@ -45,7 +45,7 @@ from src.core.question_engine import SocraticQuestionEngine
 from src.adapters.gemini_adapter import GoogleGeminiAdapter
 from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.adapters.nvidia_adapter import pdf_to_text
-from src.adapters.spec_prompts import AUDIENCE, REACT_PROMPT
+from src.adapters.spec_prompts import AUDIENCE, BATCH_NOTE, REACT_PROMPT
 from src.api import feedback
 from src.adapters import tavily
 from src.core.brief import build_brief, decision_count
@@ -406,24 +406,7 @@ def react_to_answer(question_id: str, engine: str) -> Dict[str, Any]:
     if not q or not isinstance(q, QuestionNode) or q.question_status != QuestionStatus.ANSWERED:
         raise HTTPException(status_code=404, detail="No answered question with that id")
     target = g.get_node(q.target_node_id)
-    stage = "screens" if any(n.layer.value == "SCREEN" for n in g.nodes.values()) else "flows"
-    if stage == "flows":
-        board = {
-            "users": [{"id": n.id, "title": n.title, "description": n.description}
-                      for n in g.nodes.values() if n.layer.value == "USER"],
-            "flows": [{"id": n.id, "title": n.title, "goal": n.goal, "steps": n.metadata.get("steps", []),
-                       "branches": n.metadata.get("branches", []),
-                       "user_id": next(iter(g.reverse_edges.get(n.id, [])), "")}
-                      for n in g.nodes.values() if n.layer.value == "FLOW"],
-        }
-    else:
-        near = g.forward_edges.get(q.target_node_id, set()) | g.reverse_edges.get(q.target_node_id, set())
-        board = {
-            "target": target.model_dump() if target else {},
-            "neighbours": [g.nodes[i].model_dump() for i in near
-                           if i in g.nodes and g.nodes[i].layer.value != "QUESTION"],
-            "screens": [{"id": n.id, "title": n.title} for n in g.nodes.values() if n.layer.value == "SCREEN"],
-        }
+    stage, board = _react_board(g, [q.target_node_id])
     decisions = "\n".join(
         f"- {d.question_text} => {d.answer_text}" for d in g.nodes.values()
         if isinstance(d, QuestionNode) and d.question_status == QuestionStatus.ANSWERED and d.id != q.id
@@ -455,15 +438,89 @@ def react_to_answer(question_id: str, engine: str) -> Dict[str, Any]:
         q.question_status, q.answer_text, q.answered_at = QuestionStatus.OPEN, None, None
     if stage == "screens" and q.metadata.get("previous_answer") and not r.is_vague:
         g.needs_redraw = True  # a decision changed after the screens were drawn; field edits cannot fix structure
-    if stage == "screens":
-        add_gap_defaults(g)  # anything the answer left unfilled takes the standard, shown as a default
-    else:
-        ask_open_branches(g, eng.label)  # a split the answer drew but did not settle gets asked
+    _after_reaction(g, stage, eng)
     q.metadata["note"] = r.note[:300]
     q.metadata["vague"] = bool(r.is_vague)  # a vague answer is kept in the chat but is not a decision
     q.metadata.pop("previous_answer", None)
     return {"is_vague": r.is_vague, "note": q.metadata["note"], "changed": changed,
             "follow_up": [a.id for a in added]}
+
+
+def _after_reaction(g: BuildingBeesEngine, stage: str, eng) -> None:
+    """After answers change the board: fill standard defaults on screens, or ask about splits nobody settled."""
+    if stage == "screens":
+        add_gap_defaults(g)  # anything the answer left unfilled takes the standard, shown as a default
+    else:
+        ask_open_branches(g, eng.label)  # a split the answer drew but did not settle gets asked
+
+
+def _react_board(g: BuildingBeesEngine, targets: List[str]):
+    """The part of the board a bee needs to read answers about `targets`: every flow at the flows stage,
+    or the target nodes and their neighbours once screens exist. Returns (stage, board)."""
+    stage = "screens" if any(n.layer.value == "SCREEN" for n in g.nodes.values()) else "flows"
+    if stage == "flows":
+        board = {
+            "users": [{"id": n.id, "title": n.title, "description": n.description}
+                      for n in g.nodes.values() if n.layer.value == "USER"],
+            "flows": [{"id": n.id, "title": n.title, "goal": n.goal, "steps": n.metadata.get("steps", []),
+                       "branches": n.metadata.get("branches", []),
+                       "user_id": next(iter(g.reverse_edges.get(n.id, [])), "")}
+                      for n in g.nodes.values() if n.layer.value == "FLOW"],
+        }
+    else:
+        near = set().union(*[g.forward_edges.get(t, set()) | g.reverse_edges.get(t, set()) for t in targets])
+        board = {
+            "targets": [g.nodes[t].model_dump() for t in targets if t in g.nodes],
+            "neighbours": [g.nodes[i].model_dump() for i in near
+                           if i in g.nodes and g.nodes[i].layer.value != "QUESTION"],
+            "screens": [{"id": n.id, "title": n.title} for n in g.nodes.values() if n.layer.value == "SCREEN"],
+        }
+    return stage, board
+
+
+class BatchRequest(BaseModel):
+    question_ids: List[str]
+
+
+@app.post("/api/questions/react-batch")
+def react_to_answers(payload: BatchRequest, engine: str) -> Dict[str, Any]:
+    """A solo founder answers a set of 3 to 7 questions, then the bees apply them all in ONE call and redraw once.
+    Fewer, bigger redraws read clearer for one person than a board that moves after every answer."""
+    eng = _engine(engine)
+    g = _board()
+    qs = [g.get_node(i) for i in dict.fromkeys(payload.question_ids)][:7]
+    qs = [q for q in qs if isinstance(q, QuestionNode) and q.question_status == QuestionStatus.ANSWERED]
+    if not qs:
+        raise HTTPException(status_code=404, detail="No answered questions in that set")
+    stage, board = _react_board(g, list(dict.fromkeys(q.target_node_id for q in qs)))
+    ids = {q.id for q in qs}
+    decisions = "\n".join(
+        f"- {d.question_text} => {d.answer_text}" for d in g.nodes.values()
+        if isinstance(d, QuestionNode) and d.question_status == QuestionStatus.ANSWERED and d.id not in ids
+    ) or "(none)"
+    answers = "\n".join(f"{i}. ({q.category.value}, about {getattr(g.nodes.get(q.target_node_id), 'title', q.target_node_id)}) "
+                        f"{q.question_text}\n   ANSWER: {q.answer_text}" for i, q in enumerate(qs, 1))
+    prompt = audience(g) + "\n\n" + BATCH_NOTE + REACT_PROMPT.format(
+        stage=stage, board=json.dumps(board, default=str)[:14000], decisions=decisions[:4000],
+        category="several", target="the set below", step="", question="(a set of questions, listed with their answers below)",
+        answer=answers, changed_from="")
+    started = time.time()
+    try:
+        r = eng.react(prompt)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"{eng.label} could not process the answers: {e}")
+    _trace(g, eng, started)
+    changed = [] if r.is_vague else _apply_reaction(g, r)
+    added = add_questions(g, r.follow_up[:len(qs)], eng.label, dedupe=False)
+    if r.is_vague and not added:  # nothing usable and no sharper question: ask the whole set again
+        for q in qs:
+            q.question_status, q.answer_text, q.answered_at = QuestionStatus.OPEN, None, None
+    _after_reaction(g, stage, eng)
+    for q in qs:
+        q.metadata["vague"] = bool(r.is_vague)
+        q.metadata.pop("previous_answer", None)
+    qs[-1].metadata["note"] = r.note[:300]  # one note for the set, shown after its last answer
+    return {"is_vague": r.is_vague, "note": r.note[:300], "changed": changed, "follow_up": [a.id for a in added]}
 
 
 @app.post("/api/questions/accept-defaults")

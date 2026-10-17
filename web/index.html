@@ -263,6 +263,20 @@
   .changed { animation: changed 2.4s ease-out 1; }
   @keyframes changed { 0%, 35% { box-shadow: 0 0 0 3px var(--ok); background: var(--ok-soft); } 100% { box-shadow: 0 0 0 0 transparent; } }
   @media (prefers-reduced-motion: reduce) { .changed { animation: none; outline: 2px solid var(--ok); } }
+  .dock.set { max-height: min(64vh, 620px); }
+  .dock.set #ask { overflow-x: hidden; }  /* tooltips on the right edge must not make the set scroll sideways */
+  .set-head { display: grid; gap: 2px; margin: 2px 30px 10px 0; font-size: 14px; }
+  .set-head .muted { font-size: 12.5px; }
+  .set-q { border-top: 1px solid var(--line); padding: 10px 0 12px; }
+  .set-q .who { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+  .set-q .who .tag { margin-left: auto; }
+  .set-q .question { margin: 6px 0 4px; font-size: 14px; }
+  .set-q .qn { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .set-q.done .qn { color: var(--ok); }
+  .set-q .send-row { align-items: center; gap: 10px; }
+  .set-q .send-row input { font-size: 13px; padding: 7px 11px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--panel); color: var(--text); font: inherit; }
+  .set-q .send-row .link { white-space: nowrap; font-size: 12.5px; }
+  .set-foot { position: sticky; bottom: -12px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 0 12px; background: var(--island); border-top: 1px solid var(--line); font-size: 12.5px; }
   .add-feature { margin: 8px 0 24px; border-style: dashed; }
   .flow-head h3 button { background: none; border: none; padding: 0; font: inherit; text-align: left; }
   .flow.focus .flow-head h3 { box-shadow: 0 2px 0 var(--accent); }
@@ -756,8 +770,8 @@ const bee = (cat) => BEES[cat] || BEES.PM;
 const beeIcon = (cat, sm) => `<span class="bee ${sm ? "sm" : ""}" aria-hidden="true"><i class="ph ${bee(cat)[2]}"></i></span>`;
 const MAX_ROUNDS = 3; // shortcut: caps automatic deep-dives per board to protect the free model quota
 let S = { nodes: {}, fwd: {}, rev: {}, screens: {}, engines: {}, engine: null, selected: null, view: "screens" };  // view: once screens exist, show "flows" or "screens"
-let PM = { skipped: new Set(), asked: new Set(), rounds: 0, thinking: "", error: "", focus: null, lastFocus: null, bee: null, front: null, reacting: "", changed: new Set() };
-const resetPM = () => { PM = { skipped: new Set(), asked: new Set(), rounds: 0, thinking: "", error: "", focus: null, lastFocus: null, bee: null, front: null, reacting: "", changed: new Set() }; };
+let PM = { skipped: new Set(), asked: new Set(), rounds: 0, thinking: "", error: "", focus: null, lastFocus: null, bee: null, front: null, reacting: "", changed: new Set(), draft: {} };
+const resetPM = () => { PM = { skipped: new Set(), asked: new Set(), rounds: 0, thinking: "", error: "", focus: null, lastFocus: null, bee: null, front: null, reacting: "", changed: new Set(), draft: {} }; };
 
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -1225,7 +1239,7 @@ function renderPM() {
   const q = pmQueue()[0];
   if (PM.reacting) {
     PM.lastAsk = null;
-    ask.innerHTML = `<div class="thinking enter"><div class="spinner"></div><div><b>${esc(PM.reacting)} is reading your answer</b><div class="about">Updating the board if it changes anything...</div></div></div>`;
+    ask.innerHTML = `<div class="thinking enter"><div class="spinner"></div><div><b>${PM.reacting === "The bees" ? "The bees are reading your answers" : `${esc(PM.reacting)} is reading your answer`}</b><div class="about">Updating the board if it changes anything...</div></div></div>`;
     return;
   }
   if (PM.thinking) {
@@ -1240,6 +1254,8 @@ function renderPM() {
       <div class="ask-foot"><button class="link" data-invite>Copy the link for your team</button></div>`;
     return;
   }
+  ask.closest(".dock")?.classList.toggle("set", !!q && S.mode !== "team");
+  if (q && S.mode !== "team") { renderSet(ask, cite); return; }
   if (q) {
     const t = S.nodes[q.target_node_id];
     const details = open.filter((o) => o.metadata?.source === "BuildingBees").length; // routine gaps, not a bee's question
@@ -1348,6 +1364,77 @@ function beeNote(cat, text) {
   n.innerHTML = `${beeIcon(cat)}<span><b>${esc(bee(cat)[0])}:</b> ${esc(text)}</span>`; n.hidden = false;
   noteTimer = setTimeout(() => { n.hidden = true; }, 9000);
 }
+// Solo founders answer in sets: every open question about one flow or screen (3 to 7, topped up from what
+// comes next), then ONE call applies them all and the board redraws once. Teams stay one question at a time,
+// because each person answers their own role's questions on their own screen.
+const SET_MIN = 3, SET_MAX = 7;
+function pmSet() {
+  const qs = pmQueue(); if (!qs.length) return [];
+  const same = qs.filter((q) => q.target_node_id === qs[0].target_node_id);
+  const rest = qs.filter((q) => q.target_node_id !== qs[0].target_node_id);
+  return [...same, ...rest].slice(0, Math.max(SET_MIN, Math.min(same.length, SET_MAX)));
+}
+// PM.draft maps question id -> { opts: [picked suggestions], text: typed answer, decided: bees chose }
+const draftText = (d) => d ? [...d.opts, d.text.trim()].filter(Boolean).join("; ") : "";
+function setLabel(set) {
+  const n = set.filter((q) => draftText(PM.draft[q.id])).length;
+  return n ? `Update the board with ${n} answer${n === 1 ? "" : "s"}` : "Answer at least one to update the board";
+}
+function renderSet(ask, cite) {
+  const set = pmSet(), first = set[0], t = S.nodes[first.target_node_id];
+  const about = t ? (t.label || t.title) : first.target_node_id;
+  const left = pmQueue().length - set.length;
+  ask.innerHTML = `
+    <div class="set-head"><b>${set.length} questions${set.every((q) => q.target_node_id === first.target_node_id) ? ` about ${esc(about)}` : ""}</b>
+      <span class="muted">Answer what you can, then update the board once.${left > 0 ? ` ${left} more after this set.` : ""}</span></div>
+    ${set.map((q, n) => { const d = PM.draft[q.id] || { opts: [], text: "" }; return `
+      <div class="set-q ${draftText(d) ? "done" : ""}">
+        <div class="who">${beeIcon(q.category, true)}<b>${esc(bee(q.category)[0])}</b>${stepOf(q) ? ` <span class="muted">about step ${q.metadata.step}, ${esc(stepOf(q))}</span>` : ""}
+          <span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Blocks the build" : "Good to know"}</span></div>
+        <div class="question"><span class="qn">${n + 1}.</span> ${esc(q.question_text)}</div>
+        ${q.metadata?.why ? `<div class="why"><i class="ph ph-lightbulb" aria-hidden="true"></i> ${esc(q.metadata.why)}</div>` : ""}
+        ${cite(q)}
+        ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o, i) => `<button class="option" data-sq="${esc(q.id)}" data-sopt="${esc(o)}" aria-pressed="${d.opts.includes(o)}">${esc(o)}${i === 0 && q.metadata?.why ? '<span class="rec">Recommended</span>' : ""}</button>`).join("")}</div>` : ""}
+        <div class="send-row"><input data-sown="${esc(q.id)}" value="${esc(d.text)}" aria-label="Your own answer to question ${n + 1}" placeholder="Or type your own answer" autocomplete="off">
+          ${q.suggested_options?.length ? `<button class="link" data-sdecide="${esc(q.id)}" data-tip="Takes the recommended answer; you can change it later" data-tip-pos="top"><i class="ph ph-magic-wand" aria-hidden="true"></i> Decide for me</button>` : ""}</div>
+      </div>`; }).join("")}
+    ${PM.error ? `<div class="err" style="font-size:13px;margin:6px 0">${esc(PM.error)}</div>` : ""}
+    <div class="set-foot"><button class="btn primary" data-set-send>${setLabel(set)}<i class="ph ph-arrow-right" aria-hidden="true"></i></button>
+      <button class="link" data-set-decide>Decide the rest for me</button>
+      <button class="link" data-set-skip>Ask me these later</button>
+      ${S.stage === "flows" ? '<button class="link" id="drawBtn">Skip the rest and draw the screens</button>' : ""}</div>`;
+  const key = set.map((q) => q.id).join();
+  if (PM.lastAsk !== key) { [...ask.children].forEach((c, i) => { c.classList.add("enter"); c.style.setProperty("--i", i); }); PM.lastAsk = key; }
+}
+async function sendSet(set) {
+  const done = set.filter((q) => draftText(PM.draft[q.id]));
+  if (!done.length || PM.reacting) return;
+  for (const q of done) {  // save each answer first, so nothing is lost if the redraw fails
+    const d = PM.draft[q.id];
+    await api(`/api/questions/${encodeURIComponent(q.id)}/resolve`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answer_text: draftText(d), by: d.decided ? "the bees (recommended)" : byLine(), bees_decided: !!d.decided && !d.text.trim() }) });
+    q.question_status = "ANSWERED"; q.answer_text = draftText(d); delete PM.draft[q.id];
+  }
+  PM.changed = new Set(); PM.front = null; PM.error = "";
+  if (!engineReady()) return load();
+  PM.reacting = "The bees"; store.set("bb_coach", "1"); render();
+  try {
+    const r = await api(`/api/questions/react-batch?${eq()}`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question_ids: done.map((q) => q.id) }) });
+    PM.changed = new Set(r.changed);
+    if (r.note) beeNote(done[0].category, r.note);
+  } catch (err) { PM.error = err.message; }
+  PM.reacting = "";
+  await load();
+  reveal(document.querySelector("#flows .changed"));
+}
+document.addEventListener("input", (e) => {  // typing updates the draft without a re-render, so focus stays put
+  const id = e.target.dataset?.sown; if (!id) return;
+  PM.draft[id] = { ...(PM.draft[id] || { opts: [] }), text: e.target.value, decided: false };
+  e.target.closest(".set-q")?.classList.toggle("done", !!draftText(PM.draft[id]));
+  const b = document.querySelector("[data-set-send]"); if (b) b.firstChild.textContent = setLabel(pmSet());
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.dataset?.sown) sendSet(pmSet()).catch(fail); });
 async function answer(qid, text, beesDecided = false) {
   if (!text.trim() || PM.reacting) return;
   const q = S.nodes[qid];
@@ -1407,6 +1494,18 @@ document.addEventListener("click", (e) => {
     return answer(q.id, q.suggested_options[0], true).catch(fail);
   }
   if (t.dataset.addFeature !== undefined) return openFeature();
+  if (t.dataset.sq) {  // a suggestion in a set: tap to pick, tap again to drop; several may be picked
+    const d = PM.draft[t.dataset.sq] || { opts: [], text: "" };
+    d.opts = d.opts.includes(t.dataset.sopt) ? d.opts.filter((o) => o !== t.dataset.sopt) : [...d.opts, t.dataset.sopt];
+    d.decided = false; PM.draft[t.dataset.sq] = d; return render();
+  }
+  if (t.dataset.sdecide) { const q = S.nodes[t.dataset.sdecide]; PM.draft[q.id] = { opts: [q.suggested_options[0]], text: "", decided: true }; return render(); }
+  if (t.dataset.setDecide !== undefined) {
+    pmSet().forEach((q) => { if (!draftText(PM.draft[q.id]) && q.suggested_options?.length) PM.draft[q.id] = { opts: [q.suggested_options[0]], text: "", decided: true }; });
+    return render();
+  }
+  if (t.dataset.setSkip !== undefined) { pmSet().forEach((q) => PM.skipped.add(q.id)); return render(); }
+  if (t.dataset.setSend !== undefined) return sendSet(pmSet()).catch(fail);
   if (t.dataset.editFlow) {  // edit a flow's steps by hand; after screens exist this flags a redraw
     const f = S.nodes[t.dataset.editFlow]; FLOW_EDIT = f.id;
     $("flowEditTitle").textContent = `Edit steps: ${f.title}`; $("flowEditText").value = (f.metadata?.steps || []).join("\n");
@@ -1745,7 +1844,7 @@ const menu = (open) => { $("menu").hidden = !open; $("menuBtn").setAttribute("ar
 // Teammates answer on their own screens: pick up their answers without a reload, unless this person is mid-answer.
 let teamSig = "";
 setInterval(async () => {
-  if (document.hidden || PM.reacting || PM.thinking || !Object.keys(S.nodes).length || $("own")?.value || document.activeElement?.id === "who") return;
+  if (document.hidden || PM.reacting || PM.thinking || !Object.keys(S.nodes).length || $("own")?.value || Object.keys(PM.draft).length || document.activeElement?.id === "who") return;
   try {
     const g = await api("/api/graph");
     const sig = g.nodes.length + ":" + g.nodes.filter((n) => n.question_status === "ANSWERED").length;
