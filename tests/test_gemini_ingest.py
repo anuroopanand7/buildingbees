@@ -700,3 +700,40 @@ def test_the_full_plan_adds_stories_features_and_build_order_to_the_brief(monkey
     q = next(n for n in c.get("/api/graph", headers=h).json()["nodes"] if n["layer"] == "QUESTION")
     c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "Yes"}, headers=h)
     assert "written before the latest decisions" in c.get("/api/brief", headers=h).text
+
+
+class FeatureGemini(FakeGemini):
+    """Returns the old flow again (must be ignored) plus a new flow for a new user, as Gemini does for a feature."""
+
+    def extract_flows(self, text="", pdf_bytes=None):
+        if "THE NEW FEATURE" not in text:
+            return FLOWS
+        return FlowsExtract(
+            product_name="Ignored",
+            users=[XUser(id="U_BUYER", title="Renamed", description="x"), XUser(id="U_SELLER", title="Seller", description="Sells")],
+            flows=[FLOWS.flows[0].model_copy(update={"steps": ["Changed"]}),
+                   XFlowPlan(id="F_LIST", title="List an item", goal="Sell", user_id="U_SELLER",
+                             steps=["Add photos: The seller adds pictures.", "Publish: The item goes live."])],
+            questions=[XQuestion(target_id="F_LIST", category="PM", question="Can sellers set a reserve price?",
+                                 is_blocking=True, suggested_options=["Yes", "No"])],
+        )
+
+
+def test_add_feature_keeps_the_board_and_adds_new_flows(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", FeatureGemini())
+    c = TestClient(server.app)
+    h = {"X-Board": "feature"}
+    c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h)
+    r = c.post("/api/features?engine=gemini", json={"text": "Sellers list items"}, headers=h)
+    assert r.status_code == 200 and set(r.json()["added"]) == {"U_SELLER", "F_LIST"}
+    nodes = {n["id"]: n for n in r.json()["nodes"]}
+    assert nodes["F_BUY"]["metadata"]["steps"] == ["Open cart", "Pay", "See confirmation"]  # agreed flow untouched
+    assert nodes["U_BUYER"]["title"] == "Buyer"
+    assert any(n.get("question_text") == "Can sellers set a reserve price?" for n in nodes.values())
+    assert "Added feature: Sellers list items" in r.json()["spec_text"]
+    again = c.post("/api/features?engine=gemini", json={"text": "Sellers list items"}, headers=h)
+    assert again.status_code == 422  # nothing new came back: say so instead of pretending
+    c.post("/api/expand?engine=gemini", headers=h)  # the fake draws a fixed board, which drops F_LIST again
+    after = c.post("/api/features?engine=gemini", json={"text": "Sellers list items"}, headers=h).json()
+    assert after["needs_redraw"] is True  # a feature added after screens asks for a redraw
+    assert c.post("/api/features?engine=gemini", json={"text": "  "}, headers=h).status_code == 400

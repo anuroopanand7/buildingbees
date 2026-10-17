@@ -263,6 +263,7 @@
   .changed { animation: changed 2.4s ease-out 1; }
   @keyframes changed { 0%, 35% { box-shadow: 0 0 0 3px var(--ok); background: var(--ok-soft); } 100% { box-shadow: 0 0 0 0 transparent; } }
   @media (prefers-reduced-motion: reduce) { .changed { animation: none; outline: 2px solid var(--ok); } }
+  .add-feature { margin: 8px 0 24px; border-style: dashed; }
   .flow-head h3 button { background: none; border: none; padding: 0; font: inherit; text-align: left; }
   .flow.focus .flow-head h3 { box-shadow: 0 2px 0 var(--accent); }
   .redraw { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; background: var(--warn-soft); color: var(--warn); border-radius: var(--r-card); padding: 12px 16px; margin-bottom: 20px; font-size: 14px; }
@@ -329,7 +330,7 @@
   .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; border: none; background: var(--fill); font-size: 16px; }
 
   /* The Brief: the board as a document. Prints cleanly, so "Save as PDF" works from the browser. */
-  #brief, #boards, #fb, #flowEdit { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--text) 35%, transparent); display: grid; place-items: center; padding: 24px; }
+  #brief, #boards, #fb, #flowEdit, #featureAdd { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--text) 35%, transparent); display: grid; place-items: center; padding: 24px; }
   .brief-sheet { background: var(--panel); border-radius: 18px; box-shadow: var(--shadow); width: min(820px, 100%); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; }
   .brief-sheet > :not(.brief-bar) { min-height: 0; }  /* lets the body shrink and scroll inside the capped sheet */
   .brief-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
@@ -585,6 +586,7 @@
   <button id="roleBtn" hidden><i class="ph ph-identification-badge" aria-hidden="true"></i>Change your role</button>
   <button id="boardsBtn" hidden><i class="ph ph-squares-four" aria-hidden="true"></i>My boards</button>
   <button id="engineBtn" hidden></button>
+  <button id="featureBtn" hidden><i class="ph ph-plus-square" aria-hidden="true"></i>Add a feature</button>
   <button id="menuBrief" hidden><i class="ph ph-file-text" aria-hidden="true"></i>Open the Brief</button>
 </div>
 <div class="island stage" id="meter" hidden><span id="meterText"></span><div class="track"><i id="meterBar"></i></div><span id="pmSub"></span>
@@ -602,6 +604,16 @@
       <label class="cap" for="flowEditText">One step per line, as "Short title: what happens". Add, reword, reorder or delete lines.</label>
       <textarea id="flowEditText" rows="10" style="width:100%;margin-top:8px;font:inherit;padding:10px;border:1px solid var(--line-strong);border-radius:var(--r-input)"></textarea>
       <div class="ask-foot" style="margin-top:10px"><span class="muted" id="flowEditNote"></span><button class="btn primary" id="flowEditSave">Save steps</button></div>
+    </div>
+  </div>
+</div>
+<div id="featureAdd" hidden role="dialog" aria-modal="true" aria-label="Add a feature to this board">
+  <div class="brief-sheet">
+    <div class="brief-bar"><b>Add a feature</b><button class="icon-btn" id="featureClose" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button></div>
+    <div class="fb-body">
+      <label class="cap" for="featureText">What should the product also do? Who does it, and what do they get? Everything already on the board stays as it is.</label>
+      <textarea id="featureText" rows="6" placeholder="Advisors can set their own available hours and see their upcoming calls." style="width:100%;margin-top:8px;font:inherit;padding:10px;border:1px solid var(--line-strong);border-radius:var(--r-input)"></textarea>
+      <div class="ask-foot" style="margin-top:10px"><span class="muted" id="featureNote">The bees draw the new flows and ask what the feature leaves out.</span><button class="btn primary" id="featureSave">Add to the board</button></div>
     </div>
   </div>
 </div>
@@ -831,7 +843,7 @@ function screenOf(id) {
 function render() {
   const has = Object.keys(S.nodes).length > 0;
   $("start").hidden = has; $("work").hidden = !has;
-  $("newBtn").hidden = !has; $("meter").hidden = !has; $("briefBtn").hidden = !has; $("menuBrief").hidden = !has; $("teamBtn").hidden = !has; $("roleBtn").hidden = !has || !ROLE; syncMenu();
+  $("newBtn").hidden = !has; $("meter").hidden = !has; $("briefBtn").hidden = !has; $("menuBrief").hidden = !has; $("featureBtn").hidden = !has; $("teamBtn").hidden = !has; $("roleBtn").hidden = !has || !ROLE; syncMenu();
   renderEngine();
   if (!has) return;
 
@@ -963,7 +975,7 @@ function renderMap() {
         }).join("") || '<span class="muted">No steps yet.</span>'}${last && f.steps.length ? `<button class="step next" data-node data-draw><span class="num" aria-hidden="true"><i class="ph ph-pencil-simple-line"></i></span><b>Draw the screens</b><p>Next: I draw every screen, button and API from these flows and your answers.</p></button>` : ""}</div>
         ${branchRows(f)}
         ${PM.changed.has(f.id) && f.was ? f.was.filter((t) => !f.steps.includes(t)).map((t) => `<div class="gone">Before your answer: ${esc(stepParts(t)[1])}</div>`).join("") : ""}`}
-  </div>`; }).join("");
+  </div>`; }).join("") + (rows.some((f) => f.id) ? '<button class="btn ghost add-feature" data-add-feature><i class="ph ph-plus" aria-hidden="true"></i>Add a feature to this board</button>' : "");
   let fresh = 0;  // nodes drawn for the first time rise in, in reading order
   document.querySelectorAll("#flows [data-node], #flows .flow-head").forEach((n) => {
     const k = n.dataset.key || n.dataset.id || n.textContent.slice(0, 80);
@@ -1394,6 +1406,7 @@ document.addEventListener("click", (e) => {
     const q = S.nodes[t.dataset.decide];
     return answer(q.id, q.suggested_options[0], true).catch(fail);
   }
+  if (t.dataset.addFeature !== undefined) return openFeature();
   if (t.dataset.editFlow) {  // edit a flow's steps by hand; after screens exist this flags a redraw
     const f = S.nodes[t.dataset.editFlow]; FLOW_EDIT = f.id;
     $("flowEditTitle").textContent = `Edit steps: ${f.title}`; $("flowEditText").value = (f.metadata?.steps || []).join("\n");
@@ -1547,6 +1560,22 @@ $("flowEditSave").onclick = async () => {
     $("flowEdit").hidden = true; PM.changed = new Set([FLOW_EDIT]); await load();
     toast(S.needsRedraw ? "Steps saved. Press Redraw the screens to update them." : "Steps saved.");
   } catch (err) { toast(err.message); }
+};
+// Add a feature to the same board: new flows and questions join the board; nothing agreed is redrawn.
+function openFeature() { menu(false); $("featureAdd").hidden = false; $("featureText").focus(); }
+$("featureBtn").onclick = openFeature;
+$("featureClose").onclick = () => { $("featureAdd").hidden = true; };
+$("featureSave").onclick = async () => {
+  const text = $("featureText").value.trim();
+  if (!text) return $("featureText").focus();
+  const btn = $("featureSave"); btn.disabled = true; btn.textContent = "The bees are drawing it...";
+  try {
+    const res = await api(`/api/features?${eq()}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+    $("featureAdd").hidden = true; $("featureText").value = "";
+    PM.changed = new Set(res.added || []); await load();
+    toast(S.needsRedraw ? "Feature added. Press Redraw the screens to draw its screens." : "Feature added. The bees have questions about it.");
+  } catch (err) { toast(err.message); }
+  btn.disabled = false; btn.textContent = "Add to the board";
 };
 let FB_MINE = false;  // the feedback panel shows everyone's reports, or only this person's
 const STATUS_WORDS = { new: "New", in_progress: "In progress", shelved: "Parked", fix_deployed: "Fix deployed", resolved: "Resolved" };

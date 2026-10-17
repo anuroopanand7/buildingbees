@@ -196,6 +196,26 @@ def build_flows_graph(x: FlowsExtract, source: str = "ai") -> BuildingBeesEngine
     return g
 
 
+def merge_feature(g: BuildingBeesEngine, new: BuildingBeesEngine) -> list:
+    """Adds a new feature's users, flows and questions to an existing board; returns the ids added.
+    Anything already on the board (same id) is kept as it is: a new feature never rewrites agreed flows."""
+    added = []
+    for n in new.nodes.values():
+        if n.layer.value in ("USER", "FLOW") and n.id not in g.nodes:
+            g.add_node(n.model_copy(update={"flow_ids": []}) if n.layer.value == "USER" else n)
+            added.append(n.id)
+    for fid in [i for i in added if g.nodes[i].layer.value == "FLOW"]:
+        owner = next(iter(new.reverse_edges.get(fid, [])), None)  # the user the engine gave the flow to
+        if owner in g.nodes and g.nodes[owner].layer.value == "USER":
+            g.add_edge(owner, fid)
+            g.nodes[owner].flow_ids.append(fid)
+    for q in new.nodes.values():  # the bees' questions about the feature, minus ones already asked
+        if isinstance(q, QuestionNode) and q.target_node_id in g.nodes and not _already_asked(g, q.question_text):
+            g.add_node(q)
+            g.add_edge(q.target_node_id, q.id)
+    return added
+
+
 def add_gap_questions(g: BuildingBeesEngine) -> list:
     """Asks about details the board still lacks, so "ready to build" can actually be reached.
     One bundled question per screen or API, written here (no model call), skipped if a bee already asked."""

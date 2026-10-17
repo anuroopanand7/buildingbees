@@ -49,7 +49,7 @@ from src.adapters.spec_prompts import AUDIENCE, REACT_PROMPT
 from src.api import feedback
 from src.adapters import tavily
 from src.core.brief import build_brief, decision_count
-from src.core.ingest import add_gap_questions, add_questions, apply_gap_default, strip_guesses, build_flows_graph, build_graph_from_extract, clean_branches, ask_open_branches, add_gap_defaults
+from src.core.ingest import add_gap_questions, add_questions, apply_gap_default, strip_guesses, build_flows_graph, merge_feature, build_graph_from_extract, clean_branches, ask_open_branches, add_gap_defaults
 
 app = FastAPI(
     title="BuildingBees API",
@@ -788,6 +788,44 @@ def edit_flow_steps(flow_id: str, payload: StepsRequest) -> Dict[str, Any]:
     if any(n.layer.value == "SCREEN" for n in g.nodes.values()):
         g.needs_redraw = True
     return get_graph_state()
+
+
+class FeatureRequest(BaseModel):
+    text: str
+
+
+@app.post("/api/features")
+def add_feature(payload: FeatureRequest, engine: str) -> Dict[str, Any]:
+    """Adds a new feature to the same board: the engine draws only its new flows and questions,
+    and every flow, answer and screen already on the board stays as it is."""
+    eng = _engine(engine)
+    g = _board()
+    text = payload.text.strip()[:4000]
+    if not text:
+        raise HTTPException(status_code=400, detail="Say what the new feature is")
+    if not any(n.layer.value == "FLOW" for n in g.nodes.values()):
+        raise HTTPException(status_code=400, detail="Map the idea first, then add features to it")
+    board = {
+        "users": [{"id": n.id, "title": n.title} for n in g.nodes.values() if n.layer.value == "USER"],
+        "flows": [{"id": n.id, "title": n.title, "steps": n.metadata.get("steps", [])}
+                  for n in g.nodes.values() if n.layer.value == "FLOW"],
+    }
+    lead = (audience(g) + "\n\nTHE PRODUCT SO FAR (already agreed, do not return these flows again; reuse a user's id "
+            "when the same person does the new feature, and give every new flow and user a new id):\n"
+            + json.dumps(board)[:12000] + "\n\nTHE NEW FEATURE TO ADD TO THIS PRODUCT:\n")
+    started = time.time()
+    try:
+        new = build_flows_graph(eng.extract_flows(text=lead + text), eng.label)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"{eng.label} could not add the feature: {e}")
+    _trace(g, eng, started)
+    added = merge_feature(g, new)
+    if not added:
+        raise HTTPException(status_code=422, detail="No new flow came back. Try saying what the person does in the new feature.")
+    g.spec_text = (getattr(g, "spec_text", "") + "\n\nAdded feature: " + text)[:SPEC_LIMIT]  # the founder said it, so it counts
+    if any(n.layer.value == "SCREEN" for n in g.nodes.values()):
+        g.needs_redraw = True  # the new flows have no screens yet
+    return {**get_graph_state(), "added": added}
 
 
 class SignoffRequest(BaseModel):
