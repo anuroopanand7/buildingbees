@@ -2,7 +2,8 @@
 
 From Gemini's outline, with every number checked against what we can show. Build it on the organisers' template.
 
-1. **Title.** BuildingBees: agentic product planning on Google Gemini and Cloud Run. "Other tools guess. We ask." Screenshot of the canvas with the stage bar and engine pill. Live URL, GitHub.
+1. **Title.** (Built 17 Oct as `deck.html` in the organisers' template slide order; PDF in this folder, source in `founder skills/buildingbees/source/2026-10-17-ai-builder-cup-deck/`.)
+    BuildingBees: agentic product planning on Google Gemini and Cloud Run. "Other tools guess. We ask." Screenshot of the canvas with the stage bar and engine pill. Live URL, GitHub.
 2. **Problem.** One-prompt tools (v0, Lovable, Stitch) jump to screens and guess the business logic. Requirement omissions are a large share of defects and cost far more to fix after release [use only figures with a source we can cite]. Agencies on fixed-price work pay for the guesses out of their margin.
 3. **Solution.** Six AI bees (product, design, frontend, backend, testing, compliance) interview the founder or team first. Flows with decision splits, undecided paths shown, not guessed. Standard details become visible defaults; deferred items become "out of scope for v1".
 4. **Demo.** Four stages: Idea, Flows, Screens, Brief. Annotated screenshots: vague answer and follow-up; Decide for me; screens with APIs; the Brief with who answered, defaults, out of scope, sign-off.
