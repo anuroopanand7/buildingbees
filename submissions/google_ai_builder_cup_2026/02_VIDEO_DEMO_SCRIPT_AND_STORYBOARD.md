@@ -1,25 +1,22 @@
-# Demo video script (under 3 minutes), updated 16 Oct 2026 for the canvas and team version
+# Demo video script, 2:40 (17 Oct 2026)
 
-Record the live site in a 1440 px wide browser window, zoom 100%. Idea to type: "A B2B tool where clients book and pay for consultations with advisors in a firm." (Clear B2B story, and the bees draw a "Slot still free?" split on it.)
+Built from Gemini's second-by-second draft, checked against what the product really does. Every claim below is true on the live site.
 
-Story: an agency's team scopes a client project together. The point to land: other tools guess, we ask the right person, and the client signs the scope before anyone builds.
+**Setup:** live site in Chrome, window 1440 px wide, page zoom 110%, one tab, notifications off. Start on a new board (Menu, New spec). Rehearse once. The first map takes about 20 seconds: keep it in the video (it is real Gemini), or speed that stretch up 2x in editing and say so with a small "2x" label. Thumbnail: "BuildingBees: Other tools guess. We ask. Built with Gemini on Cloud Run".
 
 | Time | On screen | Say |
 |---|---|---|
-| 0:00 to 0:15 | The empty BuildingBees board, title visible | "Agencies lose margin on fixed-price projects because the scope was never really agreed. AI app builders make it worse: they guess everything a one-line idea leaves out." |
-| 0:15 to 0:30 | Type the idea, press Map it. The drawing loader, then the flow rises in step by step | "BuildingBees asks first. I give it one line. Gemini draws the user flow, not screens, because nothing is agreed yet." |
-| 0:30 to 0:50 | Point at the diamond "Slot still free?" and the dashed "Not decided yet" path below it | "It draws where the flow can split, and leaves the path nobody has decided empty. That empty box is what a spec forgets." |
-| 0:50 to 1:10 | Role picker: choose Client. The dock shows only a business question | "A team shares the board. Each person picks their role and hears only from their own bees. The client gets business questions, never technical ones." |
-| 1:10 to 1:30 | Answer it with a suggested option. The node shows the live sketch, then "From your answer" | "I answer, and the bee redraws the board from my answer." |
-| 1:30 to 1:45 | Type a vague answer ("whatever is normal"). The bee asks one sharper question | "If an answer is vague, it does not accept it. It asks once more, more precisely." |
-| 1:45 to 2:05 | Menu, Change your role, pick Backend. Then click "Draw the screens". Screens appear with wireframes, buttons and APIs | "The backend lead sees their own questions. When the flows are agreed, it draws the screens, the buttons and the API behind each one." |
-| 2:05 to 2:20 | Open the Brief, scroll to "Standard defaults applied" | "Timeouts, retries, double taps: those have standard answers, so it applies them and shows them instead of asking. Our tester went from seventy questions to nine." |
-| 2:20 to 2:40 | Scroll to Decisions (answered by Client, Backend), then press Sign off | "Every decision says who made it. The client signs off the scope, and if anything changes later the Brief says so." |
-| 2:40 to 2:52 | Copy agent link, paste it into a coding agent (or just show the copied text) | "One link hands the agreed scope to engineers or a coding agent, with the open questions marked, so nothing is guessed." |
-| 2:52 to 3:00 | Logo, live URL, GitHub link, "Gemini on Cloud Run, Firestore, Firebase sign-in" | "BuildingBees. Other tools guess. We ask. Built on Gemini and Google Cloud Run." |
+| 0:00 to 0:08 | The start screen: "Other tools guess. We ask." | "BuildingBees is agentic product planning on Google Gemini and Cloud Run. Other tools guess. We ask." |
+| 0:08 to 0:18 | Hover the "Try a sample" button | "When an agency quotes a fixed price from a one-line idea, the edge cases nobody wrote down, a double booking, a failed payment, eat the margin later." |
+| 0:18 to 0:40 | Click "With my team" then "Try a sample in one click" (or type the B2B consultation idea). The flow rises in; point at the stage bar (Idea, Flows) and the engine pill (model name, seconds, schema validated) | "Gemini reads the idea and draws the user flow first, no screens yet. This pill shows which Gemini model answered and that its output passed our schema check." |
+| 0:40 to 0:55 | Point at the diamond "Slot still free?" and the amber "Not decided yet" path | "Where the flow can break, it draws the split, and leaves the path nobody decided empty. That empty box is what a spec forgets." |
+| 0:55 to 1:15 | Role picker: Client. Type a vague answer: "whatever is normal" | "Each teammate hears only their own bees. The client gets business questions. If an answer is vague, the bee does not accept it: it asks one sharper question." |
+| 1:15 to 1:35 | Answer clearly: pick two suggestions (multi-select) and Send. The node sketches, then "From your answer" | "A clear answer redraws the board, and marks what changed." |
+| 1:35 to 1:50 | Answer another with "Later, not in the first version" | "Anything we put off is logged as out of scope, so it cannot creep back in for free." |
+| 1:50 to 2:05 | Menu, Change your role, Backend. Click "Draw the screens". Screens, buttons and APIs appear. Click "Flows" in the stage bar, then back | "When the flows are agreed, it draws screens, buttons and the API behind each one. You can go back to the flows any time." |
+| 2:05 to 2:25 | Click "Brief" in the stage bar. Scroll: decisions with who answered, standard defaults applied, out of scope for v1. Press Sign off | "The Brief has every decision and who made it, the standard defaults it applied instead of asking, what is out of scope, and a sign-off that records who approved it and when." |
+| 2:25 to 2:40 | Copy agent link. End card: live URL, GitHub, "Gemini on Cloud Run, Firestore, Firebase" | "Our first tester answered 70 questions on an early version. The same idea now takes 9. BuildingBees: other tools guess, we ask. Try the sample on our live link." |
 
-Before recording:
-- Hard-refresh, start a new board, rehearse the vague answer once.
-- The role picker appears on a new board; if it does not, use Menu, Change your role.
-- Notifications off, one browser tab, cursor slow and deliberate.
-- If Gemini is busy (rare), wait a minute and press Map it again; do not cut to Nemotron in this video (the Google track must show Gemini).
+Optional 10 seconds if time allows: upload a photo of a whiteboard sketch on the start screen; Gemini vision turns it into flows and the bees ask what it leaves out.
+
+Do not claim: a cryptographic sign-off, sub-second answers, a fixed number of defaults, or a time from idea to brief that we have not measured.
