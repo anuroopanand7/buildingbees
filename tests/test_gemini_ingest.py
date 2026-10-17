@@ -624,3 +624,20 @@ def test_flow_steps_can_be_edited_after_screens_and_ask_for_a_redraw(monkeypatch
     assert out["needs_redraw"]
     assert c.post("/api/flows/F_BUY/steps", json={"steps": [""]}, headers=h).status_code == 400
     assert c.post("/api/flows/NOPE/steps", json={"steps": ["x"]}, headers=h).status_code == 404
+
+
+def test_out_of_scope_decide_for_me_one_question_and_engine_trace(monkeypatch):
+    from src.core.ingest import _one_question
+    assert _one_question("Do we take deposits? How much?") == "Do we take deposits?"
+    assert _one_question("Who is it for?") == "Who is it for?"
+    monkeypatch.setitem(server.engines, "gemini", FakeGemini())
+    c, h = TestClient(server.app), {"X-Board": "scope-shield"}
+    state = c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h).json()
+    assert state["last_call"]["engine"] == "Fake Gemini" and state["last_call"]["schema"] == "validated"
+    qs = [n for n in state["nodes"] if n["layer"] == "QUESTION"]
+    c.post(f"/api/questions/{qs[0]['id']}/resolve", json={"answer_text": "No, sign-in required"}, headers=h)  # "Is guest checkout allowed?"
+    c.post(f"/api/questions/{qs[1]['id']}/resolve", json={"answer_text": "Let them try again", "bees_decided": True}, headers=h)
+    brief = c.get("/api/brief", headers=h).text
+    scope = brief.split("## Out of scope for v1 (agreed)")[1].split("\n## ")[0]
+    assert "Is guest checkout allowed?" in scope
+    assert "Let them try again" in brief.split("## Standard defaults applied")[1]  # decided by the bees, still changeable

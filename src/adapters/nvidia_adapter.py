@@ -84,7 +84,9 @@ class NvidiaNemotronAdapter:
             resp.raise_for_status()
             content = resp.json()["choices"][0]["message"]["content"] or ""
             try:
-                return schema.model_validate_json(_first_json_object(content))
+                out = schema.model_validate_json(_first_json_object(content))
+                self.last_model = model or self.model
+                return out
             except Exception as e:
                 last_error = e
                 messages += [

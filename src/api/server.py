@@ -222,6 +222,7 @@ app.include_router(feedback.router)  # the beta testers' feedback board (src/api
 class QuestionResolveRequest(BaseModel):
     answer_text: str
     by: str = ""  # who answered, as the team sees it ("Backend: Ravi"); several people share one board
+    bees_decided: bool = False  # "Decide for me": the bees' recommendation, listed with the defaults so it can be changed
 
 
 class PostQuestionRequest(BaseModel):
@@ -268,6 +269,7 @@ def _state(graph: BuildingBeesEngine) -> Dict[str, Any]:
         "sources": getattr(graph, "sources", []),
         "signoffs": getattr(graph, "signoffs", []),
         "mode": getattr(graph, "mode", "solo"),
+        "last_call": getattr(graph, "last_call", None),  # engine pill: which model answered, how fast
         # Stage one agrees the flows; screens are only drawn after that.
         "stage": "screens" if any(n.layer.value == "SCREEN" for n in graph.nodes.values()) else "flows",
         "needs_redraw": bool(getattr(graph, "needs_redraw", False)),
@@ -306,7 +308,10 @@ def resolve_question(question_id: str, payload: QuestionResolveRequest) -> Dict[
     node.answer_text = payload.answer_text
     node.answered_at = datetime.datetime.utcnow().isoformat()
     node.metadata["answered_by"] = payload.by.strip()[:60]
-    node.metadata.pop("default", None)  # a person chose it now
+    if payload.bees_decided:
+        node.metadata["default"] = True
+    else:
+        node.metadata.pop("default", None)  # a person chose it now
     
     # Target node status can be updated to READY if no other blocking questions exist
     target_node = graph.get_node(node.target_node_id)
@@ -429,10 +434,12 @@ def react_to_answer(question_id: str, engine: str) -> Dict[str, Any]:
                       "Take back whatever that first answer put on the board, then apply the new one."
                       if q.metadata.get("previous_answer") else ""),
     )
+    started = time.time()
     try:
         r = eng.react(prompt)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"{eng.label} could not process the answer: {e}")
+    _trace(g, eng, started)
 
     changed = [] if r.is_vague else _apply_reaction(g, r)
     for f in r.follow_up[:1]:
@@ -599,11 +606,19 @@ def _engine(name: str):
 SPEC_LIMIT = 60_000
 
 
+def _trace(g: BuildingBeesEngine, eng, started: float) -> None:
+    """Records which model answered the last bee call and how long it took; the board shows it as the engine pill.
+    "validated" because every reply was parsed against its Pydantic schema before it reached the board."""
+    g.last_call = {"engine": eng.label, "model": getattr(eng, "last_model", "") or getattr(eng, "model", ""),
+                   "seconds": round(time.time() - started, 1), "schema": "validated"}
+
+
 def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None, mode: str = "solo") -> Dict[str, Any]:
     """Stage one: flows and the questions about them. No screens are drawn yet."""
     mode = mode if mode in AUDIENCE else "solo"
     sources = tavily.research(text)  # Scout Bee; empty without a key, and for PDFs
     lead = audience(mode) + "\n\nTHE IDEA:\n"  # how to ask, then what the founder actually said
+    started = time.time()
     try:
         x = eng.extract_flows(text=lead + text + tavily.as_prompt(sources), pdf_bytes=pdf_bytes)
         if sources and not any(q.source for q in x.questions):
@@ -611,6 +626,7 @@ def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None, mode: s
             x = eng.extract_flows(text=lead + text + tavily.as_prompt(sources), pdf_bytes=pdf_bytes)
         g = build_flows_graph(x, eng.label)
         g.mode = mode
+        _trace(g, eng, started)
         # The spec is only what the founder said: research never counts as a decision.
         g.spec_text = (text or pdf_to_text(pdf_bytes))[:SPEC_LIMIT]
     except Exception as e:
@@ -670,10 +686,12 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
         "\nDECISIONS THE PRODUCT OWNER HAS ALREADY MADE (part of the spec now, do not ask these again):",
         "\n".join(f"- {q.question_text} => {q.answer_text}" for q in decisions) or "(none yet)",
     ])
+    started = time.time()
     try:
         g = build_graph_from_extract(eng.extract_spec(text=brief[:SPEC_LIMIT + 8000]), eng.label)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"{eng.label} could not draw the screens: {e}")
+    _trace(g, eng, started)
     g.spec_text = getattr(old, "spec_text", "")
     g.product_name = getattr(old, "product_name", "") or g.product_name  # the name the founder already saw stays
     g.sources = getattr(old, "sources", [])

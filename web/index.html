@@ -116,6 +116,15 @@
   .mine { align-self: flex-end; max-width: 86%; text-align: right; }
   .mine .by { margin-right: 8px; font-size: 11.5px; color: var(--muted); }
   .send-row { display: flex; gap: 6px; }
+  .stepper { display: inline-flex; gap: 2px; background: var(--fill); border-radius: 999px; padding: 3px; }
+  .stepper button { display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 12.5px; color: var(--muted); cursor: pointer; }
+  .stepper button.done { color: var(--text); }
+  .stepper button[aria-current] { background: var(--panel); color: var(--text); font-weight: 600; box-shadow: 0 1px 3px rgba(17, 17, 16, .12); }
+  .stepper button:disabled { opacity: .45; cursor: default; }
+  .trace { position: fixed; right: 16px; bottom: 64px; z-index: 5; display: flex; align-items: center; gap: 8px; padding: 6px 12px; font-size: 12px; color: var(--muted); }
+  .trace b { color: var(--text); font-weight: 600; }
+  .trace .ok { color: var(--ok); display: inline-flex; align-items: center; gap: 3px; }
+  @media (max-width: 760px) { .trace { display: none; } .stepper button { padding: 5px 8px; } .stepper i { display: none; } }
   .recenter { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); z-index: 26; }
   .option[aria-pressed="true"] { border-color: var(--accent); background: var(--focus); }
   .glow { animation: glow 1.1s ease-in-out 4; }
@@ -497,7 +506,13 @@
   <button id="menuBrief" hidden><i class="ph ph-file-text" aria-hidden="true"></i>Open the Brief</button>
 </div>
 <div class="island stage" id="meter" hidden><span id="meterText"></span><div class="track"><i id="meterBar"></i></div><span id="pmSub"></span>
-  <div class="seg" id="viewSeg" hidden role="group" aria-label="Show the flows or the screens"><button data-view="flows">Flows</button><button data-view="screens">Screens</button></div></div>
+  <nav class="stepper" id="stepper" aria-label="Where you are in the plan">
+    <button data-step="idea"><i class="ph ph-lightbulb" aria-hidden="true"></i>Idea</button>
+    <button data-step="flows"><i class="ph ph-flow-arrow" aria-hidden="true"></i>Flows</button>
+    <button data-step="screens"><i class="ph ph-browsers" aria-hidden="true"></i>Screens</button>
+    <button data-step="brief"><i class="ph ph-file-text" aria-hidden="true"></i>Brief</button>
+  </nav></div>
+<div class="island trace" id="trace" hidden aria-live="polite"></div>
 <div id="flowEdit" hidden role="dialog" aria-modal="true" aria-label="Edit the flow's steps">
   <div class="brief-sheet">
     <div class="brief-bar"><b id="flowEditTitle">Edit steps</b><button class="icon-btn" id="flowEditClose" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button></div>
@@ -533,6 +548,7 @@
       </div>
     </div>
     <div class="ideas" id="ideas" aria-label="Starter ideas">
+      <button class="btn primary" id="sampleBtn"><i class="ph ph-play" aria-hidden="true"></i>Try a sample in one click</button>
       <span class="muted">Or start from a simple idea:</span>
       <button class="btn ghost" data-idea="An app to book a haircut at my local salon.">Book a haircut</button>
       <button class="btn ghost" data-idea="A to-do list app where I can share a list with my family.">Shared to-do list</button>
@@ -692,7 +708,7 @@ async function load() {
     finally { restoring = false; }
   }
   if (!LINKED) store.set("bb_graph", g.total_nodes ? JSON.stringify({ product_name: g.product_name, spec_text: g.spec_text, entities: g.entities, sources: g.sources, needs_redraw: g.needs_redraw, nodes: g.nodes, edges: g.edges }) : "");
-  S.stage = g.stage; S.needsRedraw = g.needs_redraw; S.sources = g.sources || []; S.mode = g.mode || "solo";
+  S.stage = g.stage; S.needsRedraw = g.needs_redraw; S.sources = g.sources || []; S.mode = g.mode || "solo"; S.spec = g.spec_text || ""; S.lastCall = g.last_call;
   S.nodes = {}; S.fwd = {}; S.rev = {}; S.screens = {};
   g.nodes.forEach((n) => (S.nodes[n.id] = n));
   g.edges.forEach((e) => {
@@ -737,8 +753,21 @@ function render() {
   const rs = Object.values(S.screens), ready = rs.filter((r) => r.is_build_ready).length;
   const flowsStage = S.stage === "flows";
   const qAll = byLayer("QUESTION").length, qOpen = openQuestions().length;
-  $("viewSeg").hidden = flowsStage;  // flows stay editable after screens are drawn (Roger's note, 17 Oct)
-  document.querySelectorAll("#viewSeg [data-view]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.view === S.view));
+  // Stage bar: where you are, and a way back to any stage (4 of 6 tester reports were about getting lost).
+  const at = flowsStage || S.view === "flows" ? "flows" : "screens";
+  document.querySelectorAll("#stepper [data-step]").forEach((b) => {
+    const k = b.dataset.step;
+    b.toggleAttribute("aria-current", k === at);
+    b.classList.toggle("done", k === "idea" || (k === "flows" && !flowsStage));
+    b.disabled = k === "screens" && flowsStage;
+    b.dataset.tip = k === "idea" ? (S.spec || "Your idea").slice(0, 160) : k === "screens" && flowsStage ? "Agree the flows first, then Draw the screens" : k === "brief" ? "Every decision, default and open question" : `Show the ${k}`;
+    b.dataset.tipPos = "bottom";
+  });
+  // Engine pill: proof for judges that a real model answered, schema-checked, and how fast.
+  const lc = S.lastCall;
+  $("trace").hidden = !lc;
+  if (lc) $("trace").innerHTML = `<i class="ph ph-cpu" aria-hidden="true"></i><b>${esc(lc.model || lc.engine)}</b><span>${esc(lc.engine)}</span><span>${lc.seconds}s</span><span class="ok"><i class="ph ph-check-circle" aria-hidden="true"></i>schema validated</span>`;
+  $("meterText").hidden = flowsStage;  // the stage bar already says "Flows"; the screens count stays useful later
   $("meterText").textContent = flowsStage ? "Step 1 of 2: agree the flows" : `${ready} of ${rs.length} screens ready to build`;
   $("meterBar").style.width = flowsStage ? `${qAll ? ((qAll - qOpen) / qAll) * 100 : 0}%` : `${rs.length ? (ready / rs.length) * 100 : 0}%`;
   renderMap(); renderPM(); renderDetails();
@@ -1124,7 +1153,7 @@ function renderPM() {
       <span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Blocks the build" : "Good to know"}</span>
       ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o, i) => `<button class="option" data-q="${esc(q.id)}" data-opt="${esc(o)}">${esc(o)}${i === 0 && q.metadata?.why ? '<span class="rec">Recommended</span>' : ""}</button>`).join("")}</div>` : '<div style="height:12px"></div>'}
       <div class="field"><label for="own">Tap one or more suggestions, or answer in your own words, then send</label><div class="send-row"><input id="own" data-answer="${esc(q.id)}" placeholder="Or type your own answer and press Enter" autocomplete="off"><button class="btn primary" data-send="${esc(q.id)}" aria-label="Send your answer"><i class="ph ph-paper-plane-right" aria-hidden="true"></i></button></div></div>
-      <div class="ask-foot"><button class="link" data-skip="${esc(q.id)}">Not sure yet, ask me later</button><span class="muted">${pmQueue().length - 1} more for you</span></div>
+      <div class="ask-foot"><button class="link" data-skip="${esc(q.id)}">Not sure yet, ask me later</button>${S.mode !== "team" && q.suggested_options?.length ? `<button class="link" data-decide="${esc(q.id)}" data-tip="Takes the recommended answer; you can change it later in the Brief" data-tip-pos="top"><i class="ph ph-magic-wand" aria-hidden="true"></i> Decide for me</button>` : ""}<span class="muted">${pmQueue().length - 1} more for you</span></div>
       ${S.mode === "team" ? `<div class="ask-foot"><span class="muted">Answering as ${esc(byLine())}</span><button class="link" data-role-change>Change</button></div>` : ""}
       ${S.stage === "flows" ? '<div class="ask-foot"><button class="link" id="drawBtn">Skip the rest and draw the screens</button></div>' : ""}
       ${details > 1 && q.metadata?.source === "BuildingBees" ? `<div class="ask-foot"><button class="btn" id="defaultsBtn" style="width:100%">Use the first suggestion for all ${details} remaining details</button></div>` : ""}`;
@@ -1221,11 +1250,11 @@ function beeNote(cat, text) {
   n.innerHTML = `${beeIcon(cat)}<span><b>${esc(bee(cat)[0])}:</b> ${esc(text)}</span>`; n.hidden = false;
   noteTimer = setTimeout(() => { n.hidden = true; }, 9000);
 }
-async function answer(qid, text) {
+async function answer(qid, text, beesDecided = false) {
   if (!text.trim() || PM.reacting) return;
   const q = S.nodes[qid];
   await api(`/api/questions/${encodeURIComponent(qid)}/resolve`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answer_text: text, by: byLine() }),
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answer_text: text, by: beesDecided ? "the bees (recommended)" : byLine(), bees_decided: beesDecided }),
   });
   PM.changed = new Set(); PM.front = null;
   if (!engineReady()) return load();
@@ -1266,6 +1295,16 @@ document.addEventListener("click", (e) => {
   }
   if (t.id === "recenter") return fitView();
   if (t.dataset.view) { S.view = t.dataset.view; render(); return requestAnimationFrame(fitView); }
+  if (t.dataset.step) {
+    const k = t.dataset.step;
+    if (k === "idea") return toast(S.spec ? `Your idea: ${S.spec.slice(0, 300)}` : "Your idea");
+    if (k === "brief") return $("briefBtn").click();
+    S.view = k; render(); return requestAnimationFrame(fitView);
+  }
+  if (t.dataset.decide) {  // solo: take the bees' recommended answer; it is listed with the defaults and can be changed
+    const q = S.nodes[t.dataset.decide];
+    return answer(q.id, q.suggested_options[0], true).catch(fail);
+  }
   if (t.dataset.editFlow) {  // edit a flow's steps by hand; after screens exist this flags a redraw
     const f = S.nodes[t.dataset.editFlow]; FLOW_EDIT = f.id;
     $("flowEditTitle").textContent = `Edit steps: ${f.title}`; $("flowEditText").value = (f.metadata?.steps || []).join("\n");
@@ -1339,6 +1378,12 @@ async function drawScreens() {
   catch (err) { PM.error = err.message; render(); }
   finally { working(""); }
 }
+// One click for judges and first-time visitors: a B2B idea that shows splits and real product questions.
+$("sampleBtn").onclick = () => {
+  if (!engineReady()) { S.engine = S.engines.gemini?.enabled ? "gemini" : Object.keys(S.engines).find((k) => S.engines[k]?.enabled) || null; store.set("bb_engine", S.engine || ""); renderEngine(); }
+  $("prd").value = "A B2B tool where clients book and pay for consultations with advisors in a firm.";
+  $("buildBtn").click();
+};
 // "Just me" or "A team" for the next board; remembered per browser.
 const newMode = () => store.get("bb_mode") || "solo";
 const renderMode = () => document.querySelectorAll("#modeSeg [data-mode]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.mode === newMode()));

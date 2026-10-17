@@ -1,6 +1,7 @@
 """The Brief: the board written out as one Markdown document a person or a coding agent can build from.
 Built straight from the graph, with no model call, so it is instant, free and says only what was decided."""
 
+import re
 from typing import List
 
 from src.core.graph import BuildingBeesEngine
@@ -18,6 +19,16 @@ def _layer(g: BuildingBeesEngine, name: str) -> list:
 def _or_open(value) -> str:
     """The value, or NOT DECIDED so a builder asks instead of assuming."""
     return str(value) if value not in ("", None, 0) else "NOT DECIDED"
+
+
+_LATER = re.compile(r"\b(later|phase ?(2|two)|v2|version 2|not now|not yet|out of scope|not needed|no need|"
+                    r"don'?t need|do not need|not in (the )?(first|initial|v1)|next release|future)\b", re.I)
+_YES_NO = re.compile(r"^(do|does|should|will|can|is|are|would)\b", re.I)
+
+
+def _deferred(question: str, answer: str) -> bool:
+    """True when an answer puts something off ("later", "phase 2") or says no to a yes or no question about building it."""
+    return bool(_LATER.search(answer)) or (bool(_YES_NO.match(question.strip())) and answer.strip().lower().startswith("no"))
 
 
 def decision_count(g: BuildingBeesEngine) -> int:
@@ -141,6 +152,14 @@ def build_brief(g: BuildingBeesEngine) -> str:
     for q in decided:
         add(f"- **{q.question_text}** {q.answer_text} _(asked by {BEE_NAMES.get(q.category.value, 'the team')}, about {title(q.target_node_id)}{cited(q)}{by(q)})_")
     add("")
+
+    out_of_scope = [q for q in decided if _deferred(q.question_text, q.answer_text or "")]
+    if out_of_scope:
+        add("## Out of scope for v1 (agreed)")
+        add("Decided not to build now. Anything here that comes back later is a change request.")
+        for q in out_of_scope:
+            add(f"- {q.question_text} **{q.answer_text}**{by(q)}")
+        add("")
 
     if defaults:
         add("## Standard defaults applied (change any on the board)")

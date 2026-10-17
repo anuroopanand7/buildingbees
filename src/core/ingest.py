@@ -46,6 +46,12 @@ def _already_asked(engine: BuildingBeesEngine, text: str) -> bool:
     return False
 
 
+def _one_question(text: str) -> str:
+    """Keeps only the first question when a bee asks two at once ("Do we take deposits? How much?")."""
+    i = text.find("?")
+    return text[:i + 1] if 0 <= i < len(text.rstrip()) - 1 and "?" in text[i + 1:] else text
+
+
 def add_questions(engine: BuildingBeesEngine, questions: Iterable[XQuestion], source: str = "ai",
                   dedupe: bool = True) -> list:
     """Pins the engine's questions to their nodes, skipping unknown targets and near-duplicates; returns the ones added."""
@@ -61,7 +67,8 @@ def add_questions(engine: BuildingBeesEngine, questions: Iterable[XQuestion], so
             title=f"Spec gap on {q.target_id}",
             target_node_id=q.target_id,
             category=cat,
-            question_text=q.question.replace("\u2014", ", ").replace(" ,", ","),  # house style: no em dashes
+            # One question at a time (research 04: prompts alone let ~29% double questions through); no em dashes.
+            question_text=_one_question(q.question).replace("\u2014", ", ").replace(" ,", ","),
             is_blocking=q.is_blocking,
             assigned_to=f"{cat.value}_LEAD",
             question_status=QuestionStatus.OPEN,
