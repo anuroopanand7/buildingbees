@@ -20,6 +20,21 @@ flowchart LR
   brief --> agent[Engineers or a coding agent]
 ```
 
+## For judges: try it in two minutes
+
+Open the live link, pick **Just me**, and press **Try a sample in one click**, or paste one of these:
+- "A home bakery app: customers order custom cakes, choose flavour and size, pay an advance; the baker sees the week's orders."
+- "An app where parents see their child's attendance and test marks, pay monthly fees, and get a message when the child misses class."
+- "A B2B tool where clients book and pay for consultations with advisors in a firm."
+
+Then answer a round (or press Decide the rest for me), tap any step card to comment, press **Update the board**, **Draw the screens**, and open the **Brief** (Plan check at the top, Write the full plan, Share as a web page). No sign-in is needed.
+
+**Limits, stated up front.** A first map takes about 20 to 40 s on Gemini 3.1 Pro. Solo rounds ask at most 6 questions. Agent Platform calls are capped at 300 a day; past that the free Gemini API key takes over, then Flash-Lite as an emergency, and the pill at the bottom shows which model answered.
+
+**Guardrails and data.** Every model reply is validated against a Pydantic schema before it touches the board. `strip_guesses` removes vendors, timeouts and limits nobody stated, so they become questions. Web research (Tavily, the Scout Bee) is shown as a source, never counted as a decision. The only data is what the person types; boards live in Firestore.
+
+**Technical problems we solved.** Each Gemini model has its own quota, so a fail-over chain across Agent Platform and the API key keeps the bees answering; rounds batch every answer and note into one call, so the board redraws once per round instead of after every answer; short ids (F1, FL1, S1, B1, A1) stay stable through redraws, so a coding agent can follow them.
+
 ## How it works
 
 1. **Say what you want to build.** Two lines are enough. A PRD, a PDF, a call transcript, or a **photo of your whiteboard or napkin sketch** works too: Gemini reads the sketch with vision, keeps what it shows and the bees ask what it leaves out.
