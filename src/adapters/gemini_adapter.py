@@ -13,10 +13,11 @@ from src.adapters.spec_prompts import (  # noqa: F401  (re-exported for callers)
     FLOWS_PROMPT, FlowsExtract, INGEST_PROMPT, INTERROGATE_PROMPT, QuestionList, Reaction, SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
 )
 
-DEFAULT_MODEL = "gemini-3.8-flash"  # newest Flash on the free tier (checked 17 Oct 2026)
-# Each model has its own free daily quota, so a long chain keeps the bees answering when one runs out
-# (17 Oct: gemini-3.5-flash hit its daily limit mid-demo while 3.8 still answered).
-FALLBACK_MODELS = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite"]
+DEFAULT_MODEL = "gemini-3.5-flash"  # fastest Flash for a full flow plan on our free key (17 Oct 2026: 15 s)
+# Each model has its own free quota, so the chain keeps the bees answering when one is busy or out of quota.
+# Measured 17 Oct on a full flow plan: 3.7-flash 24 s, flash-latest 23 s, 3.8-flash overloaded, 3.1-flash-lite 6 s
+# (fewer questions, so it is the last resort).
+FALLBACK_MODELS = ["gemini-3.7-flash", "gemini-flash-latest", "gemini-3.8-flash", "gemini-3.1-flash-lite"]
 
 
 class EngineNotConfigured(RuntimeError):
@@ -45,9 +46,9 @@ class GoogleGeminiAdapter:
         from google.genai import types
 
         if self._client is None:
-            # 25 s per attempt: a slow or overloaded model must fail over fast, not hang the visitor
-            # (17 Oct: a 45 s wait on a busy model made the first map take 68 s).
-            self._client = genai.Client(api_key=self.api_key, http_options=types.HttpOptions(timeout=25_000))
+            # 40 s per attempt: a full flow plan takes 15 to 25 s on a healthy model, so this only cuts off a stuck one
+            # (17 Oct: 25 s cut off good answers and cascaded through the chain).
+            self._client = genai.Client(api_key=self.api_key, http_options=types.HttpOptions(timeout=40_000))
         config = types.GenerateContentConfig(
             response_mime_type="application/json", response_schema=schema, temperature=0.2,
         )
