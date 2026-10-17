@@ -67,6 +67,10 @@ sequenceDiagram
 
 **Screens are specs.** Each wireframe element has a `detail` (a list's card fields, a choice's options). States only where real: `graph.screen_needs_states()` asks for loading when a screen shows a list or image and error when a button calls an API; readiness and the detail questions follow it. A screen is not ready while its flow has an open blocking question.
 
+**Agent Platform and spend guards.** With `GEMINI_VERTEX_PROJECT` set, every Gemini call goes first to Agent Platform (Vertex AI) on our project: `gemini-3.1-pro-preview`, then 3.8 and 3.7 Flash, billed to the Free Trial credit; then the free API key chain; then Flash-Lite as an emergency. `GEMINI_VERTEX_DAILY_CAP` (300) bounds the calls a day, and a Rs 2,000 budget alert sits on the billing account.
+
+**Plan check, share page, MCP (ideas from Archify).** `src/core/check.py` lists blockers and gaps (open blocking questions, undecided splits, must features with no flow, missing states, failure paths, timeouts, waiting notes); it heads the Brief and is `GET /api/plan-check`. `src/core/share.py` writes the board as one standalone page with anchors on every id (`GET /api/share`). `scripts/mcp_server.py` exposes get_plan, plan_check, open_questions and add_note to coding agents.
+
 **Adding a feature.** `POST /api/features` runs `extract_flows` with the board's users and flows as context and the new feature as the idea, then `merge_feature()` (`src/core/ingest.py`) adds only ids that are new: agreed flows, answers and screens are never rewritten. If screens exist they are flagged for a redraw. A product can have 1 to 6 flows (one per job the input names) and up to 3 branches per flow.
 
 ## Teams

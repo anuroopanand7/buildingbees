@@ -102,6 +102,14 @@ def build_brief(g: BuildingBeesEngine, with_plan: bool = True) -> str:
         f"BuildingBees asked instead: {len(decided)} decided, {len(still_open)} still open.")
     add("")
 
+    from src.core.check import plan_check  # here, not at the top: check.py itself imports this module
+    check = plan_check(g)
+    add("## Plan check")
+    add(("**Ready for a builder.**" if check["passed"] else "**Not ready yet.**") + f" {count(len(check['issues']), 'thing')} to settle.")
+    for i in check["issues"]:
+        add(f"- {'BLOCKER' if i['level'] == 'blocker' else 'Gap'}: {i['text']}")
+    add("")
+
     add("## Who it is for")
     for u in _layer(g, "USER"):
         add(f"- **{u.title}**: {u.description}".rstrip(": "))

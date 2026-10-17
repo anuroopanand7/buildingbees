@@ -7,7 +7,7 @@ Socratic Question Engine, and Dual Hackathon Track Adapters.
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import datetime
@@ -49,6 +49,8 @@ from src.adapters.spec_prompts import AUDIENCE, BATCH_NOTE, REACT_PROMPT
 from src.api import feedback
 from src.adapters import tavily
 from src.core.brief import short_ids, build_brief, decision_count
+from src.core.check import plan_check
+from src.core.share import build_share_html
 from src.core.ingest import add_gap_questions, add_questions, apply_gap_default, strip_guesses, build_flows_graph, merge_feature, build_graph_from_extract, clean_branches, ask_open_branches, add_gap_defaults
 
 app = FastAPI(
@@ -1066,6 +1068,20 @@ def get_brief() -> str:
     if not graph.nodes:
         raise HTTPException(status_code=404, detail="There is nothing on the board yet")
     return build_brief(_board())
+
+
+@app.get("/api/plan-check")
+def get_plan_check() -> Dict[str, Any]:
+    """The quality gate before a plan goes to a builder: blockers (must be settled) and gaps (worth fixing)."""
+    return plan_check(_board())
+
+
+@app.get("/api/share", response_class=HTMLResponse)
+def get_share_page() -> str:
+    """The board as one standalone interactive web page, for a client who will not sign in. Open it with ?board=<id>."""
+    if not graph.nodes:
+        raise HTTPException(status_code=404, detail="There is nothing on the board yet")
+    return build_share_html(_board())
 
 
 @app.post("/api/reset")

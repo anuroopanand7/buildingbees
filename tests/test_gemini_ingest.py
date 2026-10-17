@@ -852,3 +852,23 @@ def test_states_only_where_they_are_real():
                 g.forward_edges[n.id].discard(c)  # no buttons, nothing fetched: a static screen
     asked = add_gap_questions(g)
     assert not any("show" in q.question.lower() and ("load" in q.question.lower() or "wrong" in q.question.lower()) for q in asked)
+
+
+def test_plan_check_share_page_and_agent_tools(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", RichFlows())
+    c, h = TestClient(server.app), {"X-Board": "share"}
+    c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h)
+    check = c.get("/api/plan-check", headers=h).json()
+    assert check["passed"] is False  # blocking questions and an undecided split are open
+    assert any("No" in i["text"] and i["level"] == "blocker" for i in check["issues"])
+    page = c.get("/api/share", headers=h)
+    assert page.status_code == 200 and page.text.startswith("<!doctype html>")
+    assert "id='F1'" in page.text and "Plan check" in page.text and "<script" in page.text
+    assert "## Plan check" in c.get("/api/brief", headers=h).text
+    from scripts import mcp_server
+    init = mcp_server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
+    assert init["result"]["serverInfo"]["name"] == "buildingbees"
+    names = [t["name"] for t in mcp_server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})["result"]["tools"]]
+    assert names == ["get_plan", "plan_check", "open_questions", "add_note"]
+    assert mcp_server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
+    assert mcp_server._board("https://x.run.app/?board=abc-1") == "abc-1"

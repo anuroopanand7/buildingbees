@@ -814,6 +814,7 @@
       <button class="btn" id="briefCopy"><i class="ph ph-copy" aria-hidden="true"></i>Copy</button>
       <button class="btn" id="briefAgent" title="A link an AI coding agent (Claude Code, Cursor, Jules) can read to build from this plan"><i class="ph ph-robot" aria-hidden="true"></i>Copy link for an AI builder</button>
       <button class="btn" id="briefDownload"><i class="ph ph-download-simple" aria-hidden="true"></i>Download</button>
+      <button class="btn" id="briefShare" title="One web page with the whole plan, for someone who will not sign in"><i class="ph ph-globe" aria-hidden="true"></i>Share as a web page</button>
       <button class="btn" id="briefPrint"><i class="ph ph-printer" aria-hidden="true"></i>Print or save as PDF</button>
       <button class="icon-btn" id="briefClose" aria-label="Close brief"><i class="ph ph-x" aria-hidden="true"></i></button>
     </div>
@@ -1834,6 +1835,8 @@ $("briefBtn").onclick = async () => {
   } catch (err) { toast(err.message); }
 };
 $("briefClose").onclick = () => { $("brief").hidden = true; };
+// The whole plan as one standalone page (an idea from Archify): anyone with the link can read it, no sign-in.
+$("briefShare").onclick = () => window.open(`/api/share?board=${encodeURIComponent(BOARD)}`, "_blank", "noopener");
 
 // Testers' feedback board, the AIRs way: report, upvote, comment; the team marks a fix deployed and
 // three testers' "Confirm fixed" resolve it. Server side: src/api/feedback.py.

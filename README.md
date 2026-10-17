@@ -154,7 +154,19 @@ Every call takes the board id in an `X-Board` header or a `?board=` query parame
 | POST | `/api/me/boards/{id}/rename`, `/delete` | Rename a board; delete it (for its creator) or leave it (for a teammate) |
 | GET, POST | `/api/feedback` | Testers' feedback board: list, report (with up to 3 screenshots) |
 | POST | `/api/feedback/{id}/vote`, `/comment`, `/confirm`, `/status` | Upvote, comment, confirm a fix; status changes are team-only (`ADMIN_UIDS`) |
+| GET | `/api/plan-check` | The quality gate: blockers and gaps before a plan goes to a builder |
+| GET | `/api/share?board=` | The whole plan as one standalone interactive web page, no sign-in |
 | POST | `/api/restore`, `/api/reset` | Put a saved board back; clear the board |
+
+## For coding agents (MCP)
+
+`scripts/mcp_server.py` makes BuildingBees an MCP server (standard library only), so a coding agent can read the plan and talk back to the bees while it builds:
+
+```bash
+claude mcp add buildingbees -- python3 scripts/mcp_server.py
+```
+
+Tools: `get_plan` (the Brief, with ids F1, FL1, S1, B1, A1), `plan_check`, `open_questions`, `add_note` (a note on any part of the board; the bees apply it in the next round). Each takes the board id or link.
 
 ## Known limits
 
