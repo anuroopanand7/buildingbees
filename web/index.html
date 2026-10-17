@@ -265,6 +265,7 @@
   @media (prefers-reduced-motion: reduce) { .changed { animation: none; outline: 2px solid var(--ok); } }
   .note-btn { position: absolute; top: -11px; right: -9px; z-index: 3; box-shadow: 0 1px 3px rgba(17, 17, 16, .12); display: inline-flex; align-items: center; gap: 3px; height: 24px; min-width: 24px; padding: 0 5px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--panel); color: var(--muted); font-size: 13px; opacity: 0; transition: opacity var(--t-state, .15s), background .15s, color .15s; }
   .step .note-btn[data-tip], .scr .note-btn[data-tip] { position: absolute; }  /* beats [data-tip]'s position: relative */
+  #flows .step:not(.next):not(.decision) { cursor: pointer; }
   .note-btn span { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .step:hover .note-btn, .step:focus-within .note-btn, .scr:hover .note-btn, .scr:focus-within .note-btn, .note-btn.has { opacity: 1; }
   .note-btn:hover { color: var(--text); background: var(--fill); }
@@ -313,6 +314,10 @@
   .set-q .send-row input { font-size: 13px; padding: 7px 11px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--panel); color: var(--text); font: inherit; }
   .set-q .send-row .link { white-space: nowrap; font-size: 12.5px; }
   .set-foot { position: sticky; bottom: -12px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 0 12px; background: var(--island); border-top: 1px solid var(--line); font-size: 12.5px; }
+  .dock .dock-min { width: auto; padding: 0 8px 0 6px; gap: 3px; font-size: 12px; font-weight: 500; }
+  .dock .dock-min .ph { font-size: 14px; }
+  .idea-text { background: var(--fill); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; font-size: 13.5px; }
+  .idea-text p { margin: 4px 0 0; white-space: pre-wrap; max-height: 30vh; overflow: auto; }
   .add-feature { margin: 8px 0 24px; border-style: dashed; }
   .flow-head h3 button { background: none; border: none; padding: 0; font: inherit; text-align: left; }
   .flow.focus .flow-head h3 { box-shadow: 0 2px 0 var(--accent); }
@@ -465,6 +470,7 @@
   .brand .hex { width: 16px; height: 16px; }
   #product { color: var(--muted); font-size: 13px; padding-left: 8px; margin-left: 4px; border-left: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   #product:empty { display: none; }
+  #product { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   .menu { position: fixed; top: 58px; left: 12px; z-index: 31; min-width: 210px; padding: 6px; display: grid; gap: 1px; transform-origin: top left; animation: pop .18s var(--ease-out) both; }
   .menu button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; text-align: left; padding: 8px 10px; border-radius: 7px; font-size: 13px; cursor: pointer; }
   .menu button:hover, .menu button:focus-visible { background: var(--fill); }
@@ -661,6 +667,7 @@
   <div class="brief-sheet">
     <div class="brief-bar"><b id="noteTitle">Comment</b><button class="icon-btn" id="noteClose" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button></div>
     <div class="fb-body">
+      <div id="noteStep" class="idea-text" hidden></div>
       <div id="noteList"></div>
       <label class="cap" for="noteText">What is wrong, missing or different here? Say it in your own words.</label>
       <textarea id="noteText" rows="4" placeholder="Clients should also be able to pay by bank transfer here." style="width:100%;margin-top:8px;font:inherit;padding:10px;border:1px solid var(--line-strong);border-radius:var(--r-input)"></textarea>
@@ -674,6 +681,7 @@
   <div class="brief-sheet">
     <div class="brief-bar"><b>Add a feature</b><button class="icon-btn" id="featureClose" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button></div>
     <div class="fb-body">
+      <div id="featureIdea" class="idea-text" hidden></div>
       <label class="cap" for="featureText">What should the product also do? Who does it, and what do they get? Everything already on the board stays as it is.</label>
       <textarea id="featureText" rows="6" placeholder="Advisors can set their own available hours and see their upcoming calls." style="width:100%;margin-top:8px;font:inherit;padding:10px;border:1px solid var(--line-strong);border-radius:var(--r-input)"></textarea>
       <div class="ask-foot" style="margin-top:10px"><span class="muted" id="featureNote">The bees draw the new flows and ask what the feature leaves out.</span><button class="btn primary" id="featureSave">Add to the board</button></div>
@@ -745,7 +753,7 @@
   <section class="island dock" id="dock" aria-label="Question from the bees">
     <div id="beeNote" hidden role="status"></div>
     <div id="coach" hidden><i class="ph ph-hand-pointing" aria-hidden="true"></i>Answer here, and watch the board redraw as we talk.</div>
-    <button class="tool sm dock-min" id="dockMin" aria-expanded="true" aria-label="Hide the question" data-tip="Hide" data-tip-pos="top"><i class="ph ph-caret-down" aria-hidden="true"></i></button>
+    <button class="tool sm dock-min" id="dockMin" aria-expanded="true" aria-label="Hide the questions" data-tip="Hide the questions; the bar at the bottom brings them back" data-tip-pos="top"><i class="ph ph-caret-down" aria-hidden="true"></i><span class="dock-min-label">Hide</span></button>
     <button class="dock-pill" id="dockPill" hidden></button>
     <div id="ask" aria-live="polite"></div>
   </section>
@@ -927,18 +935,22 @@ function render() {
   // Engine pill: proof for judges that a real model answered, schema-checked, and how fast.
   const lc = S.lastCall;
   $("trace").hidden = !lc;
-  if (lc) $("trace").innerHTML = `<i class="ph ph-cpu" aria-hidden="true"></i><b>${esc(lc.model || lc.engine)}</b><span>${esc(lc.engine)}</span><span>${lc.seconds}s</span><span class="ok"><i class="ph ph-check-circle" aria-hidden="true"></i>schema validated</span>`;
+  if (lc) {
+    $("trace").innerHTML = `<i class="ph ph-cpu" aria-hidden="true"></i><span>Last update by <b>${esc(lc.engine)}</b> in ${lc.seconds}s</span><span class="ok"><i class="ph ph-check-circle" aria-hidden="true"></i>checked</span>`;
+    $("trace").dataset.tip = `Model: ${lc.model || lc.engine}. "Checked" means the reply was validated against our schema before it touched your board.`;
+    $("trace").dataset.tipPos = "top";
+  }
   $("meterText").hidden = flowsStage;  // the stage bar already says "Flows"; the screens count stays useful later
   $("meterText").textContent = flowsStage ? "Step 1 of 2: agree the flows" : `${ready} of ${rs.length} screens ready to build`;
   $("meterBar").style.width = flowsStage ? `${qAll ? ((qAll - qOpen) / qAll) * 100 : 0}%` : `${rs.length ? (ready / rs.length) * 100 : 0}%`;
   renderMap(); renderPM(); renderDetails();
 
   // Bring the node the PM is asking about into view, once per question.
-  if (PM.focus && PM.focus !== PM.lastFocus) {
+  if (PM.focus && PM.focus !== PM.lastFocus && !PM.quiet) {
     const at = document.querySelector("#flows .step.focus, #flows .scr.focus, #flows .focus");
     reveal(at); at?.classList.add("nudge");
   }
-  PM.lastFocus = PM.focus;
+  PM.lastFocus = PM.focus; PM.quiet = false;
 }
 
 // ---------- engine ----------
@@ -1255,8 +1267,8 @@ function renderPM() {
   const done = all.filter((q) => q.question_status !== "OPEN").sort((a, b) => String(a.answered_at).localeCompare(String(b.answered_at)));
   $("pmSub").textContent = all.length ? `${done.length} of ${all.length} answered` : "";
   $("coach").hidden = !!(done.length || store.get("bb_coach") || PM.reacting);
-  $("meter").dataset.tip = all.length ? `A one-shot tool would have guessed all ${all.length}.` : "";
-  $("meter").dataset.tipPos = "bottom";
+  $("pmSub").dataset.tip = all.length ? `A one-shot tool would have guessed all ${all.length}.` : "";  // on the count only, so it never stacks on the stage bar's tips
+  $("pmSub").dataset.tipPos = "bottom";
 
   // The hive: who has questions waiting. Click a bee to hear only from that one.
   if (PM.bee && !open.some((q) => q.category === PM.bee)) PM.bee = null;
@@ -1437,8 +1449,19 @@ let NOTE_AT = null;  // the part of the board the note dialog is open on
 function openNote(t) {
   NOTE_AT = { target: t.dataset.note, step: Number(t.dataset.noteStep || 0), path: t.dataset.notePath || "" };
   $("noteTitle").textContent = `"${t.dataset.noteLabel}": questions and notes`;
-  renderNoteList(); $("noteText").value = ""; $("noteAdd").hidden = false; $("noteText").focus();
+  // The card's full text, since cards cut long steps to three lines (Sravani, 17 Oct: "not getting the extended information").
+  const card = t.closest(".step, .scr");
+  const full = card ? [card.querySelector("b, h4")?.textContent, card.querySelector("p")?.textContent].filter(Boolean) : [];
+  $("noteStep").hidden = !full.length;
+  $("noteStep").innerHTML = full.length ? `<b>${esc(full[0])}</b>${full[1] ? `<p>${esc(full[1])}</p>` : ""}` : "";
+  renderNoteList(); $("noteText").value = ""; $("noteAdd").hidden = false;
 }
+// Tapping anywhere on a step card opens its thread (the pin is small on a tablet).
+document.addEventListener("click", (e) => {
+  if (e.target.closest("button, a, input, textarea")) return;
+  const pin = e.target.closest("#flows .step")?.querySelector(":scope > .note-btn");
+  if (pin) openNote(pin);
+});
 function renderNoteList() {
   const list = notesOn(NOTE_AT.target, NOTE_AT.step, NOTE_AT.path), qs = questionsOn(NOTE_AT.target, NOTE_AT.step, NOTE_AT.path);
   $("noteList").innerHTML = qs.map((q) => `<div class="note-item ask"><div class="who">${beeIcon(q.category, true)}<b>${esc(bee(q.category)[0])}</b><span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Blocks the build" : "Good to know"}</span></div>
@@ -1586,7 +1609,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.view) { S.view = t.dataset.view; render(); return requestAnimationFrame(fitView); }
   if (t.dataset.step) {
     const k = t.dataset.step;
-    if (k === "idea") return toast(S.spec ? `Your idea: ${S.spec.slice(0, 300)}` : "Your idea");
+    if (k === "idea") return openFeature(true);
     if (k === "brief") return $("briefBtn").click();
     S.view = k; render(); return requestAnimationFrame(fitView);
   }
@@ -1641,7 +1664,7 @@ document.addEventListener("click", (e) => {
     return navigator.clipboard.writeText(boardLink()).then(() => toast("Link copied. Send it to your team: each person picks their role when they open it."), () => toast(boardLink()));
   }
   if (t.dataset.send) { const i = $("own"); return answer(t.dataset.send, i?.value || "").catch(fail); }
-  if (t.dataset.bee) { PM.bee = PM.bee === t.dataset.bee ? null : t.dataset.bee; dockMin(false); return render(); }
+  if (t.dataset.bee) { PM.bee = PM.bee === t.dataset.bee ? null : t.dataset.bee; PM.quiet = true; dockMin(false); return render(); }  // filter only; the board stays still
   if ("scout" in t.dataset) { convo(true); return requestAnimationFrame(() => { const d = $("thread").querySelector("details.read"); if (d) { d.open = true; d.scrollIntoView({ block: "center", behavior: "smooth" }); } }); }
   if (t.dataset.reopen) {
     PM.skipped.delete(t.dataset.reopen); PM.front = t.dataset.reopen; PM.bee = null;
@@ -1678,7 +1701,7 @@ function working(title) {
     const sec = Math.round((Date.now() - t0) / 1000);
     $("workingTitle").textContent = title;
     $("workingStep").textContent = STEPS[Math.min(STEPS.length - 1, Math.floor(sec / 6))] + "...";
-    $("workingTime").textContent = `${sec}s. This usually takes 10 to 40 seconds.`;
+    $("workingTime").textContent = sec < 45 ? `${sec}s. This usually takes 20 to 60 seconds.` : `${sec}s. Still working: a busy model hands over to the next one, which can take up to 2 minutes.`;
   };
   tick(); workTimer = setInterval(tick, 1000);
 }
@@ -1774,8 +1797,13 @@ $("flowEditSave").onclick = async () => {
   } catch (err) { toast(err.message); }
 };
 // Add a feature to the same board: new flows and questions join the board; nothing agreed is redrawn.
-function openFeature() { menu(false); $("featureAdd").hidden = false; $("featureText").focus(); }
-$("featureBtn").onclick = openFeature;
+function openFeature(showIdea = false) {
+  menu(false);
+  $("featureIdea").hidden = !showIdea || !S.spec;
+  $("featureIdea").innerHTML = `<b>Your idea</b><p>${esc(S.spec)}</p>`;
+  $("featureAdd").hidden = false; if (!showIdea) $("featureText").focus();
+}
+$("featureBtn").onclick = () => openFeature();
 $("noteClose").onclick = () => { $("noteAdd").hidden = true; };
 $("noteSave").onclick = async () => {
   const text = $("noteText").value.trim(); if (!text) return $("noteText").focus();
