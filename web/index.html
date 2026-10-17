@@ -287,6 +287,16 @@
   .note-btn.ask .bee { width: 18px; height: 18px; font-size: 10px; }
   .tray { position: fixed; right: 16px; top: 64px; z-index: 27; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 14px; font-size: 13px; max-width: calc(100vw - 32px); }
   .tray #trayText { display: grid; line-height: 1.3; }
+  .tray.busy { box-shadow: 0 0 0 2px var(--accent), var(--island-shadow); }
+  .spinner.sm { width: 14px; height: 14px; border-width: 2px; margin: 0; border-color: rgba(255, 255, 255, .3); border-top-color: #fff; }
+  .tray [data-update]:disabled { opacity: 1; background: var(--ink-hover); }
+  /* While the board updates, a soft amber band sweeps down the canvas, like a scanner reading it. */
+  #scan { position: fixed; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; }
+  #scan::before { content: ""; position: absolute; left: 0; right: 0; height: 28vh; top: -28vh;
+    background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent) 16%, transparent) 70%, color-mix(in srgb, var(--accent) 45%, transparent) 98%, transparent);
+    animation: scan 2.2s cubic-bezier(.45, 0, .55, 1) infinite; }
+  @keyframes scan { to { transform: translateY(128vh); } }
+  @media (prefers-reduced-motion: reduce) { #scan::before { animation: none; top: 0; height: 100%; background: color-mix(in srgb, var(--accent) 6%, transparent); } }
   .tray #trayText .muted { font-size: 12px; }
   @media (max-width: 640px) { .tray { top: auto; bottom: calc(40dvh + 20px); right: 8px; left: 8px; } }
   .dock.set { max-height: min(64vh, 620px); }
@@ -658,7 +668,8 @@
     </div>
   </div>
 </div>
-<div class="island tray" id="tray" hidden role="status"><span id="trayText"></span><button class="btn primary sm" data-update>Update the board<i class="ph ph-arrows-clockwise" aria-hidden="true"></i></button></div>
+<div id="scan" hidden aria-hidden="true"></div>
+<div class="island tray" id="tray" hidden role="status" aria-live="polite"><span id="trayText"></span><button class="btn primary sm" data-update>Update the board<i class="ph ph-arrows-clockwise" aria-hidden="true"></i></button></div>
 <div id="featureAdd" hidden role="dialog" aria-modal="true" aria-label="Add a feature to this board">
   <div class="brief-sheet">
     <div class="brief-bar"><b>Add a feature</b><button class="icon-btn" id="featureClose" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button></div>
@@ -1007,7 +1018,7 @@ function renderMap() {
   const sk = PM.reacting && PM.sketch;
   // An answer about a user or the whole idea (not one flow) can touch every flow, so all of them show it.
   const wide = sk && !rows.some((f) => f.id === sk.target);
-  const chip = sk ? `<div class="drawing-chip" role="status"><i class="ph ph-pencil-simple-line" aria-hidden="true"></i>${esc(PM.reacting)} is redrawing the board from your answer</div>` : "";
+  const chip = sk ? `<div class="drawing-chip" role="status"><i class="ph ph-pencil-simple-line" aria-hidden="true"></i>${PM.reacting === "The bees" ? "The bees are redrawing the board from everything you said" : `${esc(PM.reacting)} is redrawing the board from your answer`}</div>` : "";
   $("flows").innerHTML = chip + redraw + note + rows.map((f) => { const last = f === lastFlow && S.stage === "flows"; return `<div class="flow ${f.id && ((PM.focus === f.id && !focusStep) || S.selected === f.id) ? "focus" : ""} ${sk && ((sk.target === f.id && !sk.step) || wide) ? "sketching-lane" : ""}">
     <div class="flow-head"><h3>${f.id ? `<button data-id="${esc(f.id)}">${esc(f.title)}</button>` : esc(f.title)}</h3>${f.who ? `<span class="who">for ${esc(f.who)}</span>` : ""}${f.id ? `<button class="link" data-note="${esc(f.id)}" data-note-step="0" data-note-path="" data-note-label="${esc(f.title)}"><i class="ph ph-chat-circle-text" aria-hidden="true"></i> Comment</button>` : ""}${f.id && (!f.ids.length || S.view === "flows") ? `<button class="link" data-edit-flow="${esc(f.id)}"><i class="ph ph-pencil-simple" aria-hidden="true"></i> Edit steps</button>` : ""}</div>
     ${f.ids.length && (S.view !== "flows" || !f.id)
@@ -1439,21 +1450,27 @@ const waitingAnswers = () => byLayer("QUESTION").filter((q) => q.question_status
 const waitingNotes = () => (S.comments || []).filter((c) => c.status === "open");
 function renderTray() {
   const a = waitingAnswers().length, n = waitingNotes().length;
-  $("tray").hidden = !(a + n) || !!PM.reacting;
+  const busy = PM.reacting === "The bees";
+  $("tray").hidden = !(a + n) && !busy;
+  $("tray").classList.toggle("busy", busy);
+  $("scan").hidden = !busy;
   const parts = [a && `${a} answer${a > 1 ? "s" : ""}`, n && `${n} note${n > 1 ? "s" : ""}`].filter(Boolean).join(" and ");
-  $("trayText").innerHTML = `<b>${parts} waiting</b><span class="muted">The board changes only when you say so.</span>`;
+  $("trayText").innerHTML = busy ? `<b>Updating the board</b><span class="muted">The bees are applying ${parts || "your changes"}. About 15 to 30 seconds.</span>`
+    : `<b>${parts} waiting</b><span class="muted">The board changes only when you say so.</span>`;
+  const b = $("tray").querySelector("[data-update]"); b.disabled = busy;
+  b.innerHTML = busy ? '<span class="spinner sm" aria-hidden="true"></span>Updating' : 'Update the board<i class="ph ph-arrows-clockwise" aria-hidden="true"></i>';
 }
 async function updateBoard() {
   if (PM.reacting) return;
   if (!engineReady()) return toast("Connect an engine first.");
   PM.changed = new Set(); PM.front = null; PM.error = "";
-  PM.reacting = "The bees"; render();
+  PM.reacting = "The bees"; PM.sketch = { target: "*", step: 0 }; render();  // "*" matches no flow, so every flow shows the sketch
   try {
     const r = await api(`/api/questions/react-batch?${eq()}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
     PM.changed = new Set(r.changed);
     if (r.note) beeNote("PM", r.note);
   } catch (err) { PM.error = err.message; toast(err.message); }
-  PM.reacting = "";
+  PM.reacting = ""; PM.sketch = null;
   await load();
   reveal(document.querySelector("#flows .changed"));
 }
