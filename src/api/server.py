@@ -48,7 +48,7 @@ from src.adapters.nvidia_adapter import pdf_to_text
 from src.adapters.spec_prompts import AUDIENCE, BATCH_NOTE, REACT_PROMPT
 from src.api import feedback
 from src.adapters import tavily
-from src.core.brief import build_brief, decision_count
+from src.core.brief import short_ids, build_brief, decision_count
 from src.core.ingest import add_gap_questions, add_questions, apply_gap_default, strip_guesses, build_flows_graph, merge_feature, build_graph_from_extract, clean_branches, ask_open_branches, add_gap_defaults
 
 app = FastAPI(
@@ -78,6 +78,7 @@ MAX_BOARDS = 300
 boards: "OrderedDict[str, BuildingBeesEngine]" = OrderedDict()
 _board_id: ContextVar[str] = ContextVar("board_id", default="default")
 _auth: ContextVar[str] = ContextVar("auth", default="")  # this request's Authorization header, to record who made a board
+_role: ContextVar[str] = ContextVar("role", default="")  # the role a teammate picked on a team board (X-Role header)
 log = logging.getLogger("buildingbees")
 
 _store = None   # Firestore collection of boards
@@ -209,6 +210,7 @@ async def _select_board(request, call_next):
     bid = (request.headers.get("x-board") or request.query_params.get("board") or "default")[:64]
     _board_id.set(bid)
     _auth.set(request.headers.get("authorization", ""))
+    _role.set((request.headers.get("x-role") or "")[:20].upper())
     response = await call_next(request)
     if (request.method == "POST" and request.url.path.startswith("/api/") and response.status_code < 400
             and not request.url.path.startswith(("/api/feedback", "/api/me/boards/"))):  # not the open board's business
@@ -272,6 +274,11 @@ def _state(graph: BuildingBeesEngine) -> Dict[str, Any]:
         "sources": getattr(graph, "sources", []),
         "signoffs": getattr(graph, "signoffs", []),
         "comments": getattr(graph, "comments", []),
+        "features": getattr(graph, "features", []),
+        "round": getattr(graph, "round", 1),
+        "rounds": getattr(graph, "rounds", []),
+        "round_questions": getattr(graph, "round_questions", None) or (_start_round(graph) or graph.round_questions),  # boards from before 18 Oct get a budget on first load
+        "short_ids": short_ids(graph),
         "mode": getattr(graph, "mode", "solo"),
         "owner": getattr(graph, "owner", ""),
         "plan": getattr(graph, "plan", None),
@@ -450,6 +457,24 @@ def react_to_answer(question_id: str, engine: str) -> Dict[str, Any]:
             "follow_up": [a.id for a in added]}
 
 
+ROUND_BUDGET = 6  # solo: at most 6 questions per round, fixed when the round starts (Roger, 18 Oct 2026)
+def _start_round(g: BuildingBeesEngine) -> None:
+    """Freezes the questions for this round. Solo: the most important 6 still open (blocking first), so the
+    count never grows mid-round; anything the next update asks waits for the next round. Team: all of them."""
+    open_qs = sorted((n for n in g.nodes.values() if isinstance(n, QuestionNode) and n.question_status == QuestionStatus.OPEN),
+                     key=lambda q: (not q.is_blocking, q.created_at))
+    g.round_questions = [q.id for q in open_qs][:ROUND_BUDGET if getattr(g, "mode", "solo") != "team" else 50]
+
+
+def _may_process(g: BuildingBeesEngine) -> bool:
+    """Who may apply a round. Solo: the person. Team: the board's owner or the product manager, as in Roger's
+    ritual, where everyone adds input by day and one person processes all of it in the evening."""
+    if getattr(g, "mode", "solo") != "team":
+        return True
+    owner = getattr(g, "owner", "")
+    return _role.get() == "PM" or not owner or _uid(_auth.get()) == owner
+
+
 def _after_reaction(g: BuildingBeesEngine, stage: str, eng) -> None:
     """After answers change the board: fill standard defaults on screens, or ask about splits nobody settled."""
     if stage == "screens":
@@ -492,6 +517,8 @@ def react_to_answers(payload: BatchRequest, engine: str) -> Dict[str, Any]:
     The person decides when the board changes; it never moves under them after each answer."""
     eng = _engine(engine)
     g = _board()
+    if not _may_process(g):
+        raise HTTPException(status_code=403, detail="On a team board the owner or the product manager processes the round. Your input is saved for them.")
     ids = payload.question_ids or [n.id for n in g.nodes.values() if isinstance(n, QuestionNode) and n.metadata.get("pending")]
     qs = [g.get_node(i) for i in dict.fromkeys(ids)][:20]
     qs = [q for q in qs if isinstance(q, QuestionNode) and q.question_status == QuestionStatus.ANSWERED]
@@ -509,7 +536,8 @@ def react_to_answers(payload: BatchRequest, engine: str) -> Dict[str, Any]:
     if notes:
         answers += "\n\nNOTES THE FOUNDER LEFT ON PARTS OF THE BOARD (apply each one like an answer; a note can add, change or remove steps, branches or whole flows):\n" + \
             "\n".join(f"- {_where(g, c)}: {c['text']}" for c in notes)
-    prompt = audience(g) + "\n\n" + BATCH_NOTE + REACT_PROMPT.format(
+    asked = "\n".join(f"- {n.question_text}" for n in g.nodes.values() if isinstance(n, QuestionNode))[:5000]
+    prompt = audience(g) + "\n\n" + BATCH_NOTE + f"QUESTIONS ALREADY ON THE BOARD (never ask these again, in any words):\n{asked}\n\n" + REACT_PROMPT.format(
         stage=stage, board=json.dumps(board, default=str)[:14000], decisions=decisions[:4000],
         category="several", target="the set below", step="", question="(a set of questions, listed with their answers below)",
         answer=answers, changed_from="")
@@ -520,7 +548,7 @@ def react_to_answers(payload: BatchRequest, engine: str) -> Dict[str, Any]:
         raise HTTPException(status_code=502, detail=f"{eng.label} could not process the answers: {e}")
     _trace(g, eng, started)
     changed = [] if r.is_vague else _apply_reaction(g, r)
-    added = add_questions(g, r.follow_up[:len(qs)], eng.label, dedupe=False)
+    added = add_questions(g, r.follow_up[:3 if getattr(g, "mode", "solo") != "team" else len(qs)], eng.label)  # a solo round adds at most 3 more
     if r.is_vague and not added:  # nothing usable and no sharper question: ask the whole set again
         for q in qs:
             q.question_status, q.answer_text, q.answered_at = QuestionStatus.OPEN, None, None
@@ -536,6 +564,13 @@ def react_to_answers(payload: BatchRequest, engine: str) -> Dict[str, Any]:
             c["status"] = "applied"
         if notes and stage == "screens":
             g.needs_redraw = True  # a note can change structure that field edits cannot reach
+        # The round's changelog: what came in, what changed, what the bees said. Then the next round starts.
+        g.rounds = (getattr(g, "rounds", []) + [{
+            "n": getattr(g, "round", 1), "at": datetime.datetime.utcnow().isoformat(), "answers": len(qs), "notes": len(notes),
+            "changed": [getattr(g.nodes.get(i), "title", i) for i in changed][:20], "note": r.note[:300],
+            "asked": len(added), "by": "the product manager" if _role.get() == "PM" else ""}])[-50:]
+        g.round = getattr(g, "round", 1) + 1
+        _start_round(g)
     return {"is_vague": r.is_vague, "note": r.note[:300], "changed": changed, "follow_up": [a.id for a in added]}
 
 
@@ -617,6 +652,11 @@ class RestoreRequest(BaseModel):
     sources: List[Dict[str, str]] = []
     signoffs: List[Dict[str, Any]] = []
     comments: List[Dict[str, Any]] = []
+    features: List[Dict[str, Any]] = []
+    round: int = 1
+    rounds: List[Dict[str, Any]] = []
+    round_questions: List[str] = []
+    short_ids: Dict[str, str] = {}
     mode: str = "solo"
     owner: str = ""
     plan: Optional[Dict[str, Any]] = None
@@ -642,6 +682,10 @@ def _rebuild(d: Dict[str, Any]) -> BuildingBeesEngine:
     g.sources = d.get("sources", [])[:tavily.MAX_SOURCES]
     g.signoffs = d.get("signoffs", [])[:20]
     g.comments = d.get("comments", [])[:200]
+    g.features = d.get("features", [])[:40]
+    g.round, g.rounds = int(d.get("round") or 1), d.get("rounds", [])[-50:]
+    g.round_questions = d.get("round_questions", [])[:50]
+    g.short_ids = dict(d.get("short_ids") or {})
     g.mode = d.get("mode") if d.get("mode") in AUDIENCE else "solo"
     g.owner = d.get("owner", "")
     g.plan, g.plan_decisions = d.get("plan"), int(d.get("plan_decisions") or 0)
@@ -723,6 +767,8 @@ def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None, mode: s
             n = q.metadata.pop("cite", 0)
             if isinstance(n, int) and 0 < n <= len(g.sources):
                 q.metadata["cite"] = g.sources[n - 1]
+    g.round, g.rounds = 1, []
+    _start_round(g)
     _set_graph(g)
     return get_graph_state()
 
@@ -787,6 +833,9 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     g.sources = getattr(old, "sources", [])
     g.signoffs = getattr(old, "signoffs", [])
     g.comments = getattr(old, "comments", [])
+    g.features = getattr(old, "features", [])
+    g.round, g.rounds = getattr(old, "round", 1), getattr(old, "rounds", [])
+    g.short_ids = dict(getattr(old, "short_ids", {}))  # S1 stays S1 when the screens are redrawn
     g.mode = getattr(old, "mode", "solo")
     g.owner = getattr(old, "owner", "")
     g.plan, g.plan_decisions = getattr(old, "plan", None), getattr(old, "plan_decisions", 0)
@@ -795,6 +844,14 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
         if f.id in g.nodes:
             g.nodes[f.id].metadata["steps"] = f.metadata.get("steps", [])
             g.nodes[f.id].metadata["branches"] = f.metadata.get("branches", [])
+        else:  # the model left an agreed flow out: it stays on the board (and in the Brief), without screens yet
+            g.add_node(f)
+            for u in old.reverse_edges.get(f.id, set()):
+                if u in g.nodes:
+                    g.add_edge(u, f.id)
+    for c in [n for n in g.nodes.values() if n.layer.value == "CTA"]:
+        if c.target_screen_on_failure and c.target_screen_on_failure == c.target_screen_on_success:
+            c.target_screen_on_failure = ""  # "on failure, go where success goes" is no answer: it becomes a question
     for c in g.comments:  # drawing the screens used every note, so nothing is left waiting
         c["status"] = "applied"
     for q in asked:  # every earlier question and its answer travels with the board
@@ -803,6 +860,10 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
             g.add_node(q)
             g.add_edge(q.target_node_id, q.id)
     add_gap_defaults(g)
+    g.rounds = g.rounds + [{"n": g.round, "at": datetime.datetime.utcnow().isoformat(), "answers": len(decisions), "notes": len(g.comments),
+                            "changed": ["Screens drawn"], "note": "I drew the screens from the agreed flows and your decisions.", "asked": 0, "by": ""}]
+    g.round += 1
+    _start_round(g)
     _set_graph(g)
     return get_graph_state()
 
@@ -857,6 +918,8 @@ class StepsRequest(BaseModel):
 def edit_flow_steps(flow_id: str, payload: StepsRequest) -> Dict[str, Any]:
     """The team edits a flow's steps by hand, even after screens are drawn; drawn screens are then flagged for a redraw."""
     g = _board()
+    if not _may_process(g):
+        raise HTTPException(status_code=403, detail="On a team board only the owner or the product manager edits steps. Leave a comment on the card instead.")
     f = g.nodes.get(flow_id)
     if not f or f.layer.value != "FLOW":
         raise HTTPException(status_code=404, detail="No such flow")
@@ -936,9 +999,12 @@ def add_feature(payload: FeatureRequest, engine: str) -> Dict[str, Any]:
         "flows": [{"id": n.id, "title": n.title, "steps": n.metadata.get("steps", [])}
                   for n in g.nodes.values() if n.layer.value == "FLOW"],
     }
+    asked = [n.question_text for n in g.nodes.values() if isinstance(n, QuestionNode)]
     lead = (audience(g) + "\n\nTHE PRODUCT SO FAR (already agreed, do not return these flows again; reuse a user's id "
             "when the same person does the new feature, and give every new flow and user a new id):\n"
-            + json.dumps(board)[:12000] + "\n\nTHE NEW FEATURE TO ADD TO THIS PRODUCT:\n")
+            + json.dumps({**board, "features": [f["name"] for f in getattr(g, "features", [])]})[:12000]
+            + "\n\nQUESTIONS ALREADY ASKED (never ask these again, in any words):\n" + "\n".join(f"- {t}" for t in asked)[:5000]
+            + "\n\nTHE NEW FEATURE TO ADD TO THIS PRODUCT:\n")
     started = time.time()
     try:
         new = build_flows_graph(eng.extract_flows(text=lead + text), eng.label)
@@ -951,6 +1017,8 @@ def add_feature(payload: FeatureRequest, engine: str) -> Dict[str, Any]:
     g.spec_text = (getattr(g, "spec_text", "") + "\n\nAdded feature: " + text)[:SPEC_LIMIT]  # the founder said it, so it counts
     if any(n.layer.value == "SCREEN" for n in g.nodes.values()):
         g.needs_redraw = True  # the new flows have no screens yet
+    if not any(g.nodes.get(i) is not None and g.nodes[i].question_status == QuestionStatus.OPEN for i in getattr(g, "round_questions", [])):
+        _start_round(g)  # nothing left in this round: the feature's questions start the next one
     return {**get_graph_state(), "added": added}
 
 

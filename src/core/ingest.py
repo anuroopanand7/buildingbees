@@ -171,7 +171,7 @@ def ask_open_branches(g: BuildingBeesEngine, source: str = "ai") -> list:
             if b["steps"] or key in asked:
                 continue
             q = XQuestion(target_id=f.id, category="TESTER", is_blocking=True, step=b["at_step"],
-                          question=f'What happens on the "{b["label"]}" path after "{b["decision"]}"?',
+                          question=f'What happens on the "{b["label"]}" path after "{b["decision"].rstrip("?")}"?',  # a "?" inside quotes cut the question short
                           suggested_options=["Let them try again", "Show a message and stop", "Someone follows up"])
             for node in add_questions(g, [q], source, dedupe=False):
                 node.metadata["branch"] = key
@@ -191,9 +191,30 @@ def build_flows_graph(x: FlowsExtract, source: str = "ai") -> BuildingBeesEngine
                             metadata={"steps": f.steps, "branches": clean_branches(f.branches, len(f.steps))}))
         if f.user_id in g.nodes:
             g.add_edge(f.user_id, f.id)
+    g.features = []
+    add_features(g, x.features)
     add_questions(g, x.questions, source)
     ask_open_branches(g, source)
     return g
+
+
+def add_features(g: BuildingBeesEngine, features) -> list:
+    """Adds features to the board's feature list as F1, F2...; a name already listed is skipped and flow ids
+    that are not on the board are dropped, never guessed. Returns the features added."""
+    have = {f["name"].strip().lower() for f in getattr(g, "features", [])}
+    flows = {n.id for n in g.nodes.values() if n.layer.value == "FLOW"}
+    added = []
+    for x in features:
+        name = (x.name or "").strip()[:80]
+        if not name or name.lower() in have:
+            continue
+        n = len(getattr(g, "features", [])) + 1
+        item = {"id": f"F{n}", "name": name, "priority": x.priority if x.priority in ("must", "should", "later") else "should",
+                "flow_ids": [i for i in x.flow_ids if i in flows], "why": (x.why or "")[:200]}
+        g.features = getattr(g, "features", []) + [item]
+        have.add(name.lower())
+        added.append(item)
+    return added
 
 
 def merge_feature(g: BuildingBeesEngine, new: BuildingBeesEngine) -> list:
@@ -209,6 +230,8 @@ def merge_feature(g: BuildingBeesEngine, new: BuildingBeesEngine) -> list:
         if owner in g.nodes and g.nodes[owner].layer.value == "USER":
             g.add_edge(owner, fid)
             g.nodes[owner].flow_ids.append(fid)
+    from src.adapters.spec_prompts import XProductFeature  # the new board holds plain dicts; re-check them here
+    add_features(g, [XProductFeature(**{k: v for k, v in f.items() if k != "id"}) for f in getattr(new, "features", [])])
     for q in new.nodes.values():  # the bees' questions about the feature, minus ones already asked
         if isinstance(q, QuestionNode) and q.target_node_id in g.nodes and not _already_asked(g, q.question_text):
             g.add_node(q)
@@ -222,7 +245,9 @@ def add_gap_questions(g: BuildingBeesEngine) -> list:
     asks = []
     for n in list(g.nodes.values()):
         if n.layer.value == "SCREEN":
-            missing = [name for name, v in (("loading", n.states.loading), ("error", n.states.error)) if not v]
+            need_loading, need_error = g.screen_needs_states(n.id)  # a static screen has no loading or error to settle
+            missing = [name for name, v, need in (("loading", n.states.loading, need_loading), ("error", n.states.error, need_error))
+                       if need and not v]
             if missing:
                 asks.append(XQuestion(
                     target_id=n.id, category="FRONTEND", is_blocking=False,

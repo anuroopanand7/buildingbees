@@ -2,7 +2,7 @@
 Built straight from the graph, with no model call, so it is instant, free and says only what was decided."""
 
 import re
-from typing import List
+from typing import Dict, List
 
 from src.core.graph import BuildingBeesEngine
 from src.core.schema import QuestionNode, QuestionStatus
@@ -31,6 +31,28 @@ def _deferred(question: str, answer: str) -> bool:
     return bool(_LATER.search(answer)) or (bool(_YES_NO.match(question.strip())) and answer.strip().lower().startswith("no"))
 
 
+_PREFIX = {"USER": "U", "FLOW": "FL", "SCREEN": "S", "CTA": "B", "API": "A"}
+
+
+def short_ids(g: BuildingBeesEngine) -> Dict[str, str]:
+    """Short ids the board, the Brief and the export share (FL1 a flow, S2 a screen, B3 a button, A1 an API;
+    features are F1, F2 on their own list). Given once and kept, so S2 stays S2 through every round and redraw:
+    in Roger's ritual "F1" on a screen linked to feature 1, and the agent read the same ids."""
+    ids = getattr(g, "short_ids", None)
+    if ids is None:
+        ids = g.short_ids = {}
+    used = {}
+    for code in ids.values():
+        p = code.rstrip("0123456789")
+        used[p] = max(used.get(p, 0), int(code[len(p):] or 0))
+    for n in g.nodes.values():
+        p = _PREFIX.get(n.layer.value)
+        if p and n.id not in ids:
+            used[p] = used.get(p, 0) + 1
+            ids[n.id] = f"{p}{used[p]}"
+    return {k: v for k, v in ids.items() if k in g.nodes}
+
+
 def decision_count(g: BuildingBeesEngine) -> int:
     """Decisions people made (not vague answers, not standard defaults): what a sign-off approves."""
     return sum(1 for n in g.nodes.values() if isinstance(n, QuestionNode) and n.question_status == QuestionStatus.ANSWERED
@@ -55,13 +77,15 @@ def build_brief(g: BuildingBeesEngine, with_plan: bool = True) -> str:
 
     add(f"# {getattr(g, 'product_name', '') or 'Product'}: product brief")
     add("")
+    # The same count the board's header shows ("11 of 13 answered"), then how it splits, so the two never disagree.
+    answered = len(questions) - len(still_open)
+    split = f"{answered} of {count(len(questions), 'question')} answered: {count(len(decided), 'decision')} by people, {len(defaults)} standard or recommended"
     if screens:
         ready = [s for s in screens if g.evaluate_branch_readiness(s.id).is_build_ready]
-        add(f"**Status:** {len(ready)} of {len(screens)} screens are ready to build. "
-            f"{count(len(decided), 'decision')} made, {count(len([q for q in still_open if q.is_blocking]), 'blocking question')} open.")
+        add(f"**Status:** {len(ready)} of {len(screens)} screens are ready to build. {split}; "
+            f"{count(len([q for q in still_open if q.is_blocking]), 'blocking question')} open.")
     else:
-        add(f"**Status:** flows are being agreed, no screens drawn yet. {count(len(decided), 'decision')} made, "
-            f"{count(len(still_open), 'question')} open.")
+        add(f"**Status:** flows are being agreed, no screens drawn yet. {split}.")
     add("")
 
     add("## Sign-off")
@@ -83,9 +107,14 @@ def build_brief(g: BuildingBeesEngine, with_plan: bool = True) -> str:
         add(f"- **{u.title}**: {u.description}".rstrip(": "))
     add("")
 
+    sid = short_ids(g)  # FL1, S2, B3, A1: the same ids the board shows
+    tag = lambda node_id: f"{sid[node_id]} " if node_id in sid else ""  # noqa: E731
+    features = getattr(g, "features", [])
+    feats_of = lambda flow_id: [f["id"] for f in features if flow_id in f.get("flow_ids", [])]  # noqa: E731
+
     add("## Flows")
     for f in _layer(g, "FLOW"):
-        add(f"### {f.title}")
+        add(f"### {tag(f.id)}{f.title}" + (f" (features {', '.join(feats_of(f.id))})" if feats_of(f.id) else ""))
         if f.goal:
             add(f"Goal: {f.goal}")
         for i, step in enumerate(f.metadata.get("steps", []), 1):
@@ -96,27 +125,41 @@ def build_brief(g: BuildingBeesEngine, with_plan: bool = True) -> str:
                 f"{b['label']}: " + ("; ".join(b["steps"]) + f" ({end})" if b["steps"] else "**not decided yet**"))
         add("")
 
+    if features:
+        add("## Features")
+        for f in features:
+            flows = ", ".join(tag(i).strip() or title(i) for i in f.get("flow_ids", []))
+            add(f"- **{f['id']} {f['name']}** ({f['priority']}){': ' + f['why'] if f.get('why') else ''}{f' Flows: {flows}.' if flows else ''}")
+        add("")
+
     if screens:
         add("## Screens")
         for s in screens:
             r = g.evaluate_branch_readiness(s.id)
-            add(f"### {s.title} ({'ready to build' if r.is_build_ready else 'not ready'})")
+            flow = getattr(s, "flow_id", "")
+            add(f"### {tag(s.id)}{s.title} ({'ready to build' if r.is_build_ready else 'not ready'})"
+                + (f", in {tag(flow).strip() or title(flow)}" if flow else "") + (f", features {', '.join(feats_of(flow))}" if feats_of(flow) else ""))
             if s.description:
                 add(s.description)
             elements = s.metadata.get("elements", [])
             if elements:
-                add("- On screen, top to bottom: " + "; ".join(f"{e['kind']} \"{e['label']}\"" for e in elements))
-            add(f"- Loading: {_or_open(s.states.loading)}")
+                add("- On screen, top to bottom:")
+                for e in elements:  # each element with what it shows: a list's card fields, a choice's options
+                    add(f"  - {e['kind']} \"{e['label']}\"" + (f": {e['detail']}" if e.get("detail") else ""))
+            need_loading, need_error = g.screen_needs_states(s.id)  # states only where they are real
+            if need_loading or s.states.loading:
+                add(f"- Loading: {_or_open(s.states.loading)}")
             if s.states.empty:
                 add(f"- Empty: {s.states.empty}")
-            add(f"- Error: {_or_open(s.states.error)}")
+            if need_error or s.states.error:
+                add(f"- Error: {_or_open(s.states.error)}")
             for cta_id in sorted(g.forward_edges.get(s.id, [])):
                 c = g.nodes.get(cta_id)
                 if not c or c.layer.value != "CTA":
                     continue
                 calls_api = any(getattr(g.nodes.get(i), "layer", None) and g.nodes[i].layer.value == "API"
                                 for i in g.forward_edges.get(c.id, []))
-                line = f"- Button **{c.label}**"
+                line = f"- Button {tag(c.id)}**{c.label}**"
                 if c.target_screen_on_success:
                     line += f": goes to {title(c.target_screen_on_success)}"
                 if calls_api:  # only a button that calls something can fail
@@ -125,7 +168,7 @@ def build_brief(g: BuildingBeesEngine, with_plan: bool = True) -> str:
                 for api_id in sorted(g.forward_edges.get(c.id, [])):
                     a = g.nodes.get(api_id)
                     if a and a.layer.value == "API":
-                        add(f"  - calls `{a.method} {a.path}` (service: {a.service or 'not named'}, "
+                        add(f"  - calls {tag(a.id)}`{a.method} {a.path}` (service: {a.service or 'not named'}, "
                             f"vendor: {a.vendor or 'none chosen'}, timeout: {_or_open(a.timeout_ms)} ms)")
                         sends, returns = a.inputs_schema.get("fields"), a.outputs_schema.get("fields")
                         if sends or returns:
@@ -214,6 +257,15 @@ def build_brief(g: BuildingBeesEngine, with_plan: bool = True) -> str:
     elif with_plan:
         add("## User stories, features and build order")
         add("Not written yet. Press \"Write the full plan\" in the Brief to add user stories with acceptance criteria, a feature list and a build order.")
+        add("")
+
+    rounds = getattr(g, "rounds", [])
+    if rounds:  # the review rounds, like the daily rounds of Roger's Figma ritual
+        add("## Rounds")
+        for r in rounds:
+            what = ", ".join(r.get("changed", [])) or "nothing on the board"
+            add(f"- **Round {r['n']}** ({r['at'][:10]}): {r.get('answers', 0)} answers and {r.get('notes', 0)} notes in; changed {what}."
+                + (f" {r['note']}" if r.get("note") else ""))
         add("")
 
     add("## Still open")

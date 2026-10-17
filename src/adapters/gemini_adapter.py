@@ -20,6 +20,9 @@ DEFAULT_MODEL = "gemini-3.7-flash"  # strong and steady: 24 s on a full flow pla
 # 17 Oct measurements: 3.7-flash 24 s, flash-latest 23 s, 3.8-flash overloaded at the time. 18 Oct: 3-flash-preview
 # timed out after 82 s on a full flow plan, so it is out.
 FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-flash-latest"]
+# Emergency only (Roger, 18 Oct 2026): when every strong model is busy or out of its daily quota, Flash-Lite
+# answers so a tester or judge never sees an error. The engine pill shows the model, so it is never hidden.
+EMERGENCY_MODEL = "gemini-3.1-flash-lite"
 
 
 class EngineNotConfigured(RuntimeError):
@@ -55,10 +58,13 @@ class GoogleGeminiAdapter:
             response_mime_type="application/json", response_schema=schema, temperature=0.2,
         )
         resp, last_error = None, None
-        for attempt in range(2):  # a busy spell often passes in seconds: one more round after a short pause
-            if attempt:
+        for attempt in range(3):  # strong chain, the strong chain again after a pause, then the emergency model
+            if attempt == 1:
+                if "PerDay" in str(last_error):  # the day's quota is spent: waiting 4 s will not bring it back
+                    continue
                 time.sleep(4)
-            for model in dict.fromkeys([self.model, *FALLBACK_MODELS]):
+            chain = [EMERGENCY_MODEL] if attempt == 2 else list(dict.fromkeys([self.model, *FALLBACK_MODELS]))
+            for model in chain:
                 try:
                     resp = self._client.models.generate_content(model=model, contents=contents, config=config)
                     self.last_model = model

@@ -95,6 +95,16 @@ class BuildingBeesEngine:
             "all_impacted_node_details": [n.dict() for n in impacted_nodes]
         }
 
+    def screen_needs_states(self, screen_id: str):
+        """(needs a loading state, needs an error state) for one screen. States only where they are real
+        (Roger, 18 Oct 2026): loading when the screen shows data it fetches (a list or an image), error when
+        one of its buttons calls an API, since only a call can fail."""
+        screen = self.nodes.get(screen_id)
+        kinds = {e.get("kind") for e in (screen.metadata.get("elements", []) if screen else [])}
+        ctas = [self.nodes[c] for c in self.forward_edges.get(screen_id, set()) if c in self.nodes and isinstance(self.nodes[c], CTANode)]
+        calls = any(c.apis_called or any(isinstance(self.nodes.get(a), APINode) for a in self.forward_edges.get(c.id, set())) for c in ctas)
+        return bool(kinds & {"list", "image"}), calls
+
     def evaluate_branch_readiness(self, screen_id: str) -> BranchReadiness:
         """
         Calculates whether a screen branch (Screen -> CTAs -> APIs -> Logic) is ready to build.
@@ -121,6 +131,14 @@ class BuildingBeesEngine:
                         branch_nodes.append(downstream_node)
                         queue.append(downstream_id)
 
+        # The flow a screen belongs to: a blocking question about the flow (a policy, a split nobody settled)
+        # blocks its screens too (18 Oct 2026: a layman saw "3 of 3 ready" next to "Blocks the build").
+        for up in self.reverse_edges.get(screen_id, set()):
+            parent = self.nodes.get(up)
+            if parent is not None and parent.layer == NodeLayer.FLOW and up not in visited_ids:
+                visited_ids.add(up)
+                branch_nodes.append(parent)
+
         # Collect questions attached to any node in this branch
         open_blocking_q: List[QuestionNode] = []
         non_blocking_q: List[QuestionNode] = []
@@ -137,7 +155,8 @@ class BuildingBeesEngine:
 
             # Node completeness checks
             if isinstance(b_node, ScreenNode):
-                if not b_node.states.loading or not b_node.states.error:
+                needs_loading, needs_error = self.screen_needs_states(b_node.id)
+                if (needs_loading and not b_node.states.loading) or (needs_error and not b_node.states.error):
                     completeness_reasons.append(f"Screen {b_node.id} missing explicit loading/error states")
             elif isinstance(b_node, CTANode):
                 # A button that only moves between screens cannot fail; one that calls an API can.

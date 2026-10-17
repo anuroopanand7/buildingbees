@@ -2,7 +2,7 @@
 
 **Other tools guess. BuildingBees asks.**
 
-Tools that turn one prompt into screens or diagrams have to guess everything the prompt leaves out. BuildingBees works the way a product team does: it maps the user flows first, then six bees ask what the idea leaves out (a solo founder answers a set of 3 to 7 at a time; a team answers one at a time, each person for their own role). Anyone can comment on any card, and the board changes only when you press Update the board. New features can be added to the same board later. Screens are drawn only after the flows are agreed.
+Tools that turn one prompt into screens or diagrams have to guess everything the prompt leaves out. BuildingBees works the way a product team does: it maps the user flows first, then six bees ask what the idea leaves out (a solo founder answers a set of 3 to 7 at a time; a team answers one at a time, each person for their own role). Anyone can comment on any card, and the board changes only when you press Update the board: work moves in review rounds (on a team board, the owner processes each round). Every flow, screen, button, API and feature has a short id (FL1, S2, B3, A1, F1) shared by the board, the Brief and the export. New features can be added to the same board later. Screens are drawn only after the flows are agreed.
 
 Live demo: https://buildingbees-853213660594.asia-south1.run.app
 

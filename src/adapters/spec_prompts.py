@@ -23,6 +23,9 @@ class XFlow(BaseModel):
 class XElement(BaseModel):
     kind: str  # heading | text | input | button | list | image | choice | note
     label: str
+    # What it shows, for the people who build it: for a list, the fields every card holds ("photo, cake name,
+    # price, pickup date"); for a choice, the options; for text, what it says. Empty when the label says it all.
+    detail: str = ""
 
 
 class XScreen(BaseModel):
@@ -118,11 +121,20 @@ class XFlowPlan(BaseModel):
     branches: List[XBranch] = []
 
 
+class XProductFeature(BaseModel):
+    """One feature of the product (F1, F2 on the board), written with the flows so screens can point at it."""
+    name: str
+    priority: str         # must | should | later
+    flow_ids: List[str] = []
+    why: str = ""
+
+
 class FlowsExtract(BaseModel):
     product_name: str
     users: List[XUser]
     flows: List[XFlowPlan]
     questions: List[XQuestion]
+    features: List[XProductFeature] = []  # the feature list a PRD starts with (Roger's ritual: F1, F2, F3)
 
 
 class XFlowUpdate(BaseModel):
@@ -209,6 +221,7 @@ Rules:
   question is not "later": leave it out of the features, or, if a feature depends on it, keep the feature's
   priority and end its "why" with "(depends on an open question)". flow_ids lists the flows it serves.
   "why" is one short sentence.
+- Words: follow the AUDIENCE. For one founder write plain words with no jargon (say "the first version that works end to end", never "walking skeleton"; "saves the order", never "POST /orders"). Use the board's ids (F1, FL1, S2, A1) wherever you name a feature, flow, screen or API, so people and agents can find them.
 - build_order: 3 to 6 thin vertical slices in order. The first is a walking skeleton: one flow working end to end
   in the simplest way. Each slice says what it builds and "done_when": a check a person or a test can run.
 - glossary: 3 to 10 of the product's own words, each with a one-line meaning.
@@ -224,11 +237,16 @@ typed dependency graph: User -> Flow -> Screen -> CTA -> API.
 
 Rules:
 - Use short UPPER_SNAKE ids (e.g. W01_LOGIN, CTA_W01_SUBMIT, API_AUTH_LOGIN). Every reference must point to an id you defined.
-- Every screen needs loading, empty and error states. If the spec does not say, write "UNSPECIFIED".
 - Every screen lists its "elements" top to bottom, 4 to 8 of them, so it can be sketched as a wireframe.
   kind is one of: heading, text, input, choice (a set of options to pick from), list, image, button, note.
   label is the real wording the person would see ("Pick a time", "Your mobile number", "Confirm booking").
   Every button on the screen appears as a button element with the same label as its CTA.
+  detail says what the element shows, for the people who build it: for a list, the fields each card holds
+  ("cake photo, name, price, pickup date"); for a choice, its options; for text, what it says. Leave it empty
+  when the label already says it all.
+- States only where they are real: a loading state when the screen fetches data it shows (a list, an image,
+  details from the server), an error state when a button on it calls an API. A static screen (a welcome,
+  a confirmation built from what the person just entered) leaves loading and error empty.
 - Every CTA lists the APIs it calls and where it goes on success and on failure (a screen id, or "" if unknown).
 - For every API list request_fields (what the app sends) and response_fields (what comes back), as plain
   field names. List "entities": the things the product has to store (Booking, Customer), each with its
@@ -304,6 +322,11 @@ Do NOT design screens, buttons or APIs yet. First agree the user flows.
    at_step, only when the other path is a real product choice (the slot was taken: offer the next one, or
    a waiting list?). An empty branch is how the team sees what the spec forgot: never fill it with a guess. At most 3 branches per flow;
    leave branches empty when the flow has no real split.
+FEATURES. List the product's features (3 to 10), the way a PRD's feature list starts: a short name
+   ("Custom cake order", "Advance payment", "Weekly order view"), the flow ids it lives in, why it matters in
+   one short sentence, and priority: "must" for what the input asks for, "should" for what the flows need
+   to work well, "later" only when the input says later. Only features the input asks for; a feature you
+   think is missing is a question, not a feature.
 3. Then ask what a senior PM would need answered before anyone draws a screen: exactly who the user is,
    what they bring in, what they get out, what is in and out of scope, what happens when it goes wrong,
    how we know it worked. Ask as many questions as the AUDIENCE allows, most important first. Target each at the flow id or user id

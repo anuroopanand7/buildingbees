@@ -266,6 +266,16 @@
   .note-btn { position: absolute; top: -11px; right: -9px; z-index: 3; box-shadow: 0 1px 3px rgba(17, 17, 16, .12); display: inline-flex; align-items: center; gap: 3px; height: 24px; min-width: 24px; padding: 0 5px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--panel); color: var(--muted); font-size: 13px; opacity: 0; transition: opacity var(--t-state, .15s), background .15s, color .15s; }
   .step .note-btn[data-tip], .scr .note-btn[data-tip] { position: absolute; }  /* beats [data-tip]'s position: relative */
   #flows .step:not(.next):not(.decision) { cursor: pointer; }
+  .features { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 22px; max-width: 1100px; font-size: 12.5px; }
+  .features > b { font-size: 13px; margin-right: 4px; }
+  .feature { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line-strong); background: var(--panel); border-radius: 999px; padding: 3px 9px 3px 4px; font: inherit; font-size: 12.5px; cursor: pointer; box-shadow: var(--lift); }
+  .feature:hover { border-color: var(--edge-hover); }
+  .feature .pri { margin-left: 6px; font-size: 10.5px; color: var(--muted); }
+  .feature.must .pri { color: var(--text); font-weight: 600; }
+  .id-chip { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; margin-right: 6px; border-radius: 5px; border: 1px solid var(--line-strong); background: var(--panel); color: var(--muted); font: 600 10.5px/1 "Geist Mono", ui-monospace, monospace; vertical-align: 2px; letter-spacing: .02em; }
+  button.id-chip.feat { cursor: pointer; border-color: var(--accent); background: var(--focus); color: var(--text); box-shadow: none; }
+  button.id-chip.feat:hover { background: var(--accent); }
+  .wf-detail { display: block; font-size: 10.5px; color: var(--muted); font-weight: 400; margin-top: 2px; line-height: 1.3; }
   .note-btn span { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .step:hover .note-btn, .step:focus-within .note-btn, .scr:hover .note-btn, .scr:focus-within .note-btn, .note-btn.has { opacity: 1; }
   .note-btn:hover { color: var(--text); background: var(--fill); }
@@ -315,8 +325,11 @@
   .set-q .send-row { align-items: center; gap: 10px; }
   .set-q .send-row input { font-size: 13px; padding: 7px 11px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--panel); color: var(--text); font: inherit; }
   .set-q .send-row .link { white-space: nowrap; font-size: 12.5px; }
+  .set-q .send-row input { flex: 1 1 0; width: auto; min-width: 0; }  /* the row fits the panel at 1024 px (Meena's test: 672 px in 583) */
+  .set-q .send-row .link { flex: none; }
+  .set-q, .set-q .options { min-width: 0; max-width: 100%; }
   .set-foot { position: sticky; bottom: -12px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 0 12px; background: var(--island); border-top: 1px solid var(--line); font-size: 12.5px; }
-  .dock .dock-min { width: auto; padding: 0 8px 0 6px; gap: 3px; font-size: 12px; font-weight: 500; }
+  .dock .dock-min { display: inline-flex; align-items: center; width: auto; padding: 0 8px 0 6px; gap: 3px; font-size: 12px; font-weight: 500; white-space: nowrap; }
   .dock .dock-min .ph { font-size: 14px; }
   .idea-text { background: var(--fill); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; font-size: 13.5px; }
   .idea-text p { margin: 4px 0 0; white-space: pre-wrap; max-height: 30vh; overflow: auto; }
@@ -710,7 +723,7 @@
     </div>
     <div class="composer" id="composer" hidden>
       <label class="cap" for="prd">What are we building?</label>
-      <textarea id="prd" placeholder="Paste a PRD, a feature brief, or two lines about what you want to build."></textarea>
+      <textarea id="prd" placeholder="Describe what you want to build in a few lines, or paste a product document you already have."></textarea>
       <div class="composer-foot">
         <div class="seg" id="engineSeg" role="group" aria-label="AI engine (required)"></div>
         <label class="btn ghost file-btn" data-tip="A PDF, notes, or a photo of your whiteboard or napkin sketch" data-tip-pos="top"><i class="ph ph-paperclip" aria-hidden="true"></i>Upload a PDF or a sketch photo<input type="file" id="file" accept=".pdf,.md,.txt,image/*"></label>
@@ -754,7 +767,7 @@
   </aside>
   <section class="island dock" id="dock" aria-label="Question from the bees">
     <div id="beeNote" hidden role="status"></div>
-    <div id="coach" hidden><i class="ph ph-hand-pointing" aria-hidden="true"></i>Answer here, and watch the board redraw as we talk.</div>
+    <div id="coach" hidden><i class="ph ph-hand-pointing" aria-hidden="true"></i>Answer here, or comment on any card. The board changes when you press Update the board.</div>
     <button class="tool sm dock-min" id="dockMin" aria-expanded="true" aria-label="Hide the questions" data-tip="Hide the questions; the bar at the bottom brings them back" data-tip-pos="top"><i class="ph ph-caret-down" aria-hidden="true"></i><span class="dock-min-label">Hide</span></button>
     <button class="dock-pill" id="dockPill" hidden></button>
     <div id="ask" aria-live="polite"></div>
@@ -799,8 +812,8 @@
       <button class="btn" id="briefPlan" title="User stories with acceptance criteria, a feature list and a build order, written from the board"><i class="ph ph-list-checks" aria-hidden="true"></i>Write the full plan</button>
       <button class="btn primary" id="briefSign" title="Approve this scope as it stands"><i class="ph ph-seal-check" aria-hidden="true"></i>Sign off</button>
       <button class="btn" id="briefCopy"><i class="ph ph-copy" aria-hidden="true"></i>Copy</button>
-      <button class="btn" id="briefAgent" title="A link your coding agent can read"><i class="ph ph-robot" aria-hidden="true"></i>Copy agent link</button>
-      <button class="btn" id="briefDownload"><i class="ph ph-download-simple" aria-hidden="true"></i>Download .md</button>
+      <button class="btn" id="briefAgent" title="A link an AI coding agent (Claude Code, Cursor, Jules) can read to build from this plan"><i class="ph ph-robot" aria-hidden="true"></i>Copy link for an AI builder</button>
+      <button class="btn" id="briefDownload"><i class="ph ph-download-simple" aria-hidden="true"></i>Download</button>
       <button class="btn" id="briefPrint"><i class="ph ph-printer" aria-hidden="true"></i>Print or save as PDF</button>
       <button class="icon-btn" id="briefClose" aria-label="Close brief"><i class="ph ph-x" aria-hidden="true"></i></button>
     </div>
@@ -858,7 +871,7 @@ const engineReady = () => !!(S.engine && S.engines[S.engine] && S.engines[S.engi
 // Sign-in is optional (Firebase Authentication). Signed in, every board you work on is kept under your account.
 const AUTH = { user: null, sdk: null, fb: null };
 async function api(path, opts = {}) {
-  const headers = { ...(opts.headers || {}), "X-Board": BOARD };
+  const headers = { ...(opts.headers || {}), "X-Board": BOARD, "X-Role": ROLE || "" };
   if (AUTH.user) { try { headers.Authorization = "Bearer " + await AUTH.user.getIdToken(); } catch (e) {} }
   const res = await fetch(path, { ...opts, headers });
   const body = await res.json().catch(() => ({}));
@@ -879,7 +892,8 @@ async function load() {
     finally { restoring = false; }
   }
   if (!LINKED) store.set("bb_graph", g.total_nodes ? JSON.stringify({ product_name: g.product_name, spec_text: g.spec_text, entities: g.entities, sources: g.sources, needs_redraw: g.needs_redraw, comments: g.comments, signoffs: g.signoffs, nodes: g.nodes, edges: g.edges }) : "");
-  S.stage = g.stage; S.needsRedraw = g.needs_redraw; S.comments = g.comments || []; S.sources = g.sources || []; S.mode = g.mode || "solo"; S.spec = g.spec_text || ""; S.lastCall = g.last_call;
+  S.stage = g.stage; S.needsRedraw = g.needs_redraw; S.comments = g.comments || []; S.round = g.round || 1; S.rounds = g.rounds || []; S.roundQ = new Set(g.round_questions || []);
+  S.ids = g.short_ids || {}; S.features = g.features || []; S.owner = g.owner || ""; S.sources = g.sources || []; S.mode = g.mode || "solo"; S.spec = g.spec_text || ""; S.lastCall = g.last_call;
   S.nodes = {}; S.fwd = {}; S.rev = {}; S.screens = {};
   g.nodes.forEach((n) => (S.nodes[n.id] = n));
   g.edges.forEach((e) => {
@@ -900,7 +914,7 @@ const byLayer = (layer) => Object.values(S.nodes).filter((n) => n.layer === laye
 const questionsFor = (id) => byLayer("QUESTION").filter((q) => q.target_node_id === id);
 const openQuestions = () => byLayer("QUESTION").filter((q) => q.question_status === "OPEN");
 const openBlocking = (id) => questionsFor(id).filter((q) => q.question_status === "OPEN" && q.is_blocking).length;
-const pmQueue = () => openQuestions().filter((q) => !PM.skipped.has(q.id) && (PM.bee ? q.category === PM.bee : mine(q)))
+const pmQueue = () => openQuestions().filter((q) => !PM.skipped.has(q.id) && inRound(q) && (PM.bee ? q.category === PM.bee : mine(q)))
   .sort((a, b) => (b.id === PM.front) - (a.id === PM.front) || b.is_blocking - a.is_blocking); // a reopened answer is asked again first
 const color = (score) => (score >= 0.8 ? "var(--ok)" : score > 0 ? "var(--warn)" : "var(--bad)");
 
@@ -979,8 +993,9 @@ function wireframe(els, small) {
   return `<div class="wf ${small ? "small" : ""}"${small ? ' aria-hidden="true"' : ""}>${els.slice(0, small ? 7 : 12).map((e) => {
     const k = wfKind(e.kind), t = esc(e.label);
     if (k === "choice") return `<div class="wf-choice">${e.label.split(/\s*[\/|,]\s*/).slice(0, 4).map((o) => `<span>${esc(o)}</span>`).join("")}</div>`;
-    if (k === "list") return `<div class="wf-list">${t}<i></i><i></i></div>`;
-    return `<div class="wf-${k}">${t}</div>`;
+    const d = e.detail && !small ? `<span class="wf-detail">${esc(e.detail)}</span>` : "";
+    if (k === "list") return `<div class="wf-list">${t}${d}<i></i><i></i></div>`;
+    return `<div class="wf-${k}">${t}${d}</div>`;
   }).join("")}</div>`;
 }
 // The bees still waiting on something in this screen's branch.
@@ -1000,14 +1015,14 @@ function screenCard(id) {
   const ctas = (S.fwd[id] || []).map((c) => S.nodes[c]).filter((c) => c && c.layer === "CTA");
   return `<article class="scr ${PM.focus === id || S.selected === id ? "focus" : ""} ${hit(id)}" data-id="${esc(id)}" data-node tabindex="0">
     ${pmQueue()[0] && screenOf(pmQueue()[0].target_node_id) === id ? `<span class="pin">${beeIcon(pmQueue()[0].category, true)}${esc(bee(pmQueue()[0].category)[0])} is asking</span>` : ""}
-    ${noteBtn(id, 0, "", n.title)}<h4>${esc(n.title)}</h4>${state}${branchBees(id)}
+    ${noteBtn(id, 0, "", n.title)}<h4>${idChip(id)}${esc(n.title)}</h4>${state}${n.flow_id ? featChips(n.flow_id) : ""}${branchBees(id)}
     ${n.metadata?.elements?.length ? wireframe(n.metadata.elements, true) : ""}
-    ${ctas.length ? `<div class="behind">Behind the buttons</div><ul class="ctas">${ctas.map((c) => {
+    ${ctas.length ? `<div class="behind">What the buttons do</div><ul class="ctas">${ctas.map((c) => {
       const apis = (S.fwd[c.id] || []).map((a) => S.nodes[a]).filter((a) => a && a.layer === "API");
       const cnt = openBlocking(c.id) + apis.reduce((t, a) => t + openBlocking(a.id), 0);
       return `<li class="cta ${PM.focus === c.id || S.selected === c.id ? "focus" : ""} ${hit(c.id) || apis.map((a) => hit(a.id)).find(Boolean) || ""}" data-id="${esc(c.id)}" tabindex="0">
-        <div class="cta-top"><span class="cta-label"><i class="ph ph-cursor-click" aria-hidden="true"></i>${esc(c.label || c.title)}${apis.length ? "" : ' <span class="muted">no API call</span>'}</span>${cnt ? `<span class="count" title="Open blocking questions">${cnt}</span>` : ""}</div>
-        ${apis.length ? `<div class="apis">${apis.map((a) => `<button class="api mono ${PM.focus === a.id || S.selected === a.id ? "focus" : ""}" data-id="${esc(a.id)}">${esc(a.method)} ${esc(a.path)}</button>`).join("")}</div>` : ""}
+        <div class="cta-top"><span class="cta-label">${idChip(c.id)}${esc(c.label || c.title)}${apis.length ? "" : ' <span class="muted">just moves on</span>'}</span>${cnt ? `<span class="count" title="Open blocking questions">${cnt}</span>` : ""}</div>
+        ${apis.length ? `<div class="apis">${apis.map((a) => `<button class="api mono ${PM.focus === a.id || S.selected === a.id ? "focus" : ""}" data-id="${esc(a.id)}" title="${esc(a.method)} ${esc(a.path)}">${idChip(a.id)}${S.mode === "team" ? `${esc(a.method)} ${esc(a.path)}` : esc(apiWords(a))}</button>`).join("")}</div>` : ""}
       </li>`;
     }).join("")}</ul>` : '<div class="no-ctas">No buttons defined</div>'}
   </article>`;
@@ -1033,8 +1048,11 @@ function renderMap() {
   // An answer about a user or the whole idea (not one flow) can touch every flow, so all of them show it.
   const wide = sk && !rows.some((f) => f.id === sk.target);
   const chip = sk ? `<div class="drawing-chip" role="status"><i class="ph ph-pencil-simple-line" aria-hidden="true"></i>${PM.reacting === "The bees" ? "The bees are redrawing the board from everything you said" : `${esc(PM.reacting)} is redrawing the board from your answer`}</div>` : "";
-  $("flows").innerHTML = chip + redraw + note + rows.map((f) => { const last = f === lastFlow && S.stage === "flows"; return `<div class="flow ${f.id && ((PM.focus === f.id && !focusStep) || S.selected === f.id) ? "focus" : ""} ${sk && ((sk.target === f.id && !sk.step) || wide) ? "sketching-lane" : ""}">
-    <div class="flow-head"><h3>${f.id ? `<button data-id="${esc(f.id)}">${esc(f.title)}</button>` : esc(f.title)}</h3>${f.who ? `<span class="who">for ${esc(f.who)}</span>` : ""}${f.id ? `<button class="link" data-note="${esc(f.id)}" data-note-step="0" data-note-path="" data-note-label="${esc(f.title)}"><i class="ph ph-chat-circle-text" aria-hidden="true"></i> Comment</button>` : ""}${f.id && (!f.ids.length || S.view === "flows") ? `<button class="link" data-edit-flow="${esc(f.id)}"><i class="ph ph-pencil-simple" aria-hidden="true"></i> Edit steps</button>` : ""}</div>
+  // The feature list a PRD starts with (F1, F2...), written with the flows; screens and the Brief point at it.
+  const feats = (S.features || []).length ? `<div class="features" aria-label="Features"><b>Features</b>${S.features.map((f) =>
+    `<button class="feature ${esc(f.priority)}" data-feature="${esc(f.id)}" data-tip="${esc(f.why || f.name)}" data-tip-pos="bottom"><span class="id-chip">${esc(f.id)}</span>${esc(f.name)}<span class="pri">${f.priority === "must" ? "Must" : f.priority === "later" ? "Later" : "Should"}</span></button>`).join("")}</div>` : "";
+  $("flows").innerHTML = chip + redraw + note + feats + rows.map((f) => { const last = f === lastFlow && S.stage === "flows"; return `<div class="flow ${f.id && ((PM.focus === f.id && !focusStep) || S.selected === f.id) ? "focus" : ""} ${sk && ((sk.target === f.id && !sk.step) || wide) ? "sketching-lane" : ""}">
+    <div class="flow-head"><h3>${f.id ? `<button data-id="${esc(f.id)}">${esc(f.title)}</button>` : esc(f.title)}</h3>${f.who ? `<span class="who">for ${esc(f.who)}</span>` : ""}${f.id ? `<button class="link" data-note="${esc(f.id)}" data-note-step="0" data-note-path="" data-note-label="${esc(f.title)}"><i class="ph ph-chat-circle-text" aria-hidden="true"></i> Comment</button>` : ""}${f.id ? idChip(f.id) + featChips(f.id) : ""}${f.id && mayProcess() && (!f.ids.length || S.view === "flows") ? `<button class="link" data-edit-flow="${esc(f.id)}"><i class="ph ph-pencil-simple" aria-hidden="true"></i> Edit steps</button>` : ""}</div>
     ${f.ids.length && (S.view !== "flows" || !f.id)
       ? `<div class="flow-row wire">${f.ids.map(screenCard).join("")}</div>`
       : `<div class="steps wire">${f.steps.map((t, i) => {
@@ -1190,8 +1208,10 @@ function zoomAt(z, cx, cy, glide) {
 function fitView() {
   const m = $("map").getBoundingClientRect(), c = $("canvas");
   const w = Math.max(c.scrollWidth, $("flows").scrollWidth + 48), h = c.scrollHeight;
-  VIEW.z = Math.min(1, Math.max(0.3, Math.min(m.width / w, m.height / h)));
-  VIEW.x = Math.max(0, (m.width - w * VIEW.z) / 2); VIEW.y = 0; applyView(true);
+  // Leave room for the top bar and the question dock, so no card ends up under them (Meena's test, 18 Oct).
+  const top = 72, dock = $("dock").hidden ? 0 : $("dock").getBoundingClientRect().height + 16;
+  VIEW.z = Math.min(1, Math.max(0.4, Math.min(m.width / w, (m.height - top - dock) / h)));
+  VIEW.x = Math.max(0, (m.width - w * VIEW.z) / 2); VIEW.y = Math.max(0, top - 76 * VIEW.z); applyView(true);  // 76 px: the canvas's own top padding
 }
 // Bring a node into view, the canvas version of scrollIntoView.
 function reveal(el) {
@@ -1328,7 +1348,7 @@ function renderPM() {
       <div class="question">${esc(q.question_text)}</div>
       ${q.metadata?.why ? `<div class="why"><i class="ph ph-lightbulb" aria-hidden="true"></i> ${esc(q.metadata.why)}</div>` : ""}
       ${cite(q)}
-      <span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Blocks the build" : "Good to know"}</span>
+      <span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Needed before building" : "Good to know"}</span>
       ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o, i) => `<button class="option" data-q="${esc(q.id)}" data-opt="${esc(o)}">${esc(o)}${i === 0 && q.metadata?.why ? '<span class="rec">Recommended</span>' : ""}</button>`).join("")}</div>` : '<div style="height:12px"></div>'}
       <div class="field"><label for="own">Tap one or more suggestions, or answer in your own words, then send</label><div class="send-row"><input id="own" data-answer="${esc(q.id)}" placeholder="Or type your own answer and press Enter" autocomplete="off"><button class="btn primary" data-send="${esc(q.id)}" aria-label="Send your answer"><i class="ph ph-paper-plane-right" aria-hidden="true"></i></button></div></div>
       <div class="ask-foot"><button class="link" data-skip="${esc(q.id)}">Not sure yet, ask me later</button>${S.mode !== "team" && q.suggested_options?.length ? `<button class="link" data-decide="${esc(q.id)}" data-tip="Takes the recommended answer; you can change it later in the Brief" data-tip-pos="top"><i class="ph ph-magic-wand" aria-hidden="true"></i> Decide for me</button>` : ""}<span class="muted">${pmQueue().length - 1} more for you</span></div>
@@ -1413,7 +1433,7 @@ function renderDetails() {
     ${qs.map((q) => {
       const done = q.question_status !== "OPEN";
       return `<div class="dq ${done ? "done" : q.is_blocking ? "" : "soft"}">
-        <div class="meta">${done ? "Answered" : q.is_blocking ? "Blocks the build" : "Good to know"}</div>
+        <div class="meta">${done ? "Answered" : q.is_blocking ? "Needed before building" : "Good to know"}</div>
         <div>${esc(q.question_text)}</div>
         ${done ? `<div class="meta" style="margin-top:6px;color:var(--ok)">Decision: ${esc(q.answer_text)}</div>`
           : `${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o) => `<button class="option" data-q="${esc(q.id)}" data-opt="${esc(o)}">${esc(o)}</button>`).join("")}</div>` : ""}
@@ -1429,6 +1449,20 @@ function beeNote(cat, text) {
   n.innerHTML = `${beeIcon(cat)}<span><b>${esc(bee(cat)[0])}:</b> ${esc(text)}</span>`; n.hidden = false;
   noteTimer = setTimeout(() => { n.hidden = true; }, 9000);
 }
+// Team boards follow Roger's ritual: everyone adds input, the owner or the product manager processes the round.
+const mayProcess = () => S.mode !== "team" || ROLE === "PM" || !S.owner || AUTH.user?.uid === S.owner;
+// Solo: the round's questions are frozen when it starts (at most 6), so the count never grows mid-round.
+const inRound = (q) => S.mode === "team" || !S.roundQ?.size || S.roundQ.has(q.id);
+const roundLeft = () => openQuestions().filter((q) => inRound(q) && mine(q)).length;
+const nextRound = () => openQuestions().filter((q) => !inRound(q) && mine(q)).length;
+// A solo founder reads what a call does ("Saves an order"), a team reads the method and path; both see the id.
+const apiWords = (a) => { const thing = (a.path || "").split("/").filter((p) => p && !p.startsWith("{") && !p.startsWith(":")).pop() || a.service || "data";
+  const verb = { GET: "Loads", POST: "Saves", PUT: "Updates", PATCH: "Updates", DELETE: "Removes" }[(a.method || "").toUpperCase()] || "Calls";
+  return `${verb} ${thing.replace(/[-_]/g, " ")}`; };
+// Short ids (FL1 a flow, S2 a screen, B3 a button, A1 an API, F1 a feature), the same in the Brief and the export.
+const idChip = (id) => S.ids?.[id] ? `<span class="id-chip" title="Id ${esc(S.ids[id])}: the Brief and an agent use the same one">${esc(S.ids[id])}</span>` : "";
+const featChips = (flowId) => (S.features || []).filter((f) => (f.flow_ids || []).includes(flowId)).map((f) =>
+  `<button class="id-chip feat" data-feature="${esc(f.id)}" data-tip="${esc(f.id)} ${esc(f.name)} (${esc(f.priority)})${f.why ? ": " + esc(f.why) : ""}" data-tip-pos="bottom">${esc(f.id)}</button>`).join("");
 // Notes: anyone can comment on any part of the board (a step, a split, a path, a screen). Notes wait, with
 // answers saved for later, until the person presses "Update the board"; then the bees apply all of it at once.
 const notesOn = (target, step = 0, path = "") => (S.comments || []).filter((c) => c.target === target && (c.step || 0) === step && (c.path || "") === path);
@@ -1466,7 +1500,7 @@ document.addEventListener("click", (e) => {
 });
 function renderNoteList() {
   const list = notesOn(NOTE_AT.target, NOTE_AT.step, NOTE_AT.path), qs = questionsOn(NOTE_AT.target, NOTE_AT.step, NOTE_AT.path);
-  $("noteList").innerHTML = qs.map((q) => `<div class="note-item ask"><div class="who">${beeIcon(q.category, true)}<b>${esc(bee(q.category)[0])}</b><span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Blocks the build" : "Good to know"}</span></div>
+  $("noteList").innerHTML = qs.map((q) => `<div class="note-item ask"><div class="who">${beeIcon(q.category, true)}<b>${esc(bee(q.category)[0])}</b><span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Needed before building" : "Good to know"}</span></div>
       <p class="q">${esc(q.question_text)}</p>${q.metadata?.why ? `<p class="why"><i class="ph ph-lightbulb" aria-hidden="true"></i> ${esc(q.metadata.why)}</p>` : ""}
       ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o, i) => `<button class="option" data-fill="${esc(q.id)}" data-fopt="${esc(o)}">${esc(o)}${i === 0 && q.metadata?.why ? '<span class="rec">Recommended</span>' : ""}</button>`).join("")}</div>` : ""}
       <div class="send-row"><input id="reply-${esc(q.id)}" placeholder="Reply to the bee" autocomplete="off" aria-label="Your reply"><button class="btn primary sm" data-reply="${esc(q.id)}">Reply</button>${q.suggested_options?.length ? `<button class="link" data-reply-decide="${esc(q.id)}"><i class="ph ph-magic-wand" aria-hidden="true"></i> Decide for me</button>` : ""}</div></div>`).join("") + list.map((c) => `<div class="note-item"><p>${esc(c.text)}</p><span class="muted">${esc(c.by || "You")} · ${c.status === "open" ? "waiting" : "applied"}</span>${c.status === "open" ? `<button class="link" data-note-del="${esc(c.id)}">Take back</button>` : ""}</div>`).join("");
@@ -1478,17 +1512,19 @@ const waitingNotes = () => (S.comments || []).filter((c) => c.status === "open")
 const UPDATE_AT = 7;
 function renderTray() {
   const a = waitingAnswers().length, n = waitingNotes().length;
-  const ready = a + n >= UPDATE_AT || !pmQueue().length;
+  const ready = S.mode === "team" ? a + n > 0 : a + n >= UPDATE_AT || !roundLeft();
+  const owner = mayProcess();
   const busy = PM.reacting === "The bees";
   $("tray").hidden = !(a + n) && !busy;
   $("tray").classList.toggle("busy", busy);
   $("scan").hidden = !busy;
   const parts = [a && `${a} answer${a > 1 ? "s" : ""}`, n && `${n} note${n > 1 ? "s" : ""}`].filter(Boolean).join(" and ");
-  $("trayText").innerHTML = busy ? `<b>Updating the board</b><span class="muted">The bees are applying ${parts || "your changes"}. About 15 to 30 seconds.</span>`
-    : ready ? `<b>${parts} waiting</b><span class="muted">The board changes only when you say so.</span>`
+  $("trayText").innerHTML = busy ? `<b>Updating the board</b><span class="muted">The bees are applying ${parts || "your changes"}. Usually under a minute.</span>`
+    : S.mode === "team" && !owner ? `<b>${parts} waiting for the owner</b><span class="muted">Your input is saved. The board owner or the product manager processes the round.</span>`
+    : ready ? `<b>Round ${S.round}: ${parts} waiting</b><span class="muted">${S.mode === "team" ? "Process the round when everyone has had their say." : "The board changes only when you say so."}</span>`
     : `<b>${parts} saved</b><span class="muted">Keep answering, or comment on any card. You can update the board at ${UPDATE_AT}.</span><span class="tray-meter" aria-hidden="true"><i style="width:${Math.round(100 * (a + n) / UPDATE_AT)}%"></i></span>`;
-  const b = $("tray").querySelector("[data-update]"); b.disabled = busy; b.hidden = !ready && !busy;
-  b.innerHTML = busy ? '<span class="spinner sm" aria-hidden="true"></span>Updating' : 'Update the board<i class="ph ph-arrows-clockwise" aria-hidden="true"></i>';
+  const b = $("tray").querySelector("[data-update]"); b.disabled = busy; b.hidden = (!ready || !owner) && !busy;
+  b.innerHTML = busy ? '<span class="spinner sm" aria-hidden="true"></span>Updating' : `${S.mode === "team" ? "Process the round" : "Update the board"}<i class="ph ph-arrows-clockwise" aria-hidden="true"></i>`;
 }
 async function updateBoard() {
   if (PM.reacting) return;
@@ -1502,6 +1538,7 @@ async function updateBoard() {
   } catch (err) { PM.error = err.message; toast(err.message); }
   PM.reacting = ""; PM.sketch = null;
   await load();
+  if (!PM.error) toast(roundLeft() ? `Round ${S.round - 1} done. Round ${S.round}: ${roundLeft()} question${roundLeft() > 1 ? "s" : ""}.` : `Round ${S.round - 1} done. Nothing blocks the build now: draw the screens when you are ready.`);
   reveal(document.querySelector("#flows .changed"));
 }
 // Solo founders answer in sets: every open question about one flow or screen (3 to 7, topped up from what
@@ -1523,20 +1560,20 @@ function setLabel(set) {
 function renderSet(ask, cite) {
   const set = pmSet(), first = set[0], t = S.nodes[first.target_node_id];
   const about = t ? (t.label || t.title) : first.target_node_id;
-  const left = pmQueue().length - set.length;
+  const left = pmQueue().length - set.length, later = nextRound();
   ask.innerHTML = `
     <div class="set-head"><b>${set.length} questions${set.every((q) => q.target_node_id === first.target_node_id) ? ` about ${esc(about)}` : ""}</b>
-      <span class="muted">Answer what you can and save. Nothing on the board changes until you press Update the board.${left > 0 ? ` ${left} more after this set.` : ""}</span></div>
+      <span class="muted">Round ${S.round} has ${roundLeft()} question${roundLeft() === 1 ? "" : "s"} left${later ? ` (${later} more wait for round ${S.round + 1})` : ""}. Nothing on the board changes until you press Update the board.</span></div>
     ${set.map((q, n) => { const d = PM.draft[q.id] || { opts: [], text: "" }; return `
       <div class="set-q ${draftText(d) ? "done" : ""}">
         <div class="who">${beeIcon(q.category, true)}<b>${esc(bee(q.category)[0])}</b>${stepOf(q) ? ` <span class="muted">about step ${q.metadata.step}, ${esc(stepOf(q))}</span>` : ""}
-          <span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Blocks the build" : "Good to know"}</span></div>
+          <span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Needed before building" : "Good to know"}</span></div>
         <div class="question"><span class="qn">${n + 1}.</span> ${esc(q.question_text)}</div>
         ${q.metadata?.why ? `<div class="why"><i class="ph ph-lightbulb" aria-hidden="true"></i> ${esc(q.metadata.why)}</div>` : ""}
         ${cite(q)}
         ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o, i) => `<button class="option" data-sq="${esc(q.id)}" data-sopt="${esc(o)}" aria-pressed="${d.opts.includes(o)}">${esc(o)}${i === 0 && q.metadata?.why ? '<span class="rec">Recommended</span>' : ""}</button>`).join("")}</div>` : ""}
         <div class="send-row"><input data-sown="${esc(q.id)}" value="${esc(d.text)}" aria-label="Your own answer to question ${n + 1}" placeholder="Or type your own answer" autocomplete="off">
-          ${q.suggested_options?.length ? `<button class="link" data-sdecide="${esc(q.id)}" data-tip="Takes the recommended answer; you can change it later" data-tip-pos="top"><i class="ph ph-magic-wand" aria-hidden="true"></i> Decide for me</button>` : ""}</div>
+          ${q.suggested_options?.length ? `<button class="link" data-sdecide="${esc(q.id)}" title="Takes the recommended answer; you can change it later"><i class="ph ph-magic-wand" aria-hidden="true"></i> Decide for me</button>` : ""}</div>
       </div>`; }).join("")}
     ${PM.error ? `<div class="err" style="font-size:13px;margin:6px 0">${esc(PM.error)}</div>` : ""}
     <div class="set-foot"><button class="btn primary" data-set-send>${setLabel(set)}<i class="ph ph-arrow-right" aria-hidden="true"></i></button>
@@ -1569,6 +1606,12 @@ document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.
 async function answer(qid, text, beesDecided = false) {
   if (!text.trim() || PM.reacting) return;
   const q = S.nodes[qid];
+  if (S.mode === "team") {  // saved for the round; the owner or the product manager applies all input at once
+    await api(`/api/questions/${encodeURIComponent(qid)}/resolve`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answer_text: text, by: beesDecided ? "the bees (recommended)" : byLine(), bees_decided: beesDecided, later: true }) });
+    await load();
+    return toast(mayProcess() ? "Saved for this round. Press Process the round when everyone has had their say." : "Saved. The board owner processes the round.");
+  }
   await api(`/api/questions/${encodeURIComponent(qid)}/resolve`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answer_text: text, by: beesDecided ? "the bees (recommended)" : byLine(), bees_decided: beesDecided }),
   });
@@ -1625,6 +1668,7 @@ document.addEventListener("click", (e) => {
     return answer(q.id, q.suggested_options[0], true).catch(fail);
   }
   if (t.dataset.addFeature !== undefined) return openFeature();
+  if (t.dataset.feature) { $("briefBtn").click(); return setTimeout(() => [...document.querySelectorAll("#briefBody h2")].find((h) => h.textContent.trim() === "Features")?.scrollIntoView({ block: "start" }), 400); }
   if (t.dataset.note) return openNote(t);
   if (t.dataset.fill) { const i = $(`reply-${t.dataset.fill}`); i.value = i.value && !i.value.includes(t.dataset.fopt) ? `${i.value}; ${t.dataset.fopt}` : t.dataset.fopt; return i.focus(); }
   if (t.dataset.reply || t.dataset.replyDecide) {
@@ -1644,8 +1688,9 @@ document.addEventListener("click", (e) => {
   }
   if (t.dataset.sdecide) { const q = S.nodes[t.dataset.sdecide]; PM.draft[q.id] = { opts: [q.suggested_options[0]], text: "", decided: true }; return render(); }
   if (t.dataset.setDecide !== undefined) {
-    pmSet().forEach((q) => { if (!draftText(PM.draft[q.id]) && q.suggested_options?.length) PM.draft[q.id] = { opts: [q.suggested_options[0]], text: "", decided: true }; });
-    return render();
+    const set = pmSet();
+    set.forEach((q) => { if (!draftText(PM.draft[q.id]) && q.suggested_options?.length) PM.draft[q.id] = { opts: [q.suggested_options[0]], text: "", decided: true }; });
+    return sendSet(set).catch(fail);  // the bees decide and the set is saved in one press
   }
   if (t.dataset.setSkip !== undefined) { pmSet().forEach((q) => PM.skipped.add(q.id)); return render(); }
   if (t.dataset.setSend !== undefined) return sendSet(pmSet()).catch(fail);

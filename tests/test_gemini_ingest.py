@@ -276,7 +276,7 @@ def test_brief_states_decisions_and_gaps(monkeypatch):
     c.post("/api/expand?engine=gemini", headers=h)
     brief = c.get("/api/brief", headers=h).text
     assert brief.startswith("# Tiny Shop: product brief")
-    assert "1. Open cart" in brief and "### Cart" in brief
+    assert "1. Open cart" in brief and "Cart (" in brief and "### S1 " in brief  # screens carry their short id
     assert "**Is guest checkout allowed?** No, sign-in required" in brief and "Queen Bee" in brief
     assert "BLOCKS THE BUILD: What if the gateway times out?" in brief
     assert "timeout: NOT DECIDED ms" in brief and "vendor: none chosen" in brief
@@ -783,3 +783,72 @@ def test_notes_and_saved_answers_wait_until_the_board_is_updated(monkeypatch):
     assert not next(n for n in after["nodes"] if n["id"] == q["id"])["metadata"].get("pending")
     assert c.post("/api/questions/react-batch?engine=gemini", json={}, headers=h).status_code == 404  # nothing left waiting
     assert "## Notes on the board" in c.get("/api/brief", headers=h).text
+
+
+class RichFlows(FakeGemini):
+    """Two flows, a feature list and eight questions, so rounds, features and kept flows can be checked."""
+
+    def extract_flows(self, text="", pdf_bytes=None):
+        from src.adapters.spec_prompts import XProductFeature
+        return FlowsExtract(
+            product_name="Tiny Shop",
+            users=[XUser(id="U_BUYER", title="Buyer", description="Buys things")],
+            flows=[FLOWS.flows[0], XFlowPlan(id="F_RETURN", title="Return", goal="Send back", user_id="U_BUYER",
+                                             steps=["Pick order: The buyer picks an order.", "Send: The buyer ships it back."])],
+            questions=[XQuestion(target_id="F_BUY", category="PM", question=t, is_blocking=i < 3, suggested_options=["Yes", "No"])
+                       for i, t in enumerate(["Can guests check out?", "Which currencies are accepted?", "Is there a loyalty scheme?",
+                                              "Do sellers set shipping prices?", "Are gift wraps offered?", "Can buyers save carts?",
+                                              "Is tax shown before payment?", "Do orders need approval?"])],
+            features=[XProductFeature(name="Checkout", priority="must", flow_ids=["F_BUY", "F_NOPE"], why="Money"),
+                      XProductFeature(name="Returns", priority="soon", flow_ids=["F_RETURN"])],
+        )
+
+
+def test_rounds_budget_features_and_ids(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", RichFlows())
+    c, h = TestClient(server.app), {"X-Board": "rounds"}
+    g = c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h).json()
+    assert g["round"] == 1 and len(g["round_questions"]) == 6  # solo budget: 6 of the 9 open questions
+    blocking = {n["id"] for n in g["nodes"] if n.get("is_blocking") and n["layer"] == "QUESTION"}
+    assert blocking <= set(g["round_questions"])  # blocking questions come first
+    assert [f["id"] for f in g["features"]] == ["F1", "F2"]
+    assert g["features"][0]["flow_ids"] == ["F_BUY"]  # a flow id that is not on the board is dropped
+    assert g["features"][1]["priority"] == "should"  # an unknown priority is not guessed upward
+    ids = g["short_ids"]
+    assert ids["F_BUY"].startswith("FL") and ids["U_BUYER"] == "U1"
+    # Drawing screens: the fake engine returns only F_BUY, but the agreed Return flow must stay on the board.
+    after = c.post("/api/expand?engine=gemini", headers=h).json()
+    assert "F_RETURN" in {n["id"] for n in after["nodes"]}
+    assert after["short_ids"]["F_BUY"] == ids["F_BUY"]  # ids survive the redraw
+    assert after["round"] == 2 and after["rounds"][-1]["changed"] == ["Screens drawn"]
+    brief = c.get("/api/brief", headers=h).text
+    assert "## Features" in brief and "F1 Checkout" in brief and "## Rounds" in brief
+
+
+def test_team_rounds_are_processed_by_the_owner(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", Reactor())
+    c, h = TestClient(server.app), {"X-Board": "team-round"}
+    q = _answered_flow_question(c, h, "No, sign-in required")
+    c.post("/api/mode", json={"mode": "team"}, headers=h)
+    server._board_id.set("team-round")
+    server.boards["team-round"].owner = "owner-uid"  # made by someone else, signed in
+    blocked = c.post("/api/questions/react-batch?engine=gemini", json={}, headers={**h, "X-Role": "BACKEND"})
+    assert blocked.status_code == 403
+    assert c.post("/api/flows/F_BUY/steps", json={"steps": ["x"]}, headers={**h, "X-Role": "DESIGN"}).status_code == 403
+    Reactor.reaction = Reaction(is_vague=False, note="Done.", follow_up=[], user_updates=[], field_updates=[], flow_updates=[])
+    c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "No, sign-in required", "later": True}, headers=h)
+    ok = c.post("/api/questions/react-batch?engine=gemini", json={}, headers={**h, "X-Role": "PM"})
+    assert ok.status_code == 200  # the product manager processes the round
+
+
+def test_states_only_where_they_are_real():
+    from src.core.ingest import add_gap_questions
+    g = build_graph_from_extract(EXTRACT)
+    for n in g.nodes.values():
+        if n.layer.value == "SCREEN":
+            n.states.loading = n.states.error = ""
+            n.metadata["elements"] = [{"kind": "heading", "label": "Thanks"}]
+            for c in list(g.forward_edges.get(n.id, [])):
+                g.forward_edges[n.id].discard(c)  # no buttons, nothing fetched: a static screen
+    asked = add_gap_questions(g)
+    assert not any("show" in q.question.lower() and ("load" in q.question.lower() or "wrong" in q.question.lower()) for q in asked)
