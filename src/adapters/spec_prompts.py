@@ -222,6 +222,8 @@ Rules:
   blocking), or "later" (only what the board lists under out of scope, or answers that put it off). An open
   question is not "later": leave it out of the features, or, if a feature depends on it, keep the feature's
   priority and end its "why" with "(depends on an open question)". flow_ids lists the flows it serves.
+  Start from the board's own feature list (F1, F2... in the Brief): keep those names exactly, without the id
+  in the name, and add a feature only when the board has nothing like it.
   "why" is one short sentence.
 - Words: follow the AUDIENCE. For one founder write plain words with no jargon (say "the first version that works end to end", never "walking skeleton"; "saves the order", never "POST /orders"). Use the board's ids (F1, FL1, S2, A1) wherever you name a feature, flow, screen or API, so people and agents can find them.
 - build_order: 3 to 6 thin vertical slices in order. The first is a walking skeleton: one flow working end to end

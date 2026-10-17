@@ -1,6 +1,7 @@
 """Turns an engine SpecExtract into a BuildingBeesEngine graph, and attaches generated questions."""
 
 import datetime
+import re
 from typing import Iterable
 
 from src.adapters.spec_prompts import FlowsExtract, SpecExtract, XQuestion
@@ -211,8 +212,8 @@ def add_features(g: BuildingBeesEngine, features) -> list:
     flows = {n.id for n in g.nodes.values() if n.layer.value == "FLOW"}
     added = []
     for x in features:
-        name = (x.name or "").strip()[:80]
-        if not name or name.lower() in have:
+        name = re.sub(r"^F\d+\s*[:.\-]?\s*", "", (x.name or "").strip())[:80]  # "F1 Attendance View" is F1, not a new one
+        if not name or name.lower() in have or any(similar(name, h, 0.5) or name.lower() in h or h in name.lower() for h in have):
             continue
         n = len(getattr(g, "features", [])) + 1
         item = {"id": f"F{n}", "name": name, "priority": x.priority if x.priority in ("must", "should", "later") else "should",

@@ -890,3 +890,14 @@ def test_decide_for_me_is_not_asked_again(monkeypatch):
     texts = [n["question_text"] for n in c.get("/api/graph", headers=h).json()["nodes"] if n["layer"] == "QUESTION"]
     assert "Is guest checkout allowed for buyers?" not in texts  # a rephrase of a settled decision is dropped
     assert "Which countries do you ship to?" in texts and len(r["follow_up"]) == 1
+
+
+def test_plan_features_do_not_duplicate_the_board_list():
+    from src.adapters.spec_prompts import XProductFeature
+    from src.core.ingest import add_features
+    g = build_graph_from_extract(EXTRACT)
+    g.features = []
+    add_features(g, [XProductFeature(name="Attendance & Marks View", priority="must")])
+    add_features(g, [XProductFeature(name="F1 Attendance View", priority="must"),
+                     XProductFeature(name="F2: Monthly Fee Collection", priority="must")])
+    assert [f["name"] for f in g.features] == ["Attendance & Marks View", "Monthly Fee Collection"]
