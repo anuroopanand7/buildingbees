@@ -400,7 +400,7 @@
   .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; border: none; background: var(--fill); font-size: 16px; }
 
   /* The Brief: the board as a document. Prints cleanly, so "Save as PDF" works from the browser. */
-  #brief, #boards, #fb, #flowEdit, #featureAdd, #noteAdd { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--text) 35%, transparent); display: grid; place-items: center; padding: 24px; }
+  #brief, #boards, #fb, #flowEdit, #featureAdd, #noteAdd, #invite { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--text) 35%, transparent); display: grid; place-items: center; padding: 24px; }
   .brief-sheet { background: var(--panel); border-radius: 18px; box-shadow: var(--shadow); width: min(820px, 100%); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; }
   .brief-sheet > :not(.brief-bar) { min-height: 0; }  /* lets the body shrink and scroll inside the capped sheet */
   .brief-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
@@ -563,6 +563,14 @@
   #start { padding-top: clamp(84px, 11vh, 120px); min-height: 100dvh; }
   .stage-note { font-size: 12.5px; }
   @media (prefers-reduced-motion: reduce) { .menu, #beeNote, #details, .rail #hive button.asking .bee { animation: none !important; } .convo, .dock { transition: none; } }
+  @media (max-width: 1400px) {  /* tablets: the progress text gives way so the stage bar never slides under the brand panel */
+    .stage { left: auto; right: 220px; transform: none; }
+    .stage #meterText, .stage .track { display: none; }
+  }
+  /* Touch screens keep a hover after the tap, so hover tooltips stuck on screen (Sravani, 17 Oct). */
+  @media (hover: none) { [data-tip]::after, [data-tip]::before { display: none !important; } }
+  /* Screens view: each flow's screens sit in one framed board, like a Figma frame (Sravani, 17 Oct). */
+  .flow-row.wire { border: 1.5px solid var(--line-strong); border-radius: 18px; padding: 18px; background: color-mix(in srgb, var(--panel) 55%, transparent); }
   @media (max-width: 900px) {
     .stage { display: none; }
     .brand { max-width: calc(100vw - 120px); }
@@ -675,6 +683,15 @@
       <label class="cap" for="flowEditText">One step per line, as "Short title: what happens". Add, reword, reorder or delete lines.</label>
       <textarea id="flowEditText" rows="10" style="width:100%;margin-top:8px;font:inherit;padding:10px;border:1px solid var(--line-strong);border-radius:var(--r-input)"></textarea>
       <div class="ask-foot" style="margin-top:10px"><span class="muted" id="flowEditNote"></span><button class="btn primary" id="flowEditSave">Save steps</button></div>
+    </div>
+  </div>
+</div>
+<div id="invite" hidden role="dialog" aria-modal="true" aria-label="Invite your team">
+  <div class="brief-sheet">
+    <div class="brief-bar"><b>Invite your team</b><button class="icon-btn" id="inviteClose" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button></div>
+    <div class="fb-body">
+      <p style="margin:0 0 10px">Send this link to your team. Each person picks their role (product manager, client, designer, frontend, backend, tester) and answers only their own bees. The board owner or the product manager processes each round.</p>
+      <div class="send-row"><input id="inviteLink" readonly aria-label="Link to this board" style="flex:1;border:1px solid var(--line-strong);border-radius:999px;padding:8px 12px;font:inherit;font-size:13px"><button class="btn primary" id="inviteCopy">Copy link</button></div>
     </div>
   </div>
 </div>
@@ -1714,7 +1731,7 @@ document.addEventListener("click", (e) => {
   if ("invite" in t.dataset || t.id === "teamBtn") {
     menu(false);
     if (S.mode !== "team") api("/api/mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "team" }) }).then(load).catch(fail);
-    return navigator.clipboard.writeText(boardLink()).then(() => toast("Link copied. Send it to your team: each person picks their role when they open it."), () => toast(boardLink()));
+    $("inviteLink").value = boardLink(); $("invite").hidden = false; return $("inviteLink").select();
   }
   if (t.dataset.send) { const i = $("own"); return answer(t.dataset.send, i?.value || "").catch(fail); }
   if (t.dataset.bee) { PM.bee = PM.bee === t.dataset.bee ? null : t.dataset.bee; PM.quiet = true; dockMin(false); return render(); }  // filter only; the board stays still
@@ -1860,6 +1877,9 @@ function openFeature(showIdea = false) {
 }
 $("featureBtn").onclick = () => openFeature();
 $("noteClose").onclick = () => { $("noteAdd").hidden = true; };
+$("inviteClose").onclick = () => { $("invite").hidden = true; };
+$("inviteCopy").onclick = () => navigator.clipboard.writeText($("inviteLink").value)
+  .then(() => { $("invite").hidden = true; toast("Link copied. Send it to your team."); }, () => { $("inviteLink").select(); toast("Select the link and copy it."); });
 $("noteSave").onclick = async () => {
   const text = $("noteText").value.trim(); if (!text) return $("noteText").focus();
   try {
@@ -2082,6 +2102,7 @@ $("engineBtn").onclick = () => {
   const keys = Object.keys(ENGINE_COPY).filter((k) => S.engines[k]?.enabled);
   if (keys.length < 2) return toast("Only one engine is connected right now.");
   S.engine = keys[(keys.indexOf(S.engine) + 1) % keys.length]; store.set("bb_engine", S.engine); renderEngine();
+  menu(false); toast(`Switched to ${S.engines[S.engine]?.label || S.engine}. The next update and the next drawing use it; the board stays as it is.`);  // Sravani, 17 Oct: "no changes happening"
 };
 
 $("crew").innerHTML = Object.entries(BEES).map(([c, [name, , , asks]]) => `<li>${beeIcon(c)}<span><b>${name}</b><span>${asks}</span></span></li>`).join("")

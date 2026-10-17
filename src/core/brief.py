@@ -125,12 +125,13 @@ def build_brief(g: BuildingBeesEngine, with_plan: bool = True) -> str:
         add(f"### {tag(f.id)}{f.title}" + (f" (features {', '.join(feats_of(f.id))})" if feats_of(f.id) else ""))
         if f.goal:
             add(f"Goal: {f.goal}")
+        branches = f.metadata.get("branches", [])
         for i, step in enumerate(f.metadata.get("steps", []), 1):
             add(f"{i}. {step}")
-        for b in f.metadata.get("branches", []):
-            end = f"back to step {b['rejoin_step']}" if b.get("rejoin_step") else "ends here"
-            add(f"- After step {b['at_step']}, {b['decision']} {b['main_label']}: carry on. "
-                f"{b['label']}: " + ("; ".join(b["steps"]) + f" ({end})" if b["steps"] else "**not decided yet**"))
+            for b in (x for x in branches if x["at_step"] == i):  # each split sits under the step it comes after
+                end = f"back to step {b['rejoin_step']}" if b.get("rejoin_step") else "ends here"
+                add(f"   - **{b['decision']}** {b['main_label']}: carry on. {b['label']}: "
+                    + ("; ".join(b["steps"]) + f" ({end})" if b["steps"] else "**not decided yet**"))
         add("")
 
     if features:
