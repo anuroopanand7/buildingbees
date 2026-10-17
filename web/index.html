@@ -644,6 +644,7 @@
 <div id="brief" hidden role="dialog" aria-modal="true" aria-label="Product brief">
   <div class="brief-sheet">
     <div class="brief-bar"><b>Product brief</b>
+      <button class="btn" id="briefPlan" title="User stories with acceptance criteria, a feature list and a build order, written from the board"><i class="ph ph-list-checks" aria-hidden="true"></i>Write the full plan</button>
       <button class="btn primary" id="briefSign" title="Approve this scope as it stands"><i class="ph ph-seal-check" aria-hidden="true"></i>Sign off</button>
       <button class="btn" id="briefCopy"><i class="ph ph-copy" aria-hidden="true"></i>Copy</button>
       <button class="btn" id="briefAgent" title="A link your coding agent can read"><i class="ph ph-robot" aria-hidden="true"></i>Copy agent link</button>
@@ -1537,6 +1538,13 @@ $("fbList").onkeydown = async (e) => {
 $("fbList").onchange = async (e) => {
   if (!e.target.dataset.fbStatus) return;
   try { await fbApi(`/api/feedback/${e.target.dataset.fbStatus}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: e.target.value }) }); await fbLoad(); } catch (err) { toast(err.message); }
+};
+// The plan an agent builds from: one engine call, kept on the board, rewritten when decisions change.
+$("briefPlan").onclick = async () => {
+  const b = $("briefPlan"); b.disabled = true; b.lastChild.textContent = "Writing the plan...";
+  try { await api(`/api/plan?${eq()}`, { method: "POST" }); await load(); $("briefBtn").click(); toast("Plan written: user stories, features and build order are in the Brief."); }
+  catch (err) { toast(err.message); }
+  finally { b.disabled = false; b.lastChild.textContent = "Write the full plan"; }
 };
 $("briefSign").onclick = async () => {
   const by = byLine() || (prompt("Your name and role, for the sign-off (for example: Priya, client)") || "").trim();

@@ -41,6 +41,8 @@ flowchart LR
 
 **Teams.** Everyone opens the same board link and picks a role: product manager (hears every bee), client (business and compliance questions only), designer, frontend, backend or tester. Each answer records who gave it, the board picks up teammates' answers every 15 seconds, and the Brief shows who decided what.
 
+**The plan an agent builds from.** "Write the full plan" in the Brief adds user stories with "Given, when, then" acceptance criteria for every flow and branch, a feature list (must for v1, should, later), a build order of thin slices each with a done check, and a glossary. The Brief also keeps an **assumption log** of everything the bees filled in instead of asking. Export it all as Markdown or PDF.
+
 **Standard answers are not asked.** Timeouts, retries, double taps, loading and error states have industry-standard answers, so they are filled in and listed in the Brief under "Standard defaults applied", where the team can change any of them. The bees ask only what depends on this product. (A tester answered 70+ questions on an early version; the same idea now gets 9.)
 
 **Flows split.** A step can be a decision ("Payment went through?") drawn as a diamond, with the other path underneath. A path nobody has decided is drawn as "Not decided yet" and a bee asks about it; a path with a standard handling is drawn, not asked.
@@ -142,6 +144,7 @@ Every call takes the board id in an `X-Board` header or a `?board=` query parame
 | POST | `/api/nodes/{id}/interrogate?engine=` | Look for more gaps on one screen, button or API |
 | GET | `/api/graph`, `/api/screens` | The board and each screen's readiness |
 | GET | `/api/brief` | The Brief, as Markdown |
+| POST | `/api/plan?engine=` | Write user stories, features, build order and glossary from the board |
 | POST | `/api/signoff` | Sign off the scope as it stands (`by` says who) |
 | POST | `/api/flows/{id}/steps` | Edit a flow's steps by hand; after screens exist it flags a redraw |
 | POST | `/api/mode` | Switch a board between one founder (`solo`) and a `team` |

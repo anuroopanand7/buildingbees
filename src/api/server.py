@@ -272,6 +272,8 @@ def _state(graph: BuildingBeesEngine) -> Dict[str, Any]:
         "signoffs": getattr(graph, "signoffs", []),
         "mode": getattr(graph, "mode", "solo"),
         "owner": getattr(graph, "owner", ""),
+        "plan": getattr(graph, "plan", None),
+        "plan_decisions": getattr(graph, "plan_decisions", 0),
         "last_call": getattr(graph, "last_call", None),  # engine pill: which model answered, how fast
         # Stage one agrees the flows; screens are only drawn after that.
         "stage": "screens" if any(n.layer.value == "SCREEN" for n in graph.nodes.values()) else "flows",
@@ -543,6 +545,8 @@ class RestoreRequest(BaseModel):
     signoffs: List[Dict[str, Any]] = []
     mode: str = "solo"
     owner: str = ""
+    plan: Optional[Dict[str, Any]] = None
+    plan_decisions: int = 0
     needs_redraw: bool = False
     nodes: List[Dict[str, Any]]
     edges: List[Dict[str, str]]
@@ -565,6 +569,7 @@ def _rebuild(d: Dict[str, Any]) -> BuildingBeesEngine:
     g.signoffs = d.get("signoffs", [])[:20]
     g.mode = d.get("mode") if d.get("mode") in AUDIENCE else "solo"
     g.owner = d.get("owner", "")
+    g.plan, g.plan_decisions = d.get("plan"), int(d.get("plan_decisions") or 0)
     g.needs_redraw = bool(d.get("needs_redraw"))
     for n in d["nodes"][:2000]:
         cls = LAYER_CLASSES.get(n.get("layer"))
@@ -706,6 +711,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     g.signoffs = getattr(old, "signoffs", [])
     g.mode = getattr(old, "mode", "solo")
     g.owner = getattr(old, "owner", "")
+    g.plan, g.plan_decisions = getattr(old, "plan", None), getattr(old, "plan_decisions", 0)
     strip_guesses(g, g.spec_text + " " + " ".join(q.answer_text or "" for q in decisions))
     for f in flows:  # the steps the user agreed to stay on the flow
         if f.id in g.nodes:
@@ -801,6 +807,25 @@ def sign_off(payload: SignoffRequest) -> Dict[str, Any]:
         {"by": by, "at": datetime.datetime.utcnow().isoformat(), "decisions": decision_count(g),
          "open": sum(1 for n in g.nodes.values() if isinstance(n, QuestionNode) and n.question_status == QuestionStatus.OPEN)}]
     return {"signoffs": g.signoffs}
+
+
+@app.post("/api/plan")
+def write_plan(engine: str) -> Dict[str, Any]:
+    """Writes the plan an agent builds from (user stories with acceptance criteria, features, build order, glossary)
+    from the board's current Brief, and keeps it on the board. One engine call; run again after decisions change."""
+    eng = _engine(engine)
+    g = _board()
+    if not any(n.layer.value == "FLOW" for n in g.nodes.values()):
+        raise HTTPException(status_code=400, detail="Map an idea first")
+    started = time.time()
+    try:
+        x = eng.write_plan(audience(g) + "\n\n" + build_brief(g, with_plan=False)[:40000])
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"{eng.label} could not write the plan: {e}")
+    _trace(g, eng, started)
+    g.plan = x.model_dump()
+    g.plan_decisions = decision_count(g)  # to tell the reader when later decisions made it out of date
+    return get_graph_state()
 
 
 @app.get("/api/brief", response_class=PlainTextResponse)

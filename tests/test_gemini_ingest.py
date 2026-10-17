@@ -539,7 +539,7 @@ def test_standard_details_become_defaults_and_answers_name_who_gave_them(monkeyp
     assert [q.target_node_id for q in filled] == ["API_PAY"] and filled[0].question_status == "ANSWERED"
     assert g.nodes["API_PAY"].timeout_ms == 3000
     brief = c.get("/api/brief", headers=h).text
-    assert "answered by Backend: Ravi" in brief and "## Standard defaults applied" in brief
+    assert "answered by Backend: Ravi" in brief and "## Assumption log" in brief
 
 
 def test_sign_off_is_recorded_and_flags_a_later_change(monkeypatch):
@@ -640,7 +640,7 @@ def test_out_of_scope_decide_for_me_one_question_and_engine_trace(monkeypatch):
     brief = c.get("/api/brief", headers=h).text
     scope = brief.split("## Out of scope for v1 (agreed)")[1].split("\n## ")[0]
     assert "Is guest checkout allowed?" in scope
-    assert "Let them try again" in brief.split("## Standard defaults applied")[1]  # decided by the bees, still changeable
+    assert "Let them try again" in brief.split("## Assumption log")[1]  # decided by the bees, still changeable
 
 
 def test_a_photo_of_a_sketch_goes_to_the_engine_as_an_image(monkeypatch):
@@ -672,3 +672,31 @@ def test_people_rename_and_delete_their_boards_but_never_a_teammates(monkeypatch
     assert not gone["deleted"] and gone["boards"] == [] and "ann-shop" in server.boards  # only left Bob's list
     assert c.post("/api/me/boards/ann-shop/delete", headers=ann).json()["deleted"] and "ann-shop" not in server.boards
     assert c.post("/api/me/boards/x/delete").status_code == 401
+
+
+def test_the_full_plan_adds_stories_features_and_build_order_to_the_brief(monkeypatch):
+    from src.adapters.spec_prompts import PlanExtract, XFeature, XSlice, XStory, XTerm
+    seen = {}
+
+    class Planner(FakeGemini):
+        def write_plan(self, board):
+            seen["board"] = board
+            return PlanExtract(
+                stories=[XStory(flow_id="F_BUY", title="Buy", story="As a buyer, I want to pay, so that I get my order.",
+                                criteria=["Given a cart, when I pay, then I see a confirmation."])],
+                features=[XFeature(name="Checkout", priority="must"), XFeature(name="Wallet", priority="later")],
+                build_order=[XSlice(title="Walking skeleton", builds="Cart to confirmation.", done_when="A test order completes.")],
+                glossary=[XTerm(term="Cart", meaning="Items chosen before paying.")])
+
+    monkeypatch.setitem(server.engines, "gemini", Planner())
+    c, h = TestClient(server.app), {"X-Board": "full-plan"}
+    c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h)
+    assert "Not written yet" in c.get("/api/brief", headers=h).text
+    assert c.post("/api/plan?engine=gemini", headers=h).json()["plan"]["features"][0]["name"] == "Checkout"
+    assert "## Flows" in seen["board"] and "## User stories" not in seen["board"]  # written from the Brief, not from itself
+    brief = c.get("/api/brief", headers=h).text
+    assert "Given a cart, when I pay, then I see a confirmation." in brief
+    assert "### Must have for v1" in brief and "### Later" in brief and "Done when: A test order completes." in brief
+    q = next(n for n in c.get("/api/graph", headers=h).json()["nodes"] if n["layer"] == "QUESTION")
+    c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "Yes"}, headers=h)
+    assert "written before the latest decisions" in c.get("/api/brief", headers=h).text

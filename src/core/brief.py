@@ -37,7 +37,7 @@ def decision_count(g: BuildingBeesEngine) -> int:
                and not n.metadata.get("vague") and not n.metadata.get("default"))
 
 
-def build_brief(g: BuildingBeesEngine) -> str:
+def build_brief(g: BuildingBeesEngine, with_plan: bool = True) -> str:
     """Writes the whole board as one Markdown Brief: sign-off, users, flows and splits, screens, decisions, defaults, still open."""
     out: List[str] = []
     add = out.append
@@ -162,9 +162,48 @@ def build_brief(g: BuildingBeesEngine) -> str:
         add("")
 
     if defaults:
-        add("## Standard defaults applied (change any on the board)")
+        add("## Assumption log")
+        add("What the bees filled in instead of asking. Nobody had to approve these one by one; change any of them on the board.")
         for q in defaults:
-            add(f"- {title(q.target_node_id)}: {q.answer_text}")
+            if q.metadata.get("source") == "BuildingBees":  # a detail with an industry-standard answer
+                add(f"- ASSUMED (industry standard): {title(q.target_node_id)}: {q.answer_text}")
+            else:  # "Decide for me": the bees' recommendation on a product question
+                add(f"- ASSUMED (recommended by the bees): {q.question_text} **{q.answer_text}**")
+        add("")
+
+    plan = getattr(g, "plan", None) if with_plan else None
+    if plan:
+        if getattr(g, "plan_decisions", 0) != len(decided):
+            add("> The plan below was written before the latest decisions. Write the plan again to bring it up to date.")
+            add("")
+        flows = {f.id: f.title for f in _layer(g, "FLOW")}
+        add("## User stories")
+        for s in plan.get("stories", []):
+            add(f"### {s['title']}" + (f" ({flows[s['flow_id']]})" if s.get("flow_id") in flows else ""))
+            add(s["story"])
+            for c in s.get("criteria", []):
+                add(f"- {c}")
+            add("")
+        add("## Feature list")
+        for prio, label in (("must", "Must have for v1"), ("should", "Should have"), ("later", "Later")):
+            items = [f for f in plan.get("features", []) if f.get("priority") == prio]
+            if items:
+                add(f"### {label}")
+                for f in items:
+                    add(f"- **{f['name']}**" + (f": {f['why']}" if f.get("why") else ""))
+        add("")
+        add("## Build order")
+        for i, sl in enumerate(plan.get("build_order", []), 1):
+            add(f"{i}. **{sl['title']}**: {sl['builds']} Done when: {sl['done_when']}")
+        add("")
+        if plan.get("glossary"):
+            add("## Glossary")
+            for t in plan["glossary"]:
+                add(f"- **{t['term']}**: {t['meaning']}")
+            add("")
+    elif with_plan:
+        add("## User stories, features and build order")
+        add("Not written yet. Press \"Write the full plan\" in the Brief to add user stories with acceptance criteria, a feature list and a build order.")
         add("")
 
     add("## Still open")

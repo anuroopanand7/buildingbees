@@ -10,7 +10,7 @@ import os
 from typing import List, Optional
 
 from src.adapters.spec_prompts import (  # noqa: F401  (re-exported for callers)
-    FLOWS_PROMPT, FlowsExtract, INGEST_PROMPT, INTERROGATE_PROMPT, QuestionList, Reaction, SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
+    FLOWS_PROMPT, FlowsExtract, PLAN_PROMPT, PlanExtract, INGEST_PROMPT, INTERROGATE_PROMPT, QuestionList, Reaction, SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
 )
 
 DEFAULT_MODEL = "gemini-3.5-flash"  # fastest Flash for a full flow plan on our free key (17 Oct 2026: 15 s)
@@ -98,6 +98,10 @@ class GoogleGeminiAdapter:
     def react(self, prompt: str) -> Reaction:
         """A bee reads one answer: a sharper follow-up if it is vague, otherwise changes to the board."""
         return self._generate([prompt], Reaction)
+
+    def write_plan(self, board_json: str) -> PlanExtract:
+        """Writes user stories with acceptance criteria, a feature list, a build order and a glossary from the board."""
+        return self._generate([PLAN_PROMPT + board_json], PlanExtract)
 
     def interrogate(self, node_id: str, context_json: str, asked: List[str]) -> List[XQuestion]:
         """Looks for further product questions on one screen, button or API."""

@@ -160,6 +160,65 @@ class QuestionList(BaseModel):
     questions: List[XQuestion]
 
 
+# ---- The plan an agent builds from (written on demand from the board) ----
+
+class XStory(BaseModel):
+    flow_id: str          # the flow (or the flow a branch splits off) this story is about
+    title: str            # "Book a consultation"
+    story: str            # "As a client, I want ..., so that ..."
+    criteria: List[str]   # "Given ..., when ..., then ..."; NOT DECIDED where the board has not decided
+
+
+class XFeature(BaseModel):
+    name: str
+    priority: str         # must | should | later
+    flow_ids: List[str] = []
+    why: str = ""
+
+
+class XSlice(BaseModel):
+    title: str            # "Walking skeleton: book one slot end to end"
+    builds: str           # what this slice delivers
+    done_when: str        # the check that proves it works
+
+
+class XTerm(BaseModel):
+    term: str
+    meaning: str
+
+
+class PlanExtract(BaseModel):
+    stories: List[XStory]
+    features: List[XFeature]
+    build_order: List[XSlice]
+    glossary: List[XTerm] = []
+
+
+PLAN_PROMPT = """You are the BuildingBees product owner. The board below is the agreed plan of a product: users, flows
+with their branches, screens, decisions (who decided what), assumptions the bees made, what is out of scope, and
+what is still open. Write the parts a coding agent needs to build it without guessing.
+
+Rules:
+- Use only what the board and the decisions say. Never invent a business rule, a vendor, a number or a feature.
+  Where the board has not decided something a criterion needs, write NOT DECIDED in it so the builder asks.
+- stories: one per flow, plus one per branch path that has its own steps. "story" is "As a <user>, I want <goal>,
+  so that <reason>". 2 to 5 criteria each, every one "Given ..., when ..., then ...", covering the main path and
+  the failure paths the flow and its branches show. flow_id is the id of the flow it belongs to.
+- features: 5 to 12. priority is exactly "must" (needed for the first version to work), "should" (wanted, not
+  blocking), or "later" (only what the board lists under out of scope, or answers that put it off). An open
+  question is not "later": leave it out of the features, or, if a feature depends on it, keep the feature's
+  priority and end its "why" with "(depends on an open question)". flow_ids lists the flows it serves.
+  "why" is one short sentence.
+- build_order: 3 to 6 thin vertical slices in order. The first is a walking skeleton: one flow working end to end
+  in the simplest way. Each slice says what it builds and "done_when": a check a person or a test can run.
+- glossary: 3 to 10 of the product's own words, each with a one-line meaning.
+- Follow the AUDIENCE for the voice: everyday words for one founder, precise technical terms for a team.
+- No em dashes.
+
+THE BOARD (its current Brief, Markdown):
+"""
+
+
 INGEST_PROMPT = """You are the BuildingBees information architect. Turn the product spec below into a
 typed dependency graph: User -> Flow -> Screen -> CTA -> API.
 
