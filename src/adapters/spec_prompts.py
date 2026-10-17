@@ -244,6 +244,8 @@ Rules:
   detail says what the element shows, for the people who build it: for a list, the fields each card holds
   ("cake photo, name, price, pickup date"); for a choice, its options; for text, what it says. Leave it empty
   when the label already says it all.
+- Payments follow the decisions: use the payment methods and currency the team chose (UPI, cash, cards...);
+  never draw a card form or a currency nobody decided. If it is not decided, the API vendor stays empty.
 - States only where they are real: a loading state when the screen fetches data it shows (a list, an image,
   details from the server), an error state when a button on it calls an API. A static screen (a welcome,
   a confirmation built from what the person just entered) leaves loading and error empty.
@@ -322,6 +324,9 @@ Do NOT design screens, buttons or APIs yet. First agree the user flows.
    at_step, only when the other path is a real product choice (the slot was taken: offer the next one, or
    a waiting list?). An empty branch is how the team sees what the spec forgot: never fill it with a guess. At most 3 branches per flow;
    leave branches empty when the flow has no real split.
+MONEY AND PLACE. Never assume a country, a currency or a way to pay. If the product takes money and the
+   input does not say where it runs or how people pay, ask (one PM question) and offer local options in the
+   suggestions (for India: UPI, cash, card, bank transfer). Never write prices or currencies nobody stated.
 FEATURES. List the product's features (3 to 10), the way a PRD's feature list starts: a short name
    ("Custom cake order", "Advance payment", "Weekly order view"), the flow ids it lives in, why it matters in
    one short sentence, and priority: "must" for what the input asks for, "should" for what the flows need

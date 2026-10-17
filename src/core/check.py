@@ -42,7 +42,7 @@ def plan_check(g: BuildingBeesEngine) -> Dict[str, Any]:
         if n.layer.value == "CTA" and n.apis_called and not n.target_screen_on_failure:
             add("gap", f"{name(n.id)}: where the person goes when it fails is not decided", n.id)
         if n.layer.value == "API" and n.timeout_ms <= 0:
-            add("gap", f"{name(n.id)}: no timeout set", n.id)
+            add("gap", f"{name(n.id)}: how long to wait for a reply is not set", n.id)
     waiting = [c for c in getattr(g, "comments", []) if c.get("status") == "open"]
     if waiting:
         add("gap", f"{len(waiting)} note{'s' if len(waiting) > 1 else ''} on the board not applied yet: press Update the board")

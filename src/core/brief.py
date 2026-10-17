@@ -1,6 +1,7 @@
 """The Brief: the board written out as one Markdown document a person or a coding agent can build from.
 Built straight from the graph, with no model call, so it is instant, free and says only what was decided."""
 
+import datetime
 import re
 from typing import Dict, List
 
@@ -177,8 +178,9 @@ def build_brief(g: BuildingBeesEngine, with_plan: bool = True) -> str:
                 for api_id in sorted(g.forward_edges.get(c.id, [])):
                     a = g.nodes.get(api_id)
                     if a and a.layer.value == "API":
+                        wait = f"{a.timeout_ms} ms" if a.timeout_ms else "NOT DECIDED"  # never "NOT DECIDED ms" (Ravi's test)
                         add(f"  - calls {tag(a.id)}`{a.method} {a.path}` (service: {a.service or 'not named'}, "
-                            f"vendor: {a.vendor or 'none chosen'}, timeout: {_or_open(a.timeout_ms)} ms)")
+                            f"vendor: {a.vendor or 'none chosen'}, timeout: {wait})")
                         sends, returns = a.inputs_schema.get("fields"), a.outputs_schema.get("fields")
                         if sends or returns:
                             add(f"    sends: {', '.join(sends or []) or 'nothing'}; returns: {', '.join(returns or []) or 'nothing'}")
@@ -272,9 +274,13 @@ def build_brief(g: BuildingBeesEngine, with_plan: bool = True) -> str:
     if rounds:  # the review rounds, like the daily rounds of Roger's Figma ritual
         add("## Rounds")
         for r in rounds:
+            when = (datetime.datetime.fromisoformat(r["at"]) + datetime.timedelta(hours=5, minutes=30)).strftime("%d %b %Y")  # IST
+            if r.get("screens"):
+                add(f"- **Round {r['n']}** ({when}): screens drawn. {r.get('note', '')}".rstrip())
+                continue
             what = ", ".join(r.get("changed", [])) or "nothing on the board"
-            add(f"- **Round {r['n']}** ({r['at'][:10]}): {r.get('answers', 0)} answers and {r.get('notes', 0)} notes in; changed {what}."
-                + (f" {r['note']}" if r.get("note") else ""))
+            ins = " and ".join(x for x in (count(r.get("answers", 0), "answer") if r.get("answers") else "", count(r.get("notes", 0), "note") if r.get("notes") else "") if x) or "nothing new"
+            add(f"- **Round {r['n']}** ({when}): {ins} in; changed {what}." + (f" {r['note']}" if r.get("note") else ""))
         add("")
 
     add("## Still open")

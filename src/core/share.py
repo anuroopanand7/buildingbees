@@ -41,6 +41,7 @@ def build_share_html(g: BuildingBeesEngine) -> str:
     decided = [q for q in qs if q.question_status == QuestionStatus.ANSWERED and not q.metadata.get("vague")]
     still = [q for q in qs if q.question_status == QuestionStatus.OPEN]
     check = plan_check(g)
+    who = "you" if getattr(g, "mode", "solo") != "team" else "the team"  # a solo founder's answers are theirs
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
            f"<title>{_e(title)}: product plan</title><style>{_CSS}</style></head><body>"
            f"<header><b>{_e(title)}</b><nav><a href='#check'>Plan check</a><a href='#features'>Features</a><a href='#flows'>Flows</a>"
@@ -94,8 +95,13 @@ def build_share_html(g: BuildingBeesEngine) -> str:
         add("</ul></div>")
 
     add("<h2 id='decisions'>Decisions</h2><ul>" + "".join(
-        f"<li data-s><b>{_e(q.question_text)}</b> {_e(q.answer_text or '')} <span class='muted'>({_e(q.metadata.get('answered_by') or 'the team')}{', a default' if q.metadata.get('default') else ''})</span></li>"
+        f"<li data-s><b>{_e(q.question_text)}</b> {_e(q.answer_text or '')} <span class='muted'>({_e(q.metadata.get('answered_by') or who)}{', a default' if q.metadata.get('default') else ''})</span></li>"
         for q in decided) + "</ul>")
+    notes = getattr(g, "comments", [])
+    if notes:  # what people wrote on the board itself (Ravi's note was missing from the page)
+        add("<h2 id='notes'>Notes on the board</h2><ul>" + "".join(
+            f"<li data-s>{idlink(c['target'])}{_e(c['text'])} <span class='muted'>({_e(c.get('by') or who)}; {'applied' if c.get('status') == 'applied' else 'waiting'})</span></li>"
+            for c in notes) + "</ul>")
     need = "<span class='tag bad'>needed before building</span> "
     add("<h2 id='open'>Still open</h2><ul>" + ("".join(
         f"<li data-s>{need if q.is_blocking else ''}{_e(q.question_text)} {idlink(q.target_node_id)}</li>" for q in still)

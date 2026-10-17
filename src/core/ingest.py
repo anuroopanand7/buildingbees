@@ -270,7 +270,7 @@ def add_gap_questions(g: BuildingBeesEngine) -> list:
                 suggested_options=["3 seconds, retry once", "5 seconds, no retry", "10 seconds, retry twice with a pause"]))
     asks = [q for q in asks if not any(o.question_status == QuestionStatus.OPEN for o in g.get_questions_for_node(q.target_id)
                                        if o.category.value == q.category)]
-    return add_questions(g, asks, "BuildingBees")
+    return add_questions(g, asks, "BuildingBees", dedupe=False)  # one per node: similar wording is not a repeat here
 
 
 def add_gap_defaults(g: BuildingBeesEngine) -> list:

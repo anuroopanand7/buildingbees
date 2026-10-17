@@ -51,7 +51,7 @@ from src.adapters import tavily
 from src.core.brief import short_ids, build_brief, decision_count
 from src.core.check import plan_check
 from src.core.share import build_share_html
-from src.core.ingest import add_gap_questions, add_questions, apply_gap_default, strip_guesses, build_flows_graph, merge_feature, build_graph_from_extract, clean_branches, ask_open_branches, add_gap_defaults
+from src.core.ingest import add_features, add_gap_questions, add_questions, apply_gap_default, strip_guesses, build_flows_graph, merge_feature, build_graph_from_extract, clean_branches, ask_open_branches, add_gap_defaults
 
 app = FastAPI(
     title="BuildingBees API",
@@ -862,10 +862,9 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
             g.add_node(q)
             g.add_edge(q.target_node_id, q.id)
     add_gap_defaults(g)
-    g.rounds = g.rounds + [{"n": g.round, "at": datetime.datetime.utcnow().isoformat(), "answers": len(decisions), "notes": len(g.comments),
-                            "changed": ["Screens drawn"], "note": "I drew the screens from the agreed flows and your decisions.", "asked": 0, "by": ""}]
-    g.round += 1
-    _start_round(g)
+    g.rounds = g.rounds + [{"n": g.round, "at": datetime.datetime.utcnow().isoformat(), "answers": 0, "notes": 0, "screens": True,
+                            "changed": ["Screens drawn"], "note": f"I drew the screens from the agreed flows and {len(decisions)} decisions.", "asked": 0, "by": ""}]
+    _start_round(g)  # the screens' questions make up this round; its number only moves on when input is processed
     _set_graph(g)
     return get_graph_state()
 
@@ -1057,6 +1056,8 @@ def write_plan(engine: str) -> Dict[str, Any]:
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"{eng.label} could not write the plan: {e}")
     _trace(g, eng, started)
+    from src.adapters.spec_prompts import XProductFeature
+    add_features(g, [XProductFeature(name=f.name, priority=f.priority, flow_ids=f.flow_ids, why=f.why) for f in x.features])
     g.plan = x.model_dump()
     g.plan_decisions = decision_count(g)  # to tell the reader when later decisions made it out of date
     return get_graph_state()

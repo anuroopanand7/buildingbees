@@ -279,7 +279,7 @@ def test_brief_states_decisions_and_gaps(monkeypatch):
     assert "1. Open cart" in brief and "Cart (" in brief and "### S1 " in brief  # screens carry their short id
     assert "**Is guest checkout allowed?** No, sign-in required" in brief and "Queen Bee" in brief
     assert "BLOCKS THE BUILD: What if the gateway times out?" in brief
-    assert "timeout: NOT DECIDED ms" in brief and "vendor: none chosen" in brief
+    assert "timeout: NOT DECIDED" in brief and "vendor: none chosen" in brief
     assert "Empty: NOT DECIDED" not in brief  # an empty state is only printed when one was decided
     assert "\u2014" not in brief
 
@@ -820,7 +820,7 @@ def test_rounds_budget_features_and_ids(monkeypatch):
     after = c.post("/api/expand?engine=gemini", headers=h).json()
     assert "F_RETURN" in {n["id"] for n in after["nodes"]}
     assert after["short_ids"]["F_BUY"] == ids["F_BUY"]  # ids survive the redraw
-    assert after["round"] == 2 and after["rounds"][-1]["changed"] == ["Screens drawn"]
+    assert after["round"] == 1 and after["rounds"][-1]["changed"] == ["Screens drawn"]  # drawing screens stays in the round that agreed the flows
     brief = c.get("/api/brief", headers=h).text
     assert "## Features" in brief and "F1 Checkout" in brief and "## Rounds" in brief
 

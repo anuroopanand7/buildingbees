@@ -1029,7 +1029,7 @@ function screenCard(id) {
   const open = r ? r.open_blocking_questions.length : 0;
   const state = !r ? "" : r.is_build_ready && !open ? '<span class="tag good"><i class="ph ph-check-circle" aria-hidden="true"></i>Ready to build</span>'
     : open ? `<span class="tag soft"><i class="ph ph-question" aria-hidden="true"></i>${open} open question${open > 1 ? "s" : ""}</span>`
-    : '<span class="tag soft">Details missing</span>';
+    : '<span class="tag soft">A few details to settle</span>';
   const ctas = (S.fwd[id] || []).map((c) => S.nodes[c]).filter((c) => c && c.layer === "CTA");
   return `<article class="scr ${PM.focus === id || S.selected === id ? "focus" : ""} ${hit(id)}" data-id="${esc(id)}" data-node tabindex="0">
     ${pmQueue()[0] && screenOf(pmQueue()[0].target_node_id) === id ? `<span class="pin">${beeIcon(pmQueue()[0].category, true)}${esc(bee(pmQueue()[0].category)[0])} is asking</span>` : ""}
@@ -1039,7 +1039,7 @@ function screenCard(id) {
       const apis = (S.fwd[c.id] || []).map((a) => S.nodes[a]).filter((a) => a && a.layer === "API");
       const cnt = openBlocking(c.id) + apis.reduce((t, a) => t + openBlocking(a.id), 0);
       return `<li class="cta ${PM.focus === c.id || S.selected === c.id ? "focus" : ""} ${hit(c.id) || apis.map((a) => hit(a.id)).find(Boolean) || ""}" data-id="${esc(c.id)}" tabindex="0">
-        <div class="cta-top"><span class="cta-label">${idChip(c.id)}${esc(c.label || c.title)}${apis.length ? "" : ' <span class="muted">just moves on</span>'}</span>${cnt ? `<span class="count" title="Open blocking questions">${cnt}</span>` : ""}</div>
+        <div class="cta-top"><span class="cta-label">${idChip(c.id)}${esc(c.label || c.title)}${apis.length ? "" : ' <span class="muted">goes to the next screen</span>'}</span>${cnt ? `<span class="count" title="Open blocking questions">${cnt}</span>` : ""}</div>
         ${apis.length ? `<div class="apis">${apis.map((a) => `<button class="api mono ${PM.focus === a.id || S.selected === a.id ? "focus" : ""}" data-id="${esc(a.id)}" title="${esc(a.method)} ${esc(a.path)}">${idChip(a.id)}${S.mode === "team" ? `${esc(a.method)} ${esc(a.path)}` : esc(apiWords(a))}</button>`).join("")}</div>` : ""}
       </li>`;
     }).join("")}</ul>` : '<div class="no-ctas">No buttons defined</div>'}
@@ -1784,7 +1784,11 @@ async function ingest(run, title) {
 }
 async function drawScreens() {
   working("Drawing the screens from your flows and decisions");
-  try { await api(`/api/expand?${eq()}`, { method: "POST" }); S.selected = null; resetPM(); await load(); }
+  try {
+    await api(`/api/expand?${eq()}`, { method: "POST" }); S.selected = null; resetPM(); await load();
+    // New questions about the screens belong to this round; say so, so the jump in the count makes sense (Ravi's test).
+    toast(roundLeft() ? `Screens drawn. Round ${S.round}: ${roundLeft()} question${roundLeft() > 1 ? "s" : ""} about the screens.` : "Screens drawn. Nothing blocks the build now.");
+  }
   catch (err) { PM.error = err.message; render(); }
   finally { working(""); }
 }
