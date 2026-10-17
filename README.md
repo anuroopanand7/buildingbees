@@ -106,7 +106,7 @@ Open http://localhost:8000. Run the tests with `.venv/bin/python -m pytest -q`.
 
 ```bash
 gcloud run deploy buildingbees --source . --region asia-south1 --allow-unauthenticated \
-  --min-instances 0 --max-instances 1 --set-env-vars "GEMINI_API_KEY=...,GEMINI_MODEL=gemini-3.5-flash"
+  --min-instances 0 --max-instances 1 --set-env-vars "GEMINI_API_KEY=...,GEMINI_MODEL=gemini-3.8-flash"
 ```
 
 ## Project layout

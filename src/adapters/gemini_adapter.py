@@ -13,8 +13,10 @@ from src.adapters.spec_prompts import (  # noqa: F401  (re-exported for callers)
     FLOWS_PROMPT, FlowsExtract, INGEST_PROMPT, INTERROGATE_PROMPT, QuestionList, Reaction, SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
 )
 
-DEFAULT_MODEL = "gemini-3.5-flash"
-FALLBACK_MODELS = ["gemini-3.5-flash-lite", "gemini-3.7-flash", "gemini-flash-latest"]
+DEFAULT_MODEL = "gemini-3.8-flash"  # newest Flash on the free tier (checked 17 Oct 2026)
+# Each model has its own free daily quota, so a long chain keeps the bees answering when one runs out
+# (17 Oct: gemini-3.5-flash hit its daily limit mid-demo while 3.8 still answered).
+FALLBACK_MODELS = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite"]
 
 
 class EngineNotConfigured(RuntimeError):
