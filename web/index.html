@@ -504,6 +504,73 @@
     .zoombar { display: none; }
     #canvas { padding: 76px 16px 46dvh 64px; }
   }
+
+  /* ── Interaction layer (rules in docs/DESIGN_RULES.md) ───────────────────────
+     Testers said buttons did not look clickable. Every clickable thing now has
+     four states that look different: rest (a raised edge says "press me"),
+     hover (lifts 1px, edge darkens), pressed (sinks, shadow goes inside) and
+     keyboard focus (a dark ring). This block sits last so it wins over the
+     older per-component rules above. */
+  :root {
+    --ink-hover: #2e2d2a; --ink-press: #000000; --edge-hover: #a9a7a0;
+    --lift: 0 1px 2px rgba(17, 17, 16, .08), 0 1px 0 rgba(17, 17, 16, .04);
+    --lift-hover: 0 4px 12px rgba(17, 17, 16, .10), 0 1px 2px rgba(17, 17, 16, .08);
+    --sink: inset 0 1px 2px rgba(17, 17, 16, .14);
+    --t-state: .15s; --t-press: .08s;
+  }
+  .btn, .option, .who-card, .board-row, .tool, .icon-btn, .zoombar button, .stepper button, .seg button, .link, .dock-pill, .menu button {
+    transition: background var(--t-state), border-color var(--t-state), box-shadow var(--t-state), color var(--t-state), transform var(--t-state) var(--ease-out);
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+
+  /* Text buttons. Secondary: white with a visible edge and a small shadow. */
+  .btn { background: var(--panel); border-color: var(--line-strong); box-shadow: var(--lift); }
+  .btn:hover:not(:disabled) { background: var(--panel); border-color: var(--edge-hover); box-shadow: var(--lift-hover); transform: translateY(-1px); }
+  .btn:active:not(:disabled) { background: var(--fill); box-shadow: var(--sink); transform: translateY(0) scale(.98); transition-duration: var(--t-press); }
+  /* Primary: solid ink with a faint top highlight, so it reads as a raised key. */
+  .btn.primary { background: var(--ink); color: var(--on-ink); border-color: var(--ink); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 1px 2px rgba(17, 17, 16, .3); }
+  .btn.primary:hover:not(:disabled) { background: var(--ink-hover); border-color: var(--ink-hover); opacity: 1; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 6px 16px rgba(17, 17, 16, .22); }
+  .btn.primary:active:not(:disabled) { background: var(--ink-press); box-shadow: inset 0 2px 3px rgba(0, 0, 0, .5); }
+  /* Ghost: no fill, edge only; fills on hover. */
+  .btn.ghost { background: transparent; box-shadow: none; }
+  .btn.ghost:hover:not(:disabled) { background: var(--panel); }
+  .btn:disabled { box-shadow: none; transform: none; }
+  .island.btn { background: var(--island); }
+
+  /* Choices the person picks from: an edge at rest, lift on hover, sink on press. */
+  .option, .who-card, .board-row { box-shadow: var(--lift); }
+  .option:hover, .who-card:hover, .board-row:hover { border-color: var(--edge-hover); background: var(--panel); box-shadow: var(--lift-hover); transform: translateY(-1px); }
+  .option:active, .who-card:active, .board-row:active { background: var(--fill); box-shadow: var(--sink); transform: scale(.985); transition-duration: var(--t-press); }
+  .option[aria-pressed="true"], .who-card[aria-pressed="true"] { border-color: var(--accent); background: var(--focus); box-shadow: 0 0 0 1px var(--accent); }
+  .who-card:hover i { color: var(--text); }
+  /* A radio dot tells the person these two cards are a choice, not information. */
+  .who-card { position: relative; padding-right: 36px; }
+  .who-card::after { content: ""; position: absolute; top: 14px; right: 14px; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--line-strong); background: var(--panel); transition: border-color var(--t-state), box-shadow var(--t-state); }
+  .who-card:hover::after { border-color: var(--edge-hover); }
+  .who-card[aria-pressed="true"]::after { border-color: var(--text); box-shadow: inset 0 0 0 3.5px var(--panel); background: var(--text); }
+
+  /* Icon buttons: quiet at rest (toolbars stay calm), a fill on hover, darker fill on press. */
+  .tool:hover, .icon-btn:hover, .zoombar button:hover, .dock-pill:hover, .menu button:hover { background: var(--fill); }
+  .icon-btn:hover { background: var(--line); }
+  .tool:active, .icon-btn:active, .zoombar button:active, .rail #hive button:active { background: var(--line); transform: scale(.92); transition-duration: var(--t-press); }
+  .dock-pill:active, .menu button:active { background: var(--line); }
+
+  /* Segmented controls and the stage bar: the unpicked items answer the pointer too. */
+  .stepper button:hover:not(:disabled):not([aria-current]), .seg button:hover:not(:disabled):not([aria-pressed="true"]) { color: var(--text); background: rgba(255, 255, 255, .6); }
+  .stepper button:active:not(:disabled), .seg button:active:not(:disabled) { transform: scale(.96); transition-duration: var(--t-press); }
+
+  /* Links: the underline darkens on hover, dims on press. */
+  .link:hover { text-decoration-color: currentColor; }
+  .link:active { opacity: .65; }
+
+  /* Keyboard focus: one dark ring everywhere, never removed. */
+  .btn:focus-visible, .option:focus-visible, .who-card:focus-visible, .board-row:focus-visible, .tool:focus-visible, .icon-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+  /* Touch screens keep hover stuck after a tap, so drop the lift there; press still shows. */
+  @media (hover: none) {
+    .btn:hover:not(:disabled), .option:hover, .who-card:hover, .board-row:hover { transform: none; box-shadow: var(--lift); }
+    .btn.primary:hover:not(:disabled) { background: var(--ink); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 1px 2px rgba(17, 17, 16, .3); }
+  }
 </style>
 </head>
 <body>
