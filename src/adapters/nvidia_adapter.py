@@ -20,9 +20,9 @@ from src.adapters.spec_prompts import (
 )
 
 DEFAULT_BASE_URL = "https://api.tokenfactory.nebius.com/v1"  # the hackathon requires Nebius Token Factory
-DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b"  # of the four Nemotron models on Token Factory (11 Oct 2026): Lightning is quicker but misses vague answers
-# Drawing every screen, button and API from the agreed flows is the one heavy reasoning job, so it goes to
-# the largest Nemotron. Everything the founder waits on between answers stays on the fast one.
+DEFAULT_MODEL = "nvidia/Nemotron-3-Ultra-550b-a55b"  # the strongest Nemotron on Token Factory, for every call (18 Oct 2026: 1.5 s on a small check, valid JSON)
+# Screens and the plan are the heavy jobs; since 18 Oct 2026 every call uses Ultra, which answered a small
+# structured check in 1.5 s. Set NVIDIA_MODEL to nvidia/nemotron-3-super-120b-a12b to go back to Super.
 DEFAULT_HEAVY_MODEL = "nvidia/Nemotron-3-Ultra-550b-a55b"
 
 

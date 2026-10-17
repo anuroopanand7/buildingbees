@@ -13,11 +13,13 @@ from src.adapters.spec_prompts import (  # noqa: F401  (re-exported for callers)
     FLOWS_PROMPT, FlowsExtract, PLAN_PROMPT, PlanExtract, INGEST_PROMPT, INTERROGATE_PROMPT, QuestionList, Reaction, SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
 )
 
-DEFAULT_MODEL = "gemini-3.5-flash"  # fastest Flash for a full flow plan on our free key (17 Oct 2026: 15 s)
-# Each model has its own free quota, so the chain keeps the bees answering when one is busy or out of quota.
-# Measured 17 Oct on a full flow plan: 3.7-flash 24 s, flash-latest 23 s, 3.8-flash overloaded, 3.1-flash-lite 6 s
-# (fewer questions, so it is the last resort).
-FALLBACK_MODELS = ["gemini-3.7-flash", "gemini-flash-latest", "gemini-3.8-flash", "gemini-3.1-flash-lite"]
+DEFAULT_MODEL = "gemini-3.7-flash"  # strong and steady: 24 s on a full flow plan (17 Oct 2026)
+# Each model has its own free quota (20 requests a day per model), so the chain keeps the bees answering when
+# one is busy or spent. Strong Flash models only, newest after the default; no Flash-Lite (Roger, 18 Oct 2026:
+# "lets not use lame models"). Pro models need a paid tier on this key, so they are not in the chain.
+# 17 Oct measurements: 3.7-flash 24 s, flash-latest 23 s, 3.8-flash overloaded at the time. 18 Oct: 3-flash-preview
+# timed out after 82 s on a full flow plan, so it is out.
+FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-flash-latest"]
 
 
 class EngineNotConfigured(RuntimeError):

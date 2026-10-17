@@ -288,6 +288,8 @@
   .note-btn.ask .bee { width: 18px; height: 18px; font-size: 10px; }
   .tray { position: fixed; right: 16px; top: 64px; z-index: 27; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 14px; font-size: 13px; max-width: calc(100vw - 32px); }
   .tray #trayText { display: grid; line-height: 1.3; }
+  .tray-meter { display: block; height: 4px; border-radius: 4px; background: var(--fill); margin-top: 5px; overflow: hidden; }
+  .tray-meter i { display: block; height: 100%; background: var(--accent); transition: width .3s var(--ease-out); }
   .tray.busy { box-shadow: 0 0 0 2px var(--accent), var(--island-shadow); }
   .spinner.sm { width: 14px; height: 14px; border-width: 2px; margin: 0; border-color: rgba(255, 255, 255, .3); border-top-color: #fff; }
   .tray [data-update]:disabled { opacity: 1; background: var(--ink-hover); }
@@ -1471,16 +1473,21 @@ function renderNoteList() {
 }
 const waitingAnswers = () => byLayer("QUESTION").filter((q) => q.question_status === "ANSWERED" && q.metadata?.pending);
 const waitingNotes = () => (S.comments || []).filter((c) => c.status === "open");
+// Roger, 18 Oct 2026: gather as much as the person has to say before redrawing. The update button appears
+// once 7 inputs (answers plus notes) are waiting, or sooner when the bees have nothing left to ask.
+const UPDATE_AT = 7;
 function renderTray() {
   const a = waitingAnswers().length, n = waitingNotes().length;
+  const ready = a + n >= UPDATE_AT || !pmQueue().length;
   const busy = PM.reacting === "The bees";
   $("tray").hidden = !(a + n) && !busy;
   $("tray").classList.toggle("busy", busy);
   $("scan").hidden = !busy;
   const parts = [a && `${a} answer${a > 1 ? "s" : ""}`, n && `${n} note${n > 1 ? "s" : ""}`].filter(Boolean).join(" and ");
   $("trayText").innerHTML = busy ? `<b>Updating the board</b><span class="muted">The bees are applying ${parts || "your changes"}. About 15 to 30 seconds.</span>`
-    : `<b>${parts} waiting</b><span class="muted">The board changes only when you say so.</span>`;
-  const b = $("tray").querySelector("[data-update]"); b.disabled = busy;
+    : ready ? `<b>${parts} waiting</b><span class="muted">The board changes only when you say so.</span>`
+    : `<b>${parts} saved</b><span class="muted">Keep answering, or comment on any card. You can update the board at ${UPDATE_AT}.</span><span class="tray-meter" aria-hidden="true"><i style="width:${Math.round(100 * (a + n) / UPDATE_AT)}%"></i></span>`;
+  const b = $("tray").querySelector("[data-update]"); b.disabled = busy; b.hidden = !ready && !busy;
   b.innerHTML = busy ? '<span class="spinner sm" aria-hidden="true"></span>Updating' : 'Update the board<i class="ph ph-arrows-clockwise" aria-hidden="true"></i>';
 }
 async function updateBoard() {
