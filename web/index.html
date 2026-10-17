@@ -335,10 +335,14 @@
   .brief-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
   .brief-bar b { margin-right: auto; }
   #boards .brief-sheet { width: min(520px, 100%); }
-  #boardsBody { overflow: auto; padding: 8px 18px 18px; }
+  #boardsBody { overflow-y: auto; overflow-x: hidden; padding: 8px 18px 18px; }
   #boardsBody p { color: var(--muted); font-size: 13px; margin: 10px 0; }
   .board-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: none; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-top: 8px; font: inherit; cursor: pointer; }
   .board-row:hover { border-color: var(--line-strong); }
+  .board-line { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+  .board-line .board-row { margin-top: 0; flex: 1; min-width: 0; }
+  .board-line .icon-btn.armed { background: var(--bad); color: #fff; }
+  .board-name { flex: 1; min-width: 0; height: 42px; border: 1px solid var(--accent); border-radius: 10px; padding: 0 12px; font: inherit; }
   .board-row b { flex: 1; font-weight: 600; overflow-wrap: anywhere; }
   .board-row span { color: var(--muted); font-size: 12px; flex: none; }
   .brief-bar .btn { min-height: 34px; padding: 0 14px; font-size: 13px; }
@@ -1586,11 +1590,41 @@ $("boardsBtn").onclick = async () => {
   try {
     const { boards } = await api("/api/me/boards", { method: "POST" });
     $("boardsBody").innerHTML = `<p>Signed in as ${esc(AUTH.user.email || "")}. Open these on any device by signing in.</p>` + (boards.length
-      ? boards.map((b) => `<button class="board-row" data-board="${esc(b.id)}"><b>${esc(b.name)}</b><span>${b.id === BOARD ? "Open now" : esc(new Date(b.updated).toLocaleDateString(undefined, { day: "numeric", month: "short" }))}</span></button>`).join("")
+      ? boards.map(boardRow).join("")
       : "<p>No boards yet. Map an idea and it will appear here.</p>");
   } catch (err) { $("boardsBody").innerHTML = `<p>${esc(err.message)}</p>`; }
 };
-$("boardsBody").onclick = (e) => { const b = e.target.closest("[data-board]"); if (b && b.dataset.board !== BOARD) openBoard(b.dataset.board); else if (b) $("boards").hidden = true; };
+// One row per board: open it, rename it, or delete it. Deleting needs a second press (no confirm(): in-app browsers block it).
+const boardRow = (b) => `<div class="board-line" data-row="${esc(b.id)}">
+  <button class="board-row" data-board="${esc(b.id)}"><b>${esc(b.name)}</b><span>${b.id === BOARD ? "Open now" : esc(new Date(b.updated).toLocaleDateString(undefined, { day: "numeric", month: "short" }))}</span></button>
+  <button class="icon-btn" data-rename="${esc(b.id)}" aria-label="Rename ${esc(b.name)}" data-tip="Rename" data-tip-pos="top"><i class="ph ph-pencil-simple" aria-hidden="true"></i></button>
+  <button class="icon-btn" data-del="${esc(b.id)}" aria-label="Delete ${esc(b.name)}" data-tip="Delete" data-tip-pos="top"><i class="ph ph-trash" aria-hidden="true"></i></button></div>`;
+const showBoards = (boards) => { $("boardsBody").querySelectorAll(".board-line, .empty-note").forEach((n) => n.remove());
+  $("boardsBody").insertAdjacentHTML("beforeend", boards.length ? boards.map(boardRow).join("") : '<p class="empty-note">No boards yet. Map an idea and it will appear here.</p>'); };
+$("boardsBody").onclick = async (e) => {
+  const del = e.target.closest("[data-del]"), ren = e.target.closest("[data-rename]"), b = e.target.closest("[data-board]");
+  try {
+    if (del) {
+      if (!del.classList.contains("armed")) { del.classList.add("armed"); del.dataset.tip = "Press again to delete"; return setTimeout(() => del.classList.remove("armed"), 4000); }
+      const r = await api(`/api/me/boards/${encodeURIComponent(del.dataset.del)}/delete`, { method: "POST" });
+      showBoards(r.boards);
+      toast(r.deleted ? "Board deleted." : "Removed from your boards. It stays for the teammate who created it.");
+      if (del.dataset.del === BOARD && r.deleted) openBoard("");
+      return;
+    }
+    if (ren) {
+      const row = ren.closest("[data-row]"), name = row.querySelector("b").textContent;
+      row.querySelector(".board-row").outerHTML = `<input class="board-name" data-renaming="${esc(ren.dataset.rename)}" value="${esc(name)}" aria-label="New name" maxlength="60">`;
+      const i = row.querySelector("input"); i.focus(); i.select(); return;
+    }
+    if (b && b.dataset.board !== BOARD) openBoard(b.dataset.board); else if (b) $("boards").hidden = true;
+  } catch (err) { toast(err.message); }
+};
+$("boardsBody").onkeydown = async (e) => {
+  const i = e.target.closest("[data-renaming]"); if (!i || e.key !== "Enter") return;
+  try { const r = await api(`/api/me/boards/${encodeURIComponent(i.dataset.renaming)}/rename`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: i.value }) });
+    showBoards(r.boards); if (i.dataset.renaming === BOARD) load(); toast("Renamed."); } catch (err) { toast(err.message); }
+};
 $("boardsClose").onclick = () => { $("boards").hidden = true; };
 $("signOut").onclick = async () => { await AUTH.sdk.signOut(AUTH.fb); $("boards").hidden = true; toast("Signed out."); };
 

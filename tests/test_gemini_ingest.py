@@ -656,3 +656,19 @@ def test_a_photo_of_a_sketch_goes_to_the_engine_as_an_image(monkeypatch):
                                     files={"file": ("napkin.png", b"\x89PNG fake", "image/png")})
     assert r.status_code == 200 and got["image"] == (b"\x89PNG fake", "image/png")
     assert server.boards["sketch"].spec_text == "A photo of the founder's sketch"
+
+
+def test_people_rename_and_delete_their_boards_but_never_a_teammates(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", FakeGemini())
+    monkeypatch.setattr(server, "_uid", lambda auth: {"Bearer ann": "ann", "Bearer bob": "bob"}.get(auth))
+    monkeypatch.setattr(server, "_user_boards", {})
+    c = TestClient(server.app)
+    ann, bob = {"Authorization": "Bearer ann"}, {"Authorization": "Bearer bob"}
+    c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers={**ann, "X-Board": "ann-shop"})
+    c.post("/api/me/boards", headers={**bob, "X-Board": "ann-shop"})  # Bob opened Ann's shared link
+    out = c.post("/api/me/boards/ann-shop/rename", json={"name": "Corner Shop"}, headers=bob).json()
+    assert out["boards"][0]["name"] == "Corner Shop" and server.boards["ann-shop"].product_name == "Corner Shop"
+    gone = c.post("/api/me/boards/ann-shop/delete", headers=bob).json()
+    assert not gone["deleted"] and gone["boards"] == [] and "ann-shop" in server.boards  # only left Bob's list
+    assert c.post("/api/me/boards/ann-shop/delete", headers=ann).json()["deleted"] and "ann-shop" not in server.boards
+    assert c.post("/api/me/boards/x/delete").status_code == 401

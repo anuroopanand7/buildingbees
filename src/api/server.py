@@ -77,6 +77,7 @@ def serve_index():
 MAX_BOARDS = 300
 boards: "OrderedDict[str, BuildingBeesEngine]" = OrderedDict()
 _board_id: ContextVar[str] = ContextVar("board_id", default="default")
+_auth: ContextVar[str] = ContextVar("auth", default="")  # this request's Authorization header, to record who made a board
 log = logging.getLogger("buildingbees")
 
 _store = None   # Firestore collection of boards
@@ -207,9 +208,10 @@ async def _select_board(request, call_next):
     # The web app sends a header; a coding agent given a link uses ?board=.
     bid = (request.headers.get("x-board") or request.query_params.get("board") or "default")[:64]
     _board_id.set(bid)
+    _auth.set(request.headers.get("authorization", ""))
     response = await call_next(request)
     if (request.method == "POST" and request.url.path.startswith("/api/") and response.status_code < 400
-            and not request.url.path.startswith("/api/feedback")):  # feedback is not part of any board
+            and not request.url.path.startswith(("/api/feedback", "/api/me/boards/"))):  # not the open board's business
         await run_in_threadpool(_save_board, bid)
         auth = request.headers.get("authorization", "")
         if auth:
@@ -269,6 +271,7 @@ def _state(graph: BuildingBeesEngine) -> Dict[str, Any]:
         "sources": getattr(graph, "sources", []),
         "signoffs": getattr(graph, "signoffs", []),
         "mode": getattr(graph, "mode", "solo"),
+        "owner": getattr(graph, "owner", ""),
         "last_call": getattr(graph, "last_call", None),  # engine pill: which model answered, how fast
         # Stage one agrees the flows; screens are only drawn after that.
         "stage": "screens" if any(n.layer.value == "SCREEN" for n in graph.nodes.values()) else "flows",
@@ -539,6 +542,7 @@ class RestoreRequest(BaseModel):
     sources: List[Dict[str, str]] = []
     signoffs: List[Dict[str, Any]] = []
     mode: str = "solo"
+    owner: str = ""
     needs_redraw: bool = False
     nodes: List[Dict[str, Any]]
     edges: List[Dict[str, str]]
@@ -560,6 +564,7 @@ def _rebuild(d: Dict[str, Any]) -> BuildingBeesEngine:
     g.sources = d.get("sources", [])[:tavily.MAX_SOURCES]
     g.signoffs = d.get("signoffs", [])[:20]
     g.mode = d.get("mode") if d.get("mode") in AUDIENCE else "solo"
+    g.owner = d.get("owner", "")
     g.needs_redraw = bool(d.get("needs_redraw"))
     for n in d["nodes"][:2000]:
         cls = LAYER_CLASSES.get(n.get("layer"))
@@ -626,6 +631,7 @@ def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None, mode: s
         x = eng.extract_flows(text=lead + text + tavily.as_prompt(sources), pdf_bytes=pdf_bytes, **extra)
         g = build_flows_graph(x, eng.label)
         g.mode = mode
+        g.owner = _uid(_auth.get()) or ""  # who made it: only they can delete it for everyone
         _trace(g, eng, started)
         # The spec is only what the founder said: research never counts as a decision.
         g.spec_text = (text or (pdf_to_text(pdf_bytes) if pdf_bytes else "A photo of the founder's sketch"))[:SPEC_LIMIT]
@@ -699,6 +705,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     g.sources = getattr(old, "sources", [])
     g.signoffs = getattr(old, "signoffs", [])
     g.mode = getattr(old, "mode", "solo")
+    g.owner = getattr(old, "owner", "")
     strip_guesses(g, g.spec_text + " " + " ".join(q.answer_text or "" for q in decisions))
     for f in flows:  # the steps the user agreed to stay on the flow
         if f.id in g.nodes:
@@ -818,6 +825,74 @@ def my_boards(request: Request) -> Dict[str, Any]:
     if not uid:
         raise HTTPException(status_code=401, detail="Sign in to see your boards.")
     _remember_board(uid, _board_id.get())
+    return {"boards": _list_boards(uid)}
+
+
+class RenameRequest(BaseModel):
+    name: str
+
+
+def _signed_in(request: Request) -> str:
+    """The signed-in person's uid, or 401."""
+    uid = _uid(request.headers.get("authorization", ""))
+    if not uid:
+        raise HTTPException(status_code=401, detail="Sign in to manage your boards.")
+    return uid
+
+
+def _forget_board(uid: str, bid: str) -> None:
+    """Takes a board off one person's list (memory and Firestore)."""
+    key = hashlib.sha1(bid.encode()).hexdigest()
+    _user_boards.get(uid, {}).pop(key, None)
+    if _users is not None:
+        try:
+            from google.cloud import firestore
+            _users.document(uid).update({f"boards.{key}": firestore.DELETE_FIELD})
+        except Exception as e:
+            log.warning("Could not update the board list: %s", e)
+
+
+@app.post("/api/me/boards/{bid}/delete")
+def delete_my_board(bid: str, request: Request) -> Dict[str, Any]:
+    """Deletes a board for whoever created it; for anyone else (a teammate) it only leaves their list,
+    so a shared board never disappears for the whole team because one member tidied up."""
+    uid = _signed_in(request)
+    g = boards.get(bid) or _load_board(bid)
+    _forget_board(uid, bid)
+    deleted = bool(g) and getattr(g, "owner", "") == uid
+    if deleted:
+        boards.pop(bid, None)
+        if _store is not None:
+            try:
+                _doc(bid).delete()
+            except Exception as e:
+                log.warning("Could not delete board: %s", e)
+    return {"deleted": deleted, "boards": _list_boards(uid)}
+
+
+@app.post("/api/me/boards/{bid}/rename")
+def rename_my_board(bid: str, payload: RenameRequest, request: Request) -> Dict[str, Any]:
+    """Renames a board on the person's list and on the board itself (the name everyone sees)."""
+    uid = _signed_in(request)
+    name = payload.name.strip()[:60]
+    if not name:
+        raise HTTPException(status_code=400, detail="Give the board a name")
+    key = hashlib.sha1(bid.encode()).hexdigest()
+    entry = next((b for b in _list_boards(uid) if b["id"] == bid), None)
+    if not entry:
+        raise HTTPException(status_code=404, detail="That board is not in your list")
+    g = boards.get(bid) or _load_board(bid)
+    if g:
+        g.product_name = name
+        boards[bid] = g
+        _save_board(bid)
+    entry = {**entry, "name": name}
+    _user_boards.setdefault(uid, {})[key] = entry
+    if _users is not None:
+        try:
+            _users.document(uid).set({"boards": {key: entry}}, merge=True)
+        except Exception as e:
+            log.warning("Could not save the board list: %s", e)
     return {"boards": _list_boards(uid)}
 
 

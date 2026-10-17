@@ -145,6 +145,7 @@ Every call takes the board id in an `X-Board` header or a `?board=` query parame
 | POST | `/api/signoff` | Sign off the scope as it stands (`by` says who) |
 | POST | `/api/flows/{id}/steps` | Edit a flow's steps by hand; after screens exist it flags a redraw |
 | POST | `/api/mode` | Switch a board between one founder (`solo`) and a `team` |
+| POST | `/api/me/boards/{id}/rename`, `/delete` | Rename a board; delete it (for its creator) or leave it (for a teammate) |
 | GET, POST | `/api/feedback` | Testers' feedback board: list, report (with up to 3 screenshots) |
 | POST | `/api/feedback/{id}/vote`, `/comment`, `/confirm`, `/status` | Upvote, comment, confirm a fix; status changes are team-only (`ADMIN_UIDS`) |
 | POST | `/api/restore`, `/api/reset` | Put a saved board back; clear the board |
