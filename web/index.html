@@ -78,6 +78,7 @@
   .file-btn input { display: none; }
   .ideas { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 18px; font-size: 13px; }
   .ideas .btn { min-height: 34px; padding: 0 14px; font-size: 13px; background: var(--panel); }
+  .ideas .btn.primary { background: var(--ink); color: var(--on-ink); }  /* the one-click sample stands out */
   .start-note { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-top: 16px; font-size: 13px; color: var(--muted); min-height: 22px; }
   .err { color: var(--bad); }
 
@@ -116,6 +117,16 @@
   .mine { align-self: flex-end; max-width: 86%; text-align: right; }
   .mine .by { margin-right: 8px; font-size: 11.5px; color: var(--muted); }
   .send-row { display: flex; gap: 6px; }
+  .who-first { margin-bottom: 14px; }
+  .who-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+  .who-card { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; text-align: left; padding: 14px; border: 1.5px solid var(--line-strong); border-radius: var(--r-card); background: var(--panel); font: inherit; cursor: pointer; }
+  .who-card i { grid-row: span 2; font-size: 22px; color: var(--muted); }
+  .who-card b { font-size: 15px; }
+  .who-card span { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+  .who-card:hover { border-color: var(--accent); }
+  .who-card[aria-pressed="true"] { border-color: var(--accent); background: var(--focus); }
+  .who-card[aria-pressed="true"] i { color: var(--text); }
+  @media (max-width: 560px) { .who-cards { grid-template-columns: 1fr; } }
   .stepper { display: inline-flex; gap: 2px; background: var(--fill); border-radius: 999px; padding: 3px; }
   .stepper button { display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 12.5px; color: var(--muted); cursor: pointer; }
   .stepper button.done { color: var(--text); }
@@ -534,15 +545,18 @@
    <div>
     <h1>Other tools guess. We ask.</h1>
     <p class="lead">Tell us what you want to build. Six bees map the flows, ask your product team what the idea leaves out, and redraw the board with every answer. Nothing gets built on a guess.</p>
-    <div class="composer">
+    <div class="who-first" id="modeSeg" role="group" aria-label="Who is building this">
+      <div class="cap">First: who is building this?</div>
+      <div class="who-cards">
+        <button class="who-card" data-mode="solo"><i class="ph ph-user" aria-hidden="true"></i><b>Just me</b><span>Solo builder: fewer questions in plain words, and the bees recommend the right way to build it.</span></button>
+        <button class="who-card" data-mode="team"><i class="ph ph-users-three" aria-hidden="true"></i><b>With my team</b><span>We share one board: each person answers the questions for their own role.</span></button>
+      </div>
+    </div>
+    <div class="composer" id="composer" hidden>
       <label class="cap" for="prd">What are we building?</label>
       <textarea id="prd" placeholder="Paste a PRD, a feature brief, or two lines about what you want to build."></textarea>
       <div class="composer-foot">
         <div class="seg" id="engineSeg" role="group" aria-label="AI engine (required)"></div>
-        <div class="seg" id="modeSeg" role="group" aria-label="Who will answer the questions">
-          <button data-mode="solo" data-tip="One person: fewer, plain questions, with the bees' advice" data-tip-pos="bottom">Just me</button>
-          <button data-mode="team" data-tip="A team: each person answers their own role's questions" data-tip-pos="bottom">A team</button>
-        </div>
         <label class="btn ghost file-btn" data-tip="A PDF, notes, or a photo of your whiteboard or napkin sketch" data-tip-pos="top"><i class="ph ph-paperclip" aria-hidden="true"></i>Upload a PDF or a sketch photo<input type="file" id="file" accept=".pdf,.md,.txt,image/*"></label>
         <button class="btn primary" id="buildBtn">Map it<i class="ph ph-arrow-right" aria-hidden="true"></i></button>
       </div>
@@ -1283,7 +1297,10 @@ const fail = (err) => { PM.error = err.message; toast(err.message); };
 document.addEventListener("click", (e) => {
   const t = e.target.closest("button, [data-id]");
   if (!t) return;
-  if (t.dataset.idea) { $("prd").value = t.dataset.idea; say("Idea added. Press Map it."); return $("prd").focus(); }
+  if (t.dataset.idea) {
+    if (!modePicked) return say("First choose: Just me, or With my team.", true);
+    $("prd").value = t.dataset.idea; say("Idea added. Press Map it."); return $("prd").focus();
+  }
   if (t.dataset.engine) { S.engine = t.dataset.engine; store.set("bb_engine", S.engine); say(""); return renderEngine(); }
   if (t.dataset.opt) {  // tap to pick one or more suggestions; they gather in the answer box, Send submits (Sravani, 16 Oct)
     const box = t.closest("#ask, #details")?.querySelector(`input[data-answer="${CSS.escape(t.dataset.q)}"]`);
@@ -1312,7 +1329,10 @@ document.addEventListener("click", (e) => {
     $("flowEdit").hidden = false; return $("flowEditText").focus();
   }
   if (t.dataset.skip) { PM.skipped.add(t.dataset.skip); return render(); }
-  if (t.dataset.mode) { store.set("bb_mode", t.dataset.mode); return renderMode(); }
+  if (t.dataset.mode) {
+    store.set("bb_mode", t.dataset.mode); modePicked = true; renderMode();
+    $("composer").hidden = false; return $("prd").focus();
+  }
   if (t.dataset.role) {
     ROLE = t.dataset.role; WHO = ($("who")?.value || "").trim().slice(0, 40);
     store.set("bb_role", ROLE); store.set("bb_name", WHO); PM.bee = null; return render();
@@ -1386,7 +1406,9 @@ $("sampleBtn").onclick = () => {
 };
 // "Just me" or "A team" for the next board; remembered per browser.
 const newMode = () => store.get("bb_mode") || "solo";
-const renderMode = () => document.querySelectorAll("#modeSeg [data-mode]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.mode === newMode()));
+// Asked first, before the idea (Roger, 17 Oct): solo or team decides how the bees ask.
+let modePicked = false;
+const renderMode = () => document.querySelectorAll("#modeSeg [data-mode]").forEach((b) => b.setAttribute("aria-pressed", modePicked && b.dataset.mode === newMode()));
 renderMode();
 $("buildBtn").onclick = () => {
   const text = $("prd").value.trim();
