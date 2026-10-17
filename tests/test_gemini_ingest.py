@@ -901,3 +901,20 @@ def test_plan_features_do_not_duplicate_the_board_list():
     add_features(g, [XProductFeature(name="F1 Attendance View", priority="must"),
                      XProductFeature(name="F2: Monthly Fee Collection", priority="must")])
     assert [f["name"] for f in g.features] == ["Attendance & Marks View", "Monthly Fee Collection"]
+
+
+def test_misalignments_go_to_the_product_owner(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", Reactor())
+    c, h = TestClient(server.app), {"X-Board": "clash"}
+    q = _answered_flow_question(c, h, "Cash only")
+    c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "Cash only", "later": True}, headers=h)
+    Reactor.reaction = Reaction(is_vague=False, note="Done.", follow_up=[], user_updates=[], field_updates=[], flow_updates=[],
+                                conflicts=["One answer says cash only, an earlier decision says cards: suggest both."])
+    g = c.post("/api/questions/react-batch?engine=gemini", json={}, headers=h).json()
+    assert g["is_vague"] is False
+    board = c.get("/api/graph", headers=h).json()
+    assert board["conflicts"][0]["status"] == "open"
+    assert any("Misalignment" in i["text"] for i in c.get("/api/plan-check", headers=h).json()["issues"])
+    settled = c.post("/api/conflicts/0/settle", json={"decision": "UPI and cash"}, headers=h).json()
+    assert settled["conflicts"][0]["status"] == "settled"
+    assert any("UPI and cash" in n["text"] and n["status"] == "open" for n in settled["comments"])

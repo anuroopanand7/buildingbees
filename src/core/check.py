@@ -43,6 +43,9 @@ def plan_check(g: BuildingBeesEngine) -> Dict[str, Any]:
             add("gap", f"{name(n.id)}: where the person goes when it fails is not decided", n.id)
         if n.layer.value == "API" and n.timeout_ms <= 0:
             add("gap", f"{name(n.id)}: how long to wait for a reply is not set", n.id)
+    for c in getattr(g, "conflicts", []):
+        if c.get("status") == "open":
+            add("blocker", f"Misalignment for the product owner: {c['text']}")
     waiting = [c for c in getattr(g, "comments", []) if c.get("status") == "open"]
     if waiting:
         add("gap", f"{len(waiting)} note{'s' if len(waiting) > 1 else ''} on the board not applied yet: press Update the board")

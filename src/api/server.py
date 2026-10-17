@@ -277,6 +277,7 @@ def _state(graph: BuildingBeesEngine) -> Dict[str, Any]:
         "signoffs": getattr(graph, "signoffs", []),
         "comments": getattr(graph, "comments", []),
         "features": getattr(graph, "features", []),
+        "conflicts": getattr(graph, "conflicts", []),
         "round": getattr(graph, "round", 1),
         "rounds": getattr(graph, "rounds", []),
         "round_questions": getattr(graph, "round_questions", None) or (_start_round(graph) or graph.round_questions),  # boards from before 18 Oct get a budget on first load
@@ -564,6 +565,8 @@ def react_to_answers(payload: BatchRequest, engine: str) -> Dict[str, Any]:
         q.metadata.pop("pending", None)
     if qs:
         qs[-1].metadata["note"] = r.note[:300]  # one note for the set, shown after its last answer
+    for text in getattr(r, "conflicts", [])[:5]:  # the product owner settles these; shown on the tray and in the Brief
+        g.conflicts = getattr(g, "conflicts", []) + [{"text": text[:300], "round": getattr(g, "round", 1), "status": "open"}]
     if not r.is_vague:
         for c in notes:
             c["status"] = "applied"
@@ -658,6 +661,7 @@ class RestoreRequest(BaseModel):
     signoffs: List[Dict[str, Any]] = []
     comments: List[Dict[str, Any]] = []
     features: List[Dict[str, Any]] = []
+    conflicts: List[Dict[str, Any]] = []
     round: int = 1
     rounds: List[Dict[str, Any]] = []
     round_questions: List[str] = []
@@ -688,6 +692,7 @@ def _rebuild(d: Dict[str, Any]) -> BuildingBeesEngine:
     g.signoffs = d.get("signoffs", [])[:20]
     g.comments = d.get("comments", [])[:200]
     g.features = d.get("features", [])[:40]
+    g.conflicts = d.get("conflicts", [])[:50]
     g.round, g.rounds = int(d.get("round") or 1), d.get("rounds", [])[-50:]
     g.round_questions = d.get("round_questions", [])[:50]
     g.short_ids = dict(d.get("short_ids") or {})
@@ -839,6 +844,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     g.signoffs = getattr(old, "signoffs", [])
     g.comments = getattr(old, "comments", [])
     g.features = getattr(old, "features", [])
+    g.conflicts = getattr(old, "conflicts", [])
     g.round, g.rounds = getattr(old, "round", 1), getattr(old, "rounds", [])
     g.short_ids = dict(getattr(old, "short_ids", {}))  # S1 stays S1 when the screens are redrawn
     g.mode = getattr(old, "mode", "solo")
@@ -972,6 +978,29 @@ def add_comment(payload: CommentRequest) -> Dict[str, Any]:
         "id": hashlib.sha1(f"{payload.target}{text}{time.time()}".encode()).hexdigest()[:10],
         "target": payload.target, "step": max(0, payload.step), "path": payload.path[:60], "text": text,
         "by": payload.by.strip()[:60], "at": datetime.datetime.utcnow().isoformat(), "status": "open"}][-200:]
+    return get_graph_state()
+
+
+class SettleRequest(BaseModel):
+    decision: str
+
+
+@app.post("/api/conflicts/{index}/settle")
+def settle_conflict(index: int, payload: SettleRequest) -> Dict[str, Any]:
+    """The product owner settles a misalignment. The decision is saved as a note for the next round, so the bees
+    apply it with everything else; only the owner or the product manager may settle on a team board."""
+    g = _board()
+    if not _may_process(g):
+        raise HTTPException(status_code=403, detail="Only the board owner or the product manager settles a misalignment.")
+    items = getattr(g, "conflicts", [])
+    if not (0 <= index < len(items)) or not payload.decision.strip():
+        raise HTTPException(status_code=400, detail="Say how to settle it")
+    items[index].update(status="settled", decision=payload.decision.strip()[:500])
+    target = next((n.id for n in g.nodes.values() if n.layer.value == "FLOW"), "")
+    g.comments = getattr(g, "comments", []) + [{
+        "id": hashlib.sha1(f"settle{index}{time.time()}".encode()).hexdigest()[:10], "target": target, "step": 0, "path": "",
+        "text": f"The product owner settled a misalignment ({items[index]['text']}): {items[index]['decision']}",
+        "by": "the product owner", "at": datetime.datetime.utcnow().isoformat(), "status": "open"}]
     return get_graph_state()
 
 

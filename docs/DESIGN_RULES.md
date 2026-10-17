@@ -2,6 +2,10 @@
 
 The rules the BuildingBees interface follows. The code lives in `web/index.html`; the interaction states are one block at the end of the stylesheet ("Interaction layer"), so they win over the older per-component rules above it.
 
+## Bee theme (Roger, 18 Oct 2026)
+
+Black and yellow, like a honey bee. Yellow (`--bee: #ffc800`, pressed `#f0b400`) is about 30% of the colour: calls to action, what is selected (a picked option, the current stage, the focused card), feature chips and the bees' pins. Black (`--ink: #121210`) is the outline on everything pressable (buttons, options, cards) and the hard shadow under a call to action (`2px 2px 0`), which grows on hover and disappears on press, so the button sinks. The board is a Figma-style dot grid (`--dot: #c9c6bd`) that moves and scales with the board.
+
 ## Read of the product
 
 A calm B2B work tool for founders and product teams. Neutral surfaces, one accent (bee amber `--accent: #f5b301`), Geist type. Nothing decorative competes with the board.

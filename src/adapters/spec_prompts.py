@@ -166,6 +166,9 @@ class Reaction(BaseModel):
     flow_updates: List[XFlowUpdate]
     user_updates: List[XUserUpdate]
     field_updates: List[XFieldUpdate]
+    # Misalignments for the product owner (Roger, 18 Oct): two answers or notes that disagree, or one that breaks
+    # an earlier decision. One plain sentence each, with a suggestion; the owner decides, the bees do not pick.
+    conflicts: List[str] = []
 
 
 class QuestionList(BaseModel):
@@ -421,6 +424,10 @@ settled decisions and never ask about them again, not even in other words.
 If some answers are vague, apply the clear ones and ask ONE sharper follow-up for each vague one
 (target_id and category of the question it follows up). Set is_vague true only when EVERY answer is vague.
 note: one or two short sentences saying what you changed across the whole set.
+conflicts: when two answers or notes in this set disagree with each other, or one breaks a decision already on the
+board, do NOT pick a side: leave that part of the board as it is and add one plain sentence per conflict naming
+both sides and suggesting a way to settle it ("Priya says cash only, an earlier decision says UPI and cards:
+suggest UPI plus cash at the centre"). Leave conflicts empty when nothing disagrees.
 
 """
 

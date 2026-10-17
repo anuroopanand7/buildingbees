@@ -564,7 +564,7 @@
   .stage-note { font-size: 12.5px; }
   @media (prefers-reduced-motion: reduce) { .menu, #beeNote, #details, .rail #hive button.asking .bee { animation: none !important; } .convo, .dock { transition: none; } }
   @media (max-width: 1400px) {  /* tablets: the progress text gives way so the stage bar never slides under the brand panel */
-    .stage { left: auto; right: 220px; transform: none; }
+    .stage { left: auto; right: 300px; transform: none; }
     .stage #meterText, .stage .track { display: none; }
   }
   /* Touch screens keep a hover after the tap, so hover tooltips stuck on screen (Sravani, 17 Oct). */
@@ -651,6 +651,50 @@
     .btn:hover:not(:disabled), .option:hover, .who-card:hover, .board-row:hover { transform: none; box-shadow: var(--lift); }
     .btn.primary:hover:not(:disabled) { background: var(--ink); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 1px 2px rgba(17, 17, 16, .3); }
   }
+
+  /* ── Bee theme (Roger, 18 Oct 2026): black and yellow, like a honey bee. Yellow is about 30% of the colour:
+     calls to action, what is selected, the bees and their pins. Black is the outline that makes things read as
+     pressable. A proper bee yellow, not mustard. Rules in docs/DESIGN_RULES.md. */
+  :root {
+    --accent: #ffc800; --focus: #fff3c4; --bee: #ffc800; --bee-press: #f0b400; --ink: #121210; --edge-hover: #121210;
+    --dot: #c9c6bd; --bg: #f6f6f3;
+    --pop: 2px 2px 0 var(--ink); --pop-hover: 3px 3px 0 var(--ink);
+  }
+  body { background: var(--bg); }
+  /* Figma-style board: clear dots that move and scale with the board (applyView sets position and size). */
+  #map { background-color: var(--bg); background-image: radial-gradient(var(--dot) 1.3px, transparent 1.4px); }
+  #start { background-image: radial-gradient(var(--dot) 1.2px, transparent 1.3px); }
+  /* Calls to action: yellow, black outline, a hard black shadow that sinks when pressed. */
+  .btn.primary { background: var(--bee); color: var(--ink); border: 1.5px solid var(--ink); box-shadow: var(--pop); font-weight: 600; }
+  .btn.primary:hover:not(:disabled) { background: var(--bee); border-color: var(--ink); box-shadow: var(--pop-hover); transform: translate(-1px, -1px); }
+  .btn.primary:active:not(:disabled) { background: var(--bee-press); box-shadow: 0 0 0 var(--ink); transform: translate(2px, 2px); }
+  .btn.primary .spinner.sm { border-color: rgba(18, 18, 16, .25); border-top-color: var(--ink); }
+  .tray [data-update]:disabled { background: var(--bee-press); }
+  /* Secondary buttons and choices: white with a black outline. */
+  .btn:not(.primary):not(.ghost) { border: 1.5px solid var(--ink); box-shadow: none; }
+  .btn:not(.primary):not(.ghost):hover:not(:disabled) { box-shadow: var(--pop); transform: translate(-1px, -1px); }
+  .option, .who-card, .board-row, .feature { border: 1.5px solid var(--ink); box-shadow: none; }
+  .option:hover, .who-card:hover, .board-row:hover, .feature:hover { border-color: var(--ink); box-shadow: var(--pop); }
+  .option[aria-pressed="true"], .who-card[aria-pressed="true"] { background: var(--bee); border-color: var(--ink); box-shadow: var(--pop); }
+  .who-card[aria-pressed="true"]::after { background: var(--ink); border-color: var(--ink); }
+  /* Cards on the board: black outline; the focused one is yellow. */
+  .step, .scr { border: 1.5px solid var(--ink); box-shadow: 2px 2px 0 rgba(18, 18, 16, .12); }
+  .step.focus, .scr.focus, .cta.focus, .api.focus { background: var(--focus); border-color: var(--ink); box-shadow: var(--pop); }
+  .step.next { border: 1.5px dashed var(--ink); background: var(--focus); }
+  .step.open { border: 1.5px dashed var(--warn); }
+  .id-chip { border-color: var(--ink); color: var(--ink); }
+  button.id-chip.feat, .note-btn.ask, .note-btn.open { background: var(--bee); border-color: var(--ink); }
+  .flow-row.wire { border: 1.5px solid var(--ink); }
+  .stepper button[aria-current] { background: var(--bee); box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .rail #hive button[aria-pressed="true"] { background: var(--bee); box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .meter .track i, .stage .track i, .tray-meter i { background: var(--ink); }
+  :focus-visible { outline: 2.5px solid var(--ink); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .btn.primary:hover:not(:disabled), .btn.primary:active:not(:disabled) { transform: none; } }
+  .dock .dock-min { top: 6px; right: 8px; background: var(--panel); border: 1.5px solid var(--ink); height: 26px; }  /* inside the panel, not over its edge */
+  #coach { padding-right: 84px; }
+  .dock .dock-min[data-tip] { position: absolute; }
+  .set-q.clash { border-top: 0; border: 1.5px solid var(--ink); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; background: var(--focus); }  /* [data-tip] sets position: relative; keep the button pinned inside */
+  .ideas .btn.primary { background: var(--bee); color: var(--ink); }  /* the one-click sample is a call to action too */
 </style>
 </head>
 <body>
@@ -911,7 +955,7 @@ async function load() {
   }
   if (!LINKED) store.set("bb_graph", g.total_nodes ? JSON.stringify({ product_name: g.product_name, spec_text: g.spec_text, entities: g.entities, sources: g.sources, needs_redraw: g.needs_redraw, comments: g.comments, signoffs: g.signoffs, nodes: g.nodes, edges: g.edges }) : "");
   S.stage = g.stage; S.needsRedraw = g.needs_redraw; S.comments = g.comments || []; S.round = g.round || 1; S.rounds = g.rounds || []; S.roundQ = new Set(g.round_questions || []);
-  S.ids = g.short_ids || {}; S.features = g.features || []; S.owner = g.owner || ""; S.sources = g.sources || []; S.mode = g.mode || "solo"; S.spec = g.spec_text || ""; S.lastCall = g.last_call;
+  S.ids = g.short_ids || {}; S.features = g.features || []; S.owner = g.owner || ""; S.conflicts = g.conflicts || []; S.sources = g.sources || []; S.mode = g.mode || "solo"; S.spec = g.spec_text || ""; S.lastCall = g.last_call;
   S.nodes = {}; S.fwd = {}; S.rev = {}; S.screens = {};
   g.nodes.forEach((n) => (S.nodes[n.id] = n));
   g.edges.forEach((e) => {
@@ -1356,6 +1400,15 @@ function renderPM() {
       <div class="ask-foot"><button class="link" data-invite>Copy the link for your team</button></div>`;
     return;
   }
+  // Misalignments come first for the product owner: the bees flag them, the owner settles them (Roger, 18 Oct).
+  const clash = (S.conflicts || []).map((c, i) => ({ ...c, i })).filter((c) => c.status === "open");
+  if (clash.length && mayProcess() && !PM.reacting) {
+    ask.closest(".dock")?.classList.add("set");
+    ask.innerHTML = `<div class="set-head"><b>${clash.length} misalignment${clash.length > 1 ? "s" : ""} for you to settle</b><span class="muted">Answers or notes disagree. The bees did not pick a side: you decide, and the next update applies it.</span></div>` +
+      clash.map((c) => `<div class="set-q clash"><div class="question"><i class="ph ph-warning" aria-hidden="true"></i> ${esc(c.text)}</div>
+        <div class="send-row"><input id="clash-${c.i}" placeholder="Your decision, in a few words" autocomplete="off" aria-label="Your decision"><button class="btn primary sm" data-settle="${c.i}">Settle</button></div></div>`).join("");
+    return;
+  }
   ask.closest(".dock")?.classList.toggle("set", !!q && S.mode !== "team");
   if (q && S.mode !== "team") { renderSet(ask, cite); return; }
   if (q) {
@@ -1687,6 +1740,11 @@ document.addEventListener("click", (e) => {
   }
   if (t.dataset.addFeature !== undefined) return openFeature();
   if (t.dataset.feature) { $("briefBtn").click(); return setTimeout(() => [...document.querySelectorAll("#briefBody h2")].find((h) => h.textContent.trim() === "Features")?.scrollIntoView({ block: "start" }), 400); }
+  if (t.dataset.settle) {
+    const v = $(`clash-${t.dataset.settle}`).value.trim(); if (!v) return $(`clash-${t.dataset.settle}`).focus();
+    return api(`/api/conflicts/${t.dataset.settle}/settle`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision: v }) })
+      .then(load).then(() => toast("Settled. It is saved for the next update.")).catch(fail);
+  }
   if (t.dataset.note) return openNote(t);
   if (t.dataset.fill) { const i = $(`reply-${t.dataset.fill}`); i.value = i.value && !i.value.includes(t.dataset.fopt) ? `${i.value}; ${t.dataset.fopt}` : t.dataset.fopt; return i.focus(); }
   if (t.dataset.reply || t.dataset.replyDecide) {

@@ -71,6 +71,8 @@ sequenceDiagram
 
 **Plan check, share page, MCP (ideas from Archify).** `src/core/check.py` lists blockers and gaps (open blocking questions, undecided splits, must features with no flow, missing states, failure paths, timeouts, waiting notes); it heads the Brief and is `GET /api/plan-check`. `src/core/share.py` writes the board as one standalone page with anchors on every id (`GET /api/share`). `scripts/mcp_server.py` exposes get_plan, plan_check, open_questions and add_note to coding agents.
 
+**Misalignments (Roger, 18 Oct 2026).** When answers or notes in a round disagree with each other or with an earlier decision, the model returns them in `Reaction.conflicts` instead of picking a side; they are stored on `g.conflicts`, block the plan check, and appear first in the dock for the owner or product manager, who settles each one (`POST /api/conflicts/{i}/settle`); the decision becomes a note applied in the next round.
+
 **Adding a feature.** `POST /api/features` runs `extract_flows` with the board's users and flows as context and the new feature as the idea, then `merge_feature()` (`src/core/ingest.py`) adds only ids that are new: agreed flows, answers and screens are never rewritten. If screens exist they are flagged for a redraw. A product can have 1 to 6 flows (one per job the input names) and up to 3 branches per flow.
 
 ## Teams
