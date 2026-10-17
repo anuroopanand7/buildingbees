@@ -116,6 +116,8 @@
   .mine { align-self: flex-end; max-width: 86%; text-align: right; }
   .mine .by { margin-right: 8px; font-size: 11.5px; color: var(--muted); }
   .send-row { display: flex; gap: 6px; }
+  .recenter { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); z-index: 26; }
+  .option[aria-pressed="true"] { border-color: var(--accent); background: var(--focus); }
   .glow { animation: glow 1.1s ease-in-out 4; }
   @keyframes glow { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 18px var(--accent); } }
   @media (prefers-reduced-motion: reduce) { .glow { animation: none; box-shadow: 0 0 0 3px var(--accent); } }
@@ -308,8 +310,9 @@
 
   /* The Brief: the board as a document. Prints cleanly, so "Save as PDF" works from the browser. */
   #brief, #boards, #fb { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--text) 35%, transparent); display: grid; place-items: center; padding: 24px; }
-  .brief-sheet { background: var(--panel); border-radius: 18px; box-shadow: var(--shadow); width: min(820px, 100%); max-height: 100%; display: flex; flex-direction: column; }
-  .brief-bar { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .brief-sheet { background: var(--panel); border-radius: 18px; box-shadow: var(--shadow); width: min(820px, 100%); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; }
+  .brief-sheet > :not(.brief-bar) { min-height: 0; }  /* lets the body shrink and scroll inside the capped sheet */
+  .brief-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
   .brief-bar b { margin-right: auto; }
   #boards .brief-sheet { width: min(520px, 100%); }
   #boardsBody { overflow: auto; padding: 8px 18px 18px; }
@@ -563,8 +566,9 @@
     <button id="zoomOut" aria-label="Zoom out" data-tip="Zoom out" data-tip-pos="top"><i class="ph ph-minus" aria-hidden="true"></i></button>
     <button id="zoomPct" aria-label="Reset zoom to 100%" data-tip="Reset to 100%" data-tip-pos="top">100%</button>
     <button id="zoomIn" aria-label="Zoom in" data-tip="Zoom in" data-tip-pos="top"><i class="ph ph-plus" aria-hidden="true"></i></button>
-    <button id="zoomFit" aria-label="Fit the whole board" data-tip="Fit the whole board" data-tip-pos="top"><i class="ph ph-arrows-in-simple" aria-hidden="true"></i></button>
+    <button id="zoomFit" aria-label="Recenter: fit the whole board" data-tip="Recenter: fit the whole board" data-tip-pos="top"><i class="ph ph-arrows-in-simple" aria-hidden="true"></i></button>
   </div>
+  <button class="island btn sm recenter" id="recenter" hidden><i class="ph ph-crosshair" aria-hidden="true"></i>Back to the board</button>
   <aside id="details" hidden aria-label="Details"></aside>
 </main>
 
@@ -956,6 +960,11 @@ function applyView(glide) {
   m.style.backgroundPosition = `${VIEW.x}px ${VIEW.y}px`;  // the dot grid moves with the board
   m.style.backgroundSize = `${22 * VIEW.z}px ${22 * VIEW.z}px`;
   $("zoomPct").textContent = `${Math.round(VIEW.z * 100)}%`;
+  // Lost the board after a drag? Offer a way back (tester report, 16 Oct: "like recenter in Google Maps").
+  // Worked out from VIEW, not the on-screen rect, so it is right even while a glide is still animating.
+  const f = $("flows"), z = VIEW.z, k = 80, L = VIEW.x + f.offsetLeft * z, T = VIEW.y + f.offsetTop * z;
+  $("recenter").hidden = !Object.keys(S.nodes).length
+    || !(L + f.offsetWidth * z < k || L > m.clientWidth - k || T + f.offsetHeight * z < k || T > m.clientHeight - k);
 }
 function zoomAt(z, cx, cy, glide) {
   z = Math.min(2, Math.max(0.3, z));
@@ -1101,7 +1110,7 @@ function renderPM() {
       ${cite(q)}
       <span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Blocks the build" : "Good to know"}</span>
       ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o, i) => `<button class="option" data-q="${esc(q.id)}" data-opt="${esc(o)}">${esc(o)}${i === 0 && q.metadata?.why ? '<span class="rec">Recommended</span>' : ""}</button>`).join("")}</div>` : '<div style="height:12px"></div>'}
-      <div class="field"><label for="own">Or answer in your own words</label><div class="send-row"><input id="own" data-answer="${esc(q.id)}" placeholder="Or type your own answer and press Enter" autocomplete="off"><button class="btn primary" data-send="${esc(q.id)}" aria-label="Send your answer"><i class="ph ph-paper-plane-right" aria-hidden="true"></i></button></div></div>
+      <div class="field"><label for="own">Tap one or more suggestions, or answer in your own words, then send</label><div class="send-row"><input id="own" data-answer="${esc(q.id)}" placeholder="Or type your own answer and press Enter" autocomplete="off"><button class="btn primary" data-send="${esc(q.id)}" aria-label="Send your answer"><i class="ph ph-paper-plane-right" aria-hidden="true"></i></button></div></div>
       <div class="ask-foot"><button class="link" data-skip="${esc(q.id)}">Not sure yet, ask me later</button><span class="muted">${pmQueue().length - 1} more for you</span></div>
       ${S.mode === "team" ? `<div class="ask-foot"><span class="muted">Answering as ${esc(byLine())}</span><button class="link" data-role-change>Change</button></div>` : ""}
       ${S.stage === "flows" ? '<div class="ask-foot"><button class="link" id="drawBtn">Skip the rest and draw the screens</button></div>' : ""}
@@ -1234,7 +1243,15 @@ document.addEventListener("click", (e) => {
   if (!t) return;
   if (t.dataset.idea) { $("prd").value = t.dataset.idea; say("Idea added. Press Map it."); return $("prd").focus(); }
   if (t.dataset.engine) { S.engine = t.dataset.engine; store.set("bb_engine", S.engine); say(""); return renderEngine(); }
-  if (t.dataset.opt) return answer(t.dataset.q, t.dataset.opt).catch(fail);
+  if (t.dataset.opt) {  // tap to pick one or more suggestions; they gather in the answer box, Send submits (Sravani, 16 Oct)
+    const box = t.closest("#ask, #details")?.querySelector(`input[data-answer="${CSS.escape(t.dataset.q)}"]`);
+    if (!box) return answer(t.dataset.q, t.dataset.opt).catch(fail);
+    const on = t.getAttribute("aria-pressed") !== "true"; t.setAttribute("aria-pressed", on);
+    const picked = [...t.parentElement.querySelectorAll('.option[aria-pressed="true"]')].map((o) => o.dataset.opt);
+    box.value = picked.join("; "); box.focus();
+    return;
+  }
+  if (t.id === "recenter") return fitView();
   if (t.dataset.skip) { PM.skipped.add(t.dataset.skip); return render(); }
   if (t.dataset.mode) { store.set("bb_mode", t.dataset.mode); return renderMode(); }
   if (t.dataset.role) {
