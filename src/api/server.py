@@ -51,7 +51,7 @@ from src.adapters import tavily
 from src.core.brief import short_ids, build_brief, decision_count
 from src.core.check import plan_check
 from src.core.share import build_share_html
-from src.core.ingest import add_features, add_gap_questions, add_questions, apply_gap_default, strip_guesses, build_flows_graph, merge_feature, build_graph_from_extract, clean_branches, ask_open_branches, add_gap_defaults
+from src.core.ingest import similar, add_features, add_gap_questions, add_questions, apply_gap_default, strip_guesses, build_flows_graph, merge_feature, build_graph_from_extract, clean_branches, ask_open_branches, add_gap_defaults
 
 app = FastAPI(
     title="BuildingBees API",
@@ -534,7 +534,8 @@ def react_to_answers(payload: BatchRequest, engine: str) -> Dict[str, Any]:
         if isinstance(d, QuestionNode) and d.question_status == QuestionStatus.ANSWERED and d.id not in ids
     ) or "(none)"
     answers = "\n".join(f"{i}. ({q.category.value}, about {getattr(g.nodes.get(q.target_node_id), 'title', q.target_node_id)}) "
-                        f"{q.question_text}\n   ANSWER: {q.answer_text}" for i, q in enumerate(qs, 1)) or "(no answers this time)"
+                        f"{q.question_text}\n   ANSWER: {q.answer_text}" + (" (decided by the bees)" if q.metadata.get("default") else "")
+                        for i, q in enumerate(qs, 1)) or "(no answers this time)"
     if notes:
         answers += "\n\nNOTES THE FOUNDER LEFT ON PARTS OF THE BOARD (apply each one like an answer; a note can add, change or remove steps, branches or whole flows):\n" + \
             "\n".join(f"- {_where(g, c)}: {c['text']}" for c in notes)
@@ -550,7 +551,9 @@ def react_to_answers(payload: BatchRequest, engine: str) -> Dict[str, Any]:
         raise HTTPException(status_code=502, detail=f"{eng.label} could not process the answers: {e}")
     _trace(g, eng, started)
     changed = [] if r.is_vague else _apply_reaction(g, r)
-    added = add_questions(g, r.follow_up[:3 if getattr(g, "mode", "solo") != "team" else len(qs)], eng.label)  # a solo round adds at most 3 more
+    settled = [q for q in qs if q.metadata.get("default")]  # "Decide for me" answers are decisions: never asked again (Ravi's test)
+    follow = [f for f in r.follow_up if not any(similar(f.question, q.question_text, 0.4) for q in settled)]
+    added = add_questions(g, follow[:3 if getattr(g, "mode", "solo") != "team" else len(qs)], eng.label)  # a solo round adds at most 3 more
     if r.is_vague and not added:  # nothing usable and no sharper question: ask the whole set again
         for q in qs:
             q.question_status, q.answer_text, q.answered_at = QuestionStatus.OPEN, None, None

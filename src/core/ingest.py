@@ -35,6 +35,12 @@ def _words(text: str) -> set:
     return {w for w in "".join(ch.lower() if ch.isalnum() else " " for ch in text).split() if w not in _FILLER}
 
 
+def similar(a: str, b: str, threshold: float = 0.6) -> bool:
+    """True when two questions share most of their words (a rephrase of the same thing)."""
+    x, y = _words(a), _words(b)
+    return bool(x and y) and len(x & y) / len(x | y) >= threshold
+
+
 def _already_asked(engine: BuildingBeesEngine, text: str) -> bool:
     """True when the board already holds a question that says nearly the same thing."""
     new = _words(text)

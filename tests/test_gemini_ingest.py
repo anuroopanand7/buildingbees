@@ -872,3 +872,21 @@ def test_plan_check_share_page_and_agent_tools(monkeypatch):
     assert names == ["get_plan", "plan_check", "open_questions", "add_note"]
     assert mcp_server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
     assert mcp_server._board("https://x.run.app/?board=abc-1") == "abc-1"
+
+
+def test_decide_for_me_is_not_asked_again(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", Reactor())
+    c, h = TestClient(server.app), {"X-Board": "decided"}
+    board = c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h).json()
+    q = next(n for n in board["nodes"] if n["layer"] == "QUESTION" and n["question_text"] == "Is guest checkout allowed?")
+    c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "Yes", "bees_decided": True, "later": True}, headers=h)
+    Reactor.reaction = Reaction(is_vague=False, note="Done.", user_updates=[], field_updates=[], flow_updates=[], follow_up=[
+        XQuestion(target_id="F_BUY", category="PM", question="Is guest checkout allowed for buyers?", is_blocking=True,
+                  suggested_options=["Yes", "No"]),
+        XQuestion(target_id="F_BUY", category="PM", question="Which countries do you ship to?", is_blocking=True,
+                  suggested_options=["India", "Worldwide"])])
+    r = c.post("/api/questions/react-batch?engine=gemini", json={}, headers=h).json()
+    assert "(decided by the bees)" in Reactor.prompt
+    texts = [n["question_text"] for n in c.get("/api/graph", headers=h).json()["nodes"] if n["layer"] == "QUESTION"]
+    assert "Is guest checkout allowed for buyers?" not in texts  # a rephrase of a settled decision is dropped
+    assert "Which countries do you ship to?" in texts and len(r["follow_up"]) == 1

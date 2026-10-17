@@ -212,7 +212,9 @@ what is still open. Write the parts a coding agent needs to build it without gue
 
 Rules:
 - Use only what the board and the decisions say. Never invent a business rule, a vendor, a number or a feature.
-  Where the board has not decided something a criterion needs, write NOT DECIDED in it so the builder asks.
+  Where the board has not decided something a criterion needs, say what is undecided and end with the open
+  question, so the builder asks: "then the refund amount is NOT DECIDED (open question: how much is refunded
+  after a cancellation?)". Never write NOT DECIDED as an adjective or a rule ("follows a NOT DECIDED rule").
 - stories: one per flow, plus one per branch path that has its own steps. "story" is "As a <user>, I want <goal>,
   so that <reason>". 2 to 5 criteria each, every one "Given ..., when ..., then ...", covering the main path and
   the failure paths the flow and its branches show. flow_id is the id of the flow it belongs to.
@@ -412,6 +414,8 @@ ALREADY ASKED:
 # Put in front of REACT_PROMPT when a solo founder answers a whole set at once (one call, one redraw).
 BATCH_NOTE = """THIS TIME THE FOUNDER ANSWERED A SET OF QUESTIONS AT ONCE (listed under THE FOUNDER'S ANSWER).
 Apply every clear answer together in ONE update: return each changed flow once, with all of its changes.
+Answers marked (decided by the bees) are the bees' own recommendation, accepted by the founder: treat them as
+settled decisions and never ask about them again, not even in other words.
 If some answers are vague, apply the clear ones and ask ONE sharper follow-up for each vague one
 (target_id and category of the question it follows up). Set is_vague true only when EVERY answer is vague.
 note: one or two short sentences saying what you changed across the whole set.
