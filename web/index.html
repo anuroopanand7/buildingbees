@@ -309,7 +309,7 @@
   .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; border: none; background: var(--fill); font-size: 16px; }
 
   /* The Brief: the board as a document. Prints cleanly, so "Save as PDF" works from the browser. */
-  #brief, #boards, #fb { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--text) 35%, transparent); display: grid; place-items: center; padding: 24px; }
+  #brief, #boards, #fb, #flowEdit { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--text) 35%, transparent); display: grid; place-items: center; padding: 24px; }
   .brief-sheet { background: var(--panel); border-radius: 18px; box-shadow: var(--shadow); width: min(820px, 100%); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; }
   .brief-sheet > :not(.brief-bar) { min-height: 0; }  /* lets the body shrink and scroll inside the capped sheet */
   .brief-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
@@ -496,7 +496,18 @@
   <button id="engineBtn" hidden></button>
   <button id="menuBrief" hidden><i class="ph ph-file-text" aria-hidden="true"></i>Open the Brief</button>
 </div>
-<div class="island stage" id="meter" hidden><span id="meterText"></span><div class="track"><i id="meterBar"></i></div><span id="pmSub"></span></div>
+<div class="island stage" id="meter" hidden><span id="meterText"></span><div class="track"><i id="meterBar"></i></div><span id="pmSub"></span>
+  <div class="seg" id="viewSeg" hidden role="group" aria-label="Show the flows or the screens"><button data-view="flows">Flows</button><button data-view="screens">Screens</button></div></div>
+<div id="flowEdit" hidden role="dialog" aria-modal="true" aria-label="Edit the flow's steps">
+  <div class="brief-sheet">
+    <div class="brief-bar"><b id="flowEditTitle">Edit steps</b><button class="icon-btn" id="flowEditClose" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button></div>
+    <div class="fb-body">
+      <label class="cap" for="flowEditText">One step per line, as "Short title: what happens". Add, reword, reorder or delete lines.</label>
+      <textarea id="flowEditText" rows="10" style="width:100%;margin-top:8px;font:inherit;padding:10px;border:1px solid var(--line-strong);border-radius:var(--r-input)"></textarea>
+      <div class="ask-foot" style="margin-top:10px"><span class="muted" id="flowEditNote"></span><button class="btn primary" id="flowEditSave">Save steps</button></div>
+    </div>
+  </div>
+</div>
 <div class="topright">
   <button class="island btn sm" id="fbBtn" data-tip="Report a bug or an idea, and see what other testers said" data-tip-pos="bottom-end"><i class="ph ph-megaphone" aria-hidden="true"></i>Feedback</button>
   <button class="island tool" id="signBtn" hidden aria-label="Sign in" data-tip="Sign in to keep your boards" data-tip-pos="bottom-end"><i class="ph ph-user" aria-hidden="true"></i></button>
@@ -630,7 +641,7 @@ const BEES = {
 const bee = (cat) => BEES[cat] || BEES.PM;
 const beeIcon = (cat, sm) => `<span class="bee ${sm ? "sm" : ""}" aria-hidden="true"><i class="ph ${bee(cat)[2]}"></i></span>`;
 const MAX_ROUNDS = 3; // shortcut: caps automatic deep-dives per board to protect the free model quota
-let S = { nodes: {}, fwd: {}, rev: {}, screens: {}, engines: {}, engine: null, selected: null };
+let S = { nodes: {}, fwd: {}, rev: {}, screens: {}, engines: {}, engine: null, selected: null, view: "screens" };  // view: once screens exist, show "flows" or "screens"
 let PM = { skipped: new Set(), asked: new Set(), rounds: 0, thinking: "", error: "", focus: null, lastFocus: null, bee: null, front: null, reacting: "", changed: new Set() };
 const resetPM = () => { PM = { skipped: new Set(), asked: new Set(), rounds: 0, thinking: "", error: "", focus: null, lastFocus: null, bee: null, front: null, reacting: "", changed: new Set() }; };
 
@@ -726,6 +737,8 @@ function render() {
   const rs = Object.values(S.screens), ready = rs.filter((r) => r.is_build_ready).length;
   const flowsStage = S.stage === "flows";
   const qAll = byLayer("QUESTION").length, qOpen = openQuestions().length;
+  $("viewSeg").hidden = flowsStage;  // flows stay editable after screens are drawn (Roger's note, 17 Oct)
+  document.querySelectorAll("#viewSeg [data-view]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.view === S.view));
   $("meterText").textContent = flowsStage ? "Step 1 of 2: agree the flows" : `${ready} of ${rs.length} screens ready to build`;
   $("meterBar").style.width = flowsStage ? `${qAll ? ((qAll - qOpen) / qAll) * 100 : 0}%` : `${rs.length ? (ready / rs.length) * 100 : 0}%`;
   renderMap(); renderPM(); renderDetails();
@@ -817,8 +830,8 @@ function renderMap() {
   const wide = sk && !rows.some((f) => f.id === sk.target);
   const chip = sk ? `<div class="drawing-chip" role="status"><i class="ph ph-pencil-simple-line" aria-hidden="true"></i>${esc(PM.reacting)} is redrawing the board from your answer</div>` : "";
   $("flows").innerHTML = chip + redraw + note + rows.map((f) => { const last = f === lastFlow && S.stage === "flows"; return `<div class="flow ${f.id && ((PM.focus === f.id && !focusStep) || S.selected === f.id) ? "focus" : ""} ${sk && ((sk.target === f.id && !sk.step) || wide) ? "sketching-lane" : ""}">
-    <div class="flow-head"><h3>${f.id ? `<button data-id="${esc(f.id)}">${esc(f.title)}</button>` : esc(f.title)}</h3>${f.who ? `<span class="who">for ${esc(f.who)}</span>` : ""}</div>
-    ${f.ids.length
+    <div class="flow-head"><h3>${f.id ? `<button data-id="${esc(f.id)}">${esc(f.title)}</button>` : esc(f.title)}</h3>${f.who ? `<span class="who">for ${esc(f.who)}</span>` : ""}${f.id && (!f.ids.length || S.view === "flows") ? `<button class="link" data-edit-flow="${esc(f.id)}"><i class="ph ph-pencil-simple" aria-hidden="true"></i> Edit steps</button>` : ""}</div>
+    ${f.ids.length && (S.view !== "flows" || !f.id)
       ? `<div class="flow-row wire">${f.ids.map(screenCard).join("")}</div>`
       : `<div class="steps wire">${f.steps.map((t, i) => {
           // After an answer, mark only the steps it added or reworded, and list what it removed.
@@ -1252,6 +1265,13 @@ document.addEventListener("click", (e) => {
     return;
   }
   if (t.id === "recenter") return fitView();
+  if (t.dataset.view) { S.view = t.dataset.view; render(); return requestAnimationFrame(fitView); }
+  if (t.dataset.editFlow) {  // edit a flow's steps by hand; after screens exist this flags a redraw
+    const f = S.nodes[t.dataset.editFlow]; FLOW_EDIT = f.id;
+    $("flowEditTitle").textContent = `Edit steps: ${f.title}`; $("flowEditText").value = (f.metadata?.steps || []).join("\n");
+    $("flowEditNote").textContent = S.stage === "screens" ? "The screens are redrawn from the new steps when you press Redraw." : "";
+    $("flowEdit").hidden = false; return $("flowEditText").focus();
+  }
   if (t.dataset.skip) { PM.skipped.add(t.dataset.skip); return render(); }
   if (t.dataset.mode) { store.set("bb_mode", t.dataset.mode); return renderMode(); }
   if (t.dataset.role) {
@@ -1379,6 +1399,16 @@ $("briefClose").onclick = () => { $("brief").hidden = true; };
 // Testers' feedback board, the AIRs way: report, upvote, comment; the team marks a fix deployed and
 // three testers' "Confirm fixed" resolve it. Server side: src/api/feedback.py.
 const TESTER = store.get("bb_tester") || (() => { const id = Math.random().toString(36).slice(2) + Date.now().toString(36); store.set("bb_tester", id); return id; })();
+let FLOW_EDIT = null;  // the flow open in the step editor
+$("flowEditClose").onclick = () => { $("flowEdit").hidden = true; };
+$("flowEditSave").onclick = async () => {
+  try {
+    await api(`/api/flows/${encodeURIComponent(FLOW_EDIT)}/steps`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ steps: $("flowEditText").value.split("\n") }) });
+    $("flowEdit").hidden = true; PM.changed = new Set([FLOW_EDIT]); await load();
+    toast(S.needsRedraw ? "Steps saved. Press Redraw the screens to update them." : "Steps saved.");
+  } catch (err) { toast(err.message); }
+};
 let FB_MINE = false;  // the feedback panel shows everyone's reports, or only this person's
 const STATUS_WORDS = { new: "New", in_progress: "In progress", shelved: "Parked", fix_deployed: "Fix deployed", resolved: "Resolved" };
 async function fbApi(path, opts = {}) {  // like api(), plus the tester id; feedback is not tied to a board

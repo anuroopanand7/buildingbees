@@ -735,6 +735,28 @@ def set_mode(payload: ModeRequest) -> Dict[str, Any]:
     return {"mode": payload.mode}
 
 
+class StepsRequest(BaseModel):
+    steps: List[str]
+
+
+@app.post("/api/flows/{flow_id}/steps")
+def edit_flow_steps(flow_id: str, payload: StepsRequest) -> Dict[str, Any]:
+    """The team edits a flow's steps by hand, even after screens are drawn; drawn screens are then flagged for a redraw."""
+    g = _board()
+    f = g.nodes.get(flow_id)
+    if not f or f.layer.value != "FLOW":
+        raise HTTPException(status_code=404, detail="No such flow")
+    steps = [s.strip()[:160] for s in payload.steps if s.strip()][:12]
+    if not steps:
+        raise HTTPException(status_code=400, detail="A flow needs at least one step")
+    f.metadata["was"] = f.metadata.get("steps", [])  # so the board can tag what changed
+    f.metadata["steps"] = steps
+    f.metadata["branches"] = [b for b in f.metadata.get("branches", []) if b["at_step"] <= len(steps)]
+    if any(n.layer.value == "SCREEN" for n in g.nodes.values()):
+        g.needs_redraw = True
+    return get_graph_state()
+
+
 class SignoffRequest(BaseModel):
     by: str
 

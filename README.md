@@ -49,6 +49,8 @@ flowchart LR
 
 **Testers' feedback.** The Feedback button opens a public board for beta testers: report a bug or an idea with screenshots, upvote and comment; the team marks a fix deployed and three testers' "Confirm fixed" resolve it.
 
+**Flows stay editable.** Once screens are drawn, a Flows / Screens switch brings the flows back; "Edit steps" changes a flow by hand, and the board offers to redraw the screens from it.
+
 **Sign-off.** Anyone who owns part of the scope signs off the Brief. It records who and when, how many questions were still open, and says so if later decisions changed the scope.
 
 A screen is "ready to build" only when it has no open blocking question, its loading and error states are decided, every API it calls has a timeout, and every button that calls an API says where a failure leads.
@@ -141,6 +143,7 @@ Every call takes the board id in an `X-Board` header or a `?board=` query parame
 | GET | `/api/graph`, `/api/screens` | The board and each screen's readiness |
 | GET | `/api/brief` | The Brief, as Markdown |
 | POST | `/api/signoff` | Sign off the scope as it stands (`by` says who) |
+| POST | `/api/flows/{id}/steps` | Edit a flow's steps by hand; after screens exist it flags a redraw |
 | POST | `/api/mode` | Switch a board between one founder (`solo`) and a `team` |
 | GET, POST | `/api/feedback` | Testers' feedback board: list, report (with up to 3 screenshots) |
 | POST | `/api/feedback/{id}/vote`, `/comment`, `/confirm`, `/status` | Upvote, comment, confirm a fix; status changes are team-only (`ADMIN_UIDS`) |

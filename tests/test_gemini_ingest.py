@@ -609,3 +609,18 @@ def test_my_reports_include_the_ones_filed_before_signing_in(monkeypatch):
     c.post("/api/feedback", json={"description": "Filed after signing in"}, headers=signed_in)
     mine = [r["description"] for r in c.get("/api/feedback", headers=signed_in).json()["reports"] if r["mine"]]
     assert sorted(mine) == ["Filed after signing in", "Filed while signed out"]
+
+
+def test_flow_steps_can_be_edited_after_screens_and_ask_for_a_redraw(monkeypatch):
+    monkeypatch.setitem(server.engines, "gemini", FakeGemini())
+    c, h = TestClient(server.app), {"X-Board": "edit-steps"}
+    c.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "shop"}, headers=h)
+    out = c.post("/api/flows/F_BUY/steps", json={"steps": ["Open cart", " ", "Pay"]}, headers=h).json()
+    flow = next(n for n in out["nodes"] if n["id"] == "F_BUY")
+    assert flow["metadata"]["steps"] == ["Open cart", "Pay"] and not out["needs_redraw"]  # no screens yet
+    assert flow["metadata"]["branches"][0]["at_step"] == 2  # a split off a step that still exists stays
+    c.post("/api/expand?engine=gemini", headers=h)
+    out = c.post("/api/flows/F_BUY/steps", json={"steps": ["Open cart", "Pay", "Rate the order"]}, headers=h).json()
+    assert out["needs_redraw"]
+    assert c.post("/api/flows/F_BUY/steps", json={"steps": [""]}, headers=h).status_code == 400
+    assert c.post("/api/flows/NOPE/steps", json={"steps": ["x"]}, headers=h).status_code == 404
