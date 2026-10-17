@@ -79,12 +79,18 @@ class GoogleGeminiAdapter:
             contents.append(types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"))
         return self._generate(contents, SpecExtract)
 
-    def extract_flows(self, text: str = "", pdf_bytes: Optional[bytes] = None) -> FlowsExtract:
-        """Turns an idea or PDF into users, flows, branches and the first questions (stage one)."""
-        contents = [FLOWS_PROMPT + (text or "(see attached PDF)")]
+    def extract_flows(self, text: str = "", pdf_bytes: Optional[bytes] = None,
+                      image: Optional[tuple] = None) -> FlowsExtract:
+        """Turns an idea, a PDF, or a photo of a sketch into users, flows, branches and the first questions (stage one).
+        `image` is (bytes, mime type): a whiteboard, napkin or screenshot that Gemini reads with vision."""
+        from google.genai import types
+        note = ("\n(See the attached image: a photo or screenshot of the founder's own sketch. Read its boxes, arrows and "
+                "labels as their draft user flow: keep what it shows, and ask about what it leaves out.)") if image else ""
+        contents = [FLOWS_PROMPT + (text or "(see the attachment)") + note]
         if pdf_bytes:
-            from google.genai import types
             contents.append(types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"))
+        if image:
+            contents.append(types.Part.from_bytes(data=image[0], mime_type=image[1]))
         return self._generate(contents, FlowsExtract)
 
     def react(self, prompt: str) -> Reaction:

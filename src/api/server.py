@@ -613,14 +613,16 @@ def _trace(g: BuildingBeesEngine, eng, started: float) -> None:
                    "seconds": round(time.time() - started, 1), "schema": "validated"}
 
 
-def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None, mode: str = "solo") -> Dict[str, Any]:
+def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None, mode: str = "solo",
+                 image: Optional[tuple] = None) -> Dict[str, Any]:
     """Stage one: flows and the questions about them. No screens are drawn yet."""
     mode = mode if mode in AUDIENCE else "solo"
     sources = tavily.research(text)  # Scout Bee; empty without a key, and for PDFs
     lead = audience(mode) + "\n\nTHE IDEA:\n"  # how to ask, then what the founder actually said
     started = time.time()
     try:
-        x = eng.extract_flows(text=lead + text + tavily.as_prompt(sources), pdf_bytes=pdf_bytes)
+        extra = {"image": image} if image else {}  # only Gemini reads images; older engines take no such argument
+        x = eng.extract_flows(text=lead + text + tavily.as_prompt(sources), pdf_bytes=pdf_bytes, **extra)
         if sources and not any(q.source for q in x.questions):
             # The pages were read but no question used them: ask once more rather than waste the research.
             x = eng.extract_flows(text=lead + text + tavily.as_prompt(sources), pdf_bytes=pdf_bytes)
@@ -628,7 +630,7 @@ def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None, mode: s
         g.mode = mode
         _trace(g, eng, started)
         # The spec is only what the founder said: research never counts as a decision.
-        g.spec_text = (text or pdf_to_text(pdf_bytes))[:SPEC_LIMIT]
+        g.spec_text = (text or (pdf_to_text(pdf_bytes) if pdf_bytes else "A photo of the founder's sketch"))[:SPEC_LIMIT]
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"{eng.label} could not read the spec: {e}")
     g.sources = [{"title": s["title"], "url": s["url"]} for s in sources]
@@ -659,6 +661,8 @@ async def ingest_file(engine: str, file: UploadFile = File(...), mode: str = "so
         raise HTTPException(status_code=413, detail="File is over 20 MB")
     if data[:4] == b"%PDF":
         return _start_board(eng, pdf_bytes=data, mode=mode)
+    if (file.content_type or "").startswith("image/"):  # a photo of a whiteboard or napkin sketch: Gemini vision reads it
+        return _start_board(eng, mode=mode, image=(data, file.content_type))
     return _start_board(eng, text=data.decode("utf-8", errors="ignore"), mode=mode)
 
 

@@ -641,3 +641,18 @@ def test_out_of_scope_decide_for_me_one_question_and_engine_trace(monkeypatch):
     scope = brief.split("## Out of scope for v1 (agreed)")[1].split("\n## ")[0]
     assert "Is guest checkout allowed?" in scope
     assert "Let them try again" in brief.split("## Standard defaults applied")[1]  # decided by the bees, still changeable
+
+
+def test_a_photo_of_a_sketch_goes_to_the_engine_as_an_image(monkeypatch):
+    got = {}
+
+    class Seeing(FakeGemini):
+        def extract_flows(self, text="", pdf_bytes=None, image=None):
+            got["image"] = image
+            return super().extract_flows(text=text, pdf_bytes=pdf_bytes)
+
+    monkeypatch.setitem(server.engines, "gemini", Seeing())
+    r = TestClient(server.app).post("/api/ingest-file?engine=gemini", headers={"X-Board": "sketch"},
+                                    files={"file": ("napkin.png", b"\x89PNG fake", "image/png")})
+    assert r.status_code == 200 and got["image"] == (b"\x89PNG fake", "image/png")
+    assert server.boards["sketch"].spec_text == "A photo of the founder's sketch"

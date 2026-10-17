@@ -22,7 +22,7 @@ flowchart LR
 
 ## How it works
 
-1. **Say what you want to build.** Two lines are enough. A PRD or a PDF works too.
+1. **Say what you want to build.** Two lines are enough. A PRD, a PDF, a call transcript, or a **photo of your whiteboard or napkin sketch** works too: Gemini reads the sketch with vision, keeps what it shows and the bees ask what it leaves out.
 2. **Flows first.** The engine returns the users and their flows, step by step. No screens yet.
 3. **The bees ask.** Each question belongs to one bee and points at one step of a flow.
 

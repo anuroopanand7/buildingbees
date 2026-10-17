@@ -101,8 +101,11 @@ class NvidiaNemotronAdapter:
             text = pdf_to_text(pdf_bytes)
         return self._generate(INGEST_PROMPT + text[:60000], SpecExtract, model=self.heavy_model)
 
-    def extract_flows(self, text: str = "", pdf_bytes: Optional[bytes] = None) -> FlowsExtract:
+    def extract_flows(self, text: str = "", pdf_bytes: Optional[bytes] = None,
+                      image: Optional[tuple] = None) -> FlowsExtract:
         """Turns an idea or PDF into users, flows, branches and the first questions (stage one)."""
+        if image:
+            raise ValueError("Nemotron reads text only here; switch to Google Gemini to map a photo of a sketch")
         if pdf_bytes:
             text = pdf_to_text(pdf_bytes)
         return self._generate(FLOWS_PROMPT + text[:60000], FlowsExtract)
