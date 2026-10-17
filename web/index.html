@@ -116,6 +116,10 @@
   .mine { align-self: flex-end; max-width: 86%; text-align: right; }
   .mine .by { margin-right: 8px; font-size: 11.5px; color: var(--muted); }
   .send-row { display: flex; gap: 6px; }
+  .glow { animation: glow 1.1s ease-in-out 4; }
+  @keyframes glow { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 18px var(--accent); } }
+  @media (prefers-reduced-motion: reduce) { .glow { animation: none; box-shadow: 0 0 0 3px var(--accent); } }
+  .fb-filter { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; font-size: 12.5px; color: var(--muted); }
   .fb-body { padding: 16px 18px; overflow: auto; }
   .fb-form { display: grid; gap: 10px; padding-bottom: 16px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
   .fb-form textarea, .fb-form select { width: 100%; border: 1px solid var(--line-strong); border-radius: var(--r-input); padding: 8px 10px; font: inherit; background: var(--panel); color: var(--text); }
@@ -1358,6 +1362,7 @@ $("briefClose").onclick = () => { $("brief").hidden = true; };
 // Testers' feedback board, the AIRs way: report, upvote, comment; the team marks a fix deployed and
 // three testers' "Confirm fixed" resolve it. Server side: src/api/feedback.py.
 const TESTER = store.get("bb_tester") || (() => { const id = Math.random().toString(36).slice(2) + Date.now().toString(36); store.set("bb_tester", id); return id; })();
+let FB_MINE = false;  // the feedback panel shows everyone's reports, or only this person's
 const STATUS_WORDS = { new: "New", in_progress: "In progress", shelved: "Parked", fix_deployed: "Fix deployed", resolved: "Resolved" };
 async function fbApi(path, opts = {}) {  // like api(), plus the tester id; feedback is not tied to a board
   return api(path, { ...opts, headers: { ...(opts.headers || {}), "X-Tester": TESTER } });
@@ -1373,7 +1378,11 @@ const shrink = (file) => new Promise((ok, bad) => {
 async function fbLoad() {
   const r = await fbApi("/api/feedback");
   if (!$("fbSection").options.length) $("fbSection").innerHTML = r.sections.map((x) => `<option>${esc(x)}</option>`).join("");
-  $("fbList").innerHTML = r.reports.length ? r.reports.map((f) => `<div class="fb-item ${f.status}">
+  const mineCount = r.reports.filter((f) => f.mine).length;
+  const shown = FB_MINE ? r.reports.filter((f) => f.mine) : r.reports;
+  $("fbList").innerHTML = `<div class="fb-filter"><div class="seg" role="group" aria-label="Which reports">
+      <button data-fb-mine="0" aria-pressed="${!FB_MINE}">All reports</button><button data-fb-mine="1" aria-pressed="${FB_MINE}">My reports (${mineCount})</button></div>
+      ${AUTH.user ? "" : "<span>Sign in to see your reports on any device.</span>"}</div>` + (shown.length ? shown.map((f) => `<div class="fb-item ${f.status}">
     <div class="fb-meta"><span class="fb-chip ${f.status}">${STATUS_WORDS[f.status]}</span><span>${esc(f.section)}</span><span>${esc(f.name)}, ${esc(f.created.slice(0, 10))}</span></div>
     <p>${esc(f.description)}</p>
     ${f.screenshots?.length ? `<div class="fb-shots">${f.screenshots.map((u) => `<a href="${u}" target="_blank" rel="noopener"><img src="${u}" alt="Screenshot from ${esc(f.name)}"></a>`).join("")}</div>` : ""}
@@ -1383,7 +1392,7 @@ async function fbLoad() {
       ${f.status === "fix_deployed" ? `<button class="btn sm primary" data-fb-confirm="${f.id}" ${f.confirmed ? "disabled" : ""}>${f.confirmed ? "You confirmed" : "Confirm fixed"} (${f.confirms}/3)</button>` : ""}
       <input class="fb-reply" data-fb-reply="${f.id}" placeholder="Add a comment and press Enter" aria-label="Comment">
       ${r.team ? `<select data-fb-status="${f.id}" aria-label="Status">${Object.entries(STATUS_WORDS).map(([k, v]) => `<option value="${k}" ${k === f.status ? "selected" : ""}>${v}</option>`).join("")}</select>` : ""}
-    </div></div>`).join("") : '<p class="muted">No reports yet. Be the first.</p>';
+    </div></div>`).join("") : `<p class="muted">${FB_MINE ? "You have not reported anything yet." : "No reports yet. Be the first."}</p>`);
 }
 $("fbBtn").onclick = () => { $("fbName").value ||= WHO || AUTH.user?.displayName || ""; $("fb").hidden = false; fbLoad().catch(fail); $("fbText").focus(); };
 $("fbClose").onclick = () => { $("fb").hidden = true; };
@@ -1399,6 +1408,7 @@ $("fbForm").onsubmit = async (e) => {
 };
 $("fbList").onclick = async (e) => {
   const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.fbMine) { FB_MINE = b.dataset.fbMine === "1"; return fbLoad().catch(fail); }
   const id = b.dataset.fbVote || b.dataset.fbConfirm; if (!id) return;
   try { await fbApi(`/api/feedback/${id}/${b.dataset.fbVote ? "vote" : "confirm"}`, { method: "POST" }); await fbLoad(); } catch (err) { toast(err.message); }
 };
@@ -1501,14 +1511,15 @@ const dockMin = (min) => { $("dock").classList.toggle("min", min); $("dockPill")
 $("dockMin").onclick = () => dockMin(true);
 $("dockPill").onclick = () => dockMin(false);
 
-$("newBtn").onclick = async () => {
-  if (AUTH.user) {  // signed in: the old board stays in My boards, the new spec gets a board of its own
-    if (confirm("Start a new spec? Your current board stays in My boards.")) openBoard("");
-    return;
-  }
-  if (!confirm("Start a new spec? This clears the current map and its answers.")) return;
-  try { await api("/api/reset", { method: "POST" }); resetPM(); S.selected = null; await load(); $("prd").focus(); }
-  catch (err) { toast(err.message); }
+// New spec always opens a fresh board and never deletes the old one. No confirm(): in-app browsers
+// (WhatsApp, Instagram) block it silently, which made this button look dead (tester report, 16 Oct).
+let newArmed = 0;
+$("newBtn").onclick = () => {
+  menu(false);
+  if (AUTH.user || !AUTH.sdk?.signInWithPopup || Date.now() - newArmed < 10000) return openBoard("");
+  newArmed = Date.now();  // signed out: first press asks them to sign in so this board is not lost
+  $("signBtn").classList.remove("glow"); void $("signBtn").offsetWidth; $("signBtn").classList.add("glow");
+  toast("Sign in (top right) to keep this board in My boards. Press New spec again to start without saving.");
 };
 // Switching engine mid-board only changes who asks the next questions.
 $("engineBtn").onclick = () => {

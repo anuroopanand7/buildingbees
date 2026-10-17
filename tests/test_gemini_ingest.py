@@ -596,3 +596,16 @@ def test_feedback_board_works_the_airs_way(monkeypatch):
     assert c.post(f"/api/feedback/{fid}/confirm", headers=t("c")).json()["status"] == "resolved"  # third confirmation
     listed = c.get("/api/feedback", headers=t("a")).json()
     assert listed["reports"][0]["id"] == fid and "voters" not in listed["reports"][0] and not listed["team"]
+
+
+def test_my_reports_include_the_ones_filed_before_signing_in(monkeypatch):
+    from src.api import feedback
+    monkeypatch.setattr(feedback, "_mem", {})
+    monkeypatch.setattr(server, "_uid", lambda auth: {"Bearer sravani": "SRAVANI"}.get(auth))
+    c = TestClient(server.app)
+    c.post("/api/feedback", json={"description": "Filed while signed out"}, headers={"X-Tester": "phone1"})
+    c.post("/api/feedback", json={"description": "Someone else's"}, headers={"X-Tester": "phone2"})
+    signed_in = {"X-Tester": "phone1", "Authorization": "Bearer sravani"}
+    c.post("/api/feedback", json={"description": "Filed after signing in"}, headers=signed_in)
+    mine = [r["description"] for r in c.get("/api/feedback", headers=signed_in).json()["reports"] if r["mine"]]
+    assert sorted(mine) == ["Filed after signing in", "Filed while signed out"]

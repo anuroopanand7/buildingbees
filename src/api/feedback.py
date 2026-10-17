@@ -77,11 +77,12 @@ def _is_team(authorization: str) -> bool:
     return bool(uid) and uid in {u.strip() for u in os.getenv("ADMIN_UIDS", "").split(",") if u.strip()}
 
 
-def _public(item: Dict[str, Any], me: str) -> Dict[str, Any]:
-    """A report as the browser sees it: counts instead of voter ids, and whether this tester voted or confirmed."""
+def _public(item: Dict[str, Any], me: str, keys: frozenset = frozenset()) -> Dict[str, Any]:
+    """A report as the browser sees it: counts instead of voter ids, and whether this tester voted, confirmed or filed it.
+    `keys` are all of this person's identities, so reports filed before signing in still count as theirs."""
     out = {k: v for k, v in item.items() if k not in ("voters", "confirmers", "reporter_key")}
     out.update(votes=len(item["voters"]), voted=me in item["voters"], confirms=len(item["confirmers"]),
-               confirmed=me in item["confirmers"], mine=item.get("reporter_key") == me)
+               confirmed=me in item["confirmers"], mine=item.get("reporter_key") in (keys or {me}))
     return out
 
 
@@ -111,10 +112,11 @@ class NewStatus(BaseModel):
 def list_reports(authorization: str = Header(""), x_tester: str = Header("")) -> Dict[str, Any]:
     """Every report, open ones first and the most voted at the top; resolved ones sink to the end."""
     me = _tester(authorization, x_tester) if (authorization or x_tester) else ""
+    keys = frozenset(k for k in (me, "t:" + x_tester if x_tester and len(x_tester) <= 64 else "") if k)
     col = _col()
     items = list(_mem.values()) if col is None else [d.to_dict() for d in col.stream()]
     items.sort(key=lambda i: (i["status"] == "resolved", -len(i["voters"]), i["created"]), reverse=False)
-    return {"sections": SECTIONS, "reports": [_public(i, me) for i in items], "team": _is_team(authorization)}
+    return {"sections": SECTIONS, "reports": [_public(i, me, keys) for i in items], "team": _is_team(authorization)}
 
 
 @router.post("")
