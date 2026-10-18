@@ -744,10 +744,14 @@
     <div class="brief-bar"><b id="noteTitle">Comment</b><button class="icon-btn" id="noteClose" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button></div>
     <div class="fb-body">
       <div id="noteStep" class="idea-text" hidden></div>
+      <div id="stepEdit" hidden>
+        <label class="cap" for="stepEditText">Edit this step now (the card changes at once)</label>
+        <div class="send-row" style="margin:6px 0 14px"><input id="stepEditText" autocomplete="off" style="flex:1;min-width:0;border:1.5px solid var(--ink);border-radius:999px;padding:8px 12px;font:inherit;font-size:13px"><button class="btn primary sm" id="stepEditSave">Save</button></div>
+      </div>
       <div id="noteList"></div>
       <label class="cap" for="noteText">What is wrong, missing or different here? Say it in your own words.</label>
       <textarea id="noteText" rows="4" placeholder="Clients should also be able to pay by bank transfer here." style="width:100%;margin-top:8px;font:inherit;padding:10px;border:1px solid var(--line-strong);border-radius:var(--r-input)"></textarea>
-      <div class="ask-foot" style="margin-top:10px"><span class="muted">Your note waits with your other notes until you press Update the board.</span><button class="btn primary" id="noteSave">Add note</button></div>
+      <div class="ask-foot" style="margin-top:10px"><span class="muted">A note is for the bees: they apply it, with your other notes, when you press Update the board. To change the words on the card now, edit the step above.</span><button class="btn primary" id="noteSave">Add note</button></div>
     </div>
   </div>
 </div>
@@ -1289,20 +1293,32 @@ function reveal(el) {
   if (dx || dy) { VIEW.x += dx; VIEW.y += dy; applyView(true); }
 }
 (() => {
-  const m = $("map"); let drag = null;
+  const m = $("map"); let drag = null, pinch = null;
+  const touches = new Map();  // every finger on the board, so two fingers pinch-zoom instead of fighting a pan (Sravani, 18 Oct: "the screen is moving forever")
   m.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "touch") touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.size === 2) {  // second finger: stop panning, start a pinch around the midpoint
+      const [a, b] = [...touches.values()], r = m.getBoundingClientRect();
+      pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: VIEW.z, cx: (a.x + b.x) / 2 - r.left, cy: (a.y + b.y) / 2 - r.top };
+      drag = null; m.classList.remove("panning"); return;
+    }
     if (e.button !== 0 || e.target.closest("button, a, input, textarea, select, summary, [data-id], #details, .zoombar")) return;
     drag = { x: e.clientX, y: e.clientY, vx: VIEW.x, vy: VIEW.y, moved: false, id: e.pointerId };
   });
   m.addEventListener("pointermove", (e) => {
+    if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && touches.size === 2) {
+      const [a, b] = [...touches.values()];
+      return zoomAt(pinch.z * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d, pinch.cx, pinch.cy, false);
+    }
     if (!drag || e.pointerId !== drag.id) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) < 4) return;  // a small wobble is still a click
     if (!drag.moved) { drag.moved = true; m.setPointerCapture(e.pointerId); m.classList.add("panning"); }
     VIEW.x = drag.vx + dx; VIEW.y = drag.vy + dy; applyView(false);
   });
-  const end = () => { drag = null; m.classList.remove("panning"); };
-  m.addEventListener("pointerup", end); m.addEventListener("pointercancel", end);
+  const end = (e) => { touches.delete(e.pointerId); if (touches.size < 2) pinch = null; drag = null; m.classList.remove("panning"); };
+  ["pointerup", "pointercancel", "lostpointercapture", "pointerleave"].forEach((t) => m.addEventListener(t, end));  // every way a touch can end ends the pan
   m.addEventListener("wheel", (e) => {
     if (e.target.closest("#details")) return;
     e.preventDefault();
@@ -1561,6 +1577,10 @@ function openNote(t) {
   const full = card ? [card.querySelector("b, h4")?.textContent, card.querySelector("p")?.textContent].filter(Boolean) : [];
   $("noteStep").hidden = !full.length;
   $("noteStep").innerHTML = full.length ? `<b>${esc(full[0])}</b>${full[1] ? `<p>${esc(full[1])}</p>` : ""}` : "";
+  const flow = S.nodes[NOTE_AT.target];
+  const editable = flow?.layer === "FLOW" && NOTE_AT.step > 0 && !NOTE_AT.path && mayProcess();
+  $("stepEdit").hidden = !editable;
+  if (editable) $("stepEditText").value = (flow.metadata?.steps || [])[NOTE_AT.step - 1] || "";
   renderNoteList(); $("noteText").value = ""; $("noteAdd").hidden = false;
 }
 // Tapping anywhere on a step card opens its thread (the pin is small on a tablet).
@@ -1939,6 +1959,17 @@ function openFeature(showIdea = false) {
 }
 $("featureBtn").onclick = () => openFeature();
 $("noteClose").onclick = () => { $("noteAdd").hidden = true; };
+// Sravani, 18 Oct: "When I'm trying to edit, I can't see the edited text in the card" (she had written a note).
+$("stepEditSave").onclick = async () => {
+  const flow = S.nodes[NOTE_AT.target], text = $("stepEditText").value.trim();
+  if (!flow || !text) return $("stepEditText").focus();
+  const steps = [...(flow.metadata?.steps || [])]; steps[NOTE_AT.step - 1] = text;
+  try {
+    await api(`/api/flows/${encodeURIComponent(flow.id)}/steps`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ steps }) });
+    PM.changed = new Set([flow.id]); $("noteAdd").hidden = true; await load();
+    toast(S.needsRedraw ? "Step changed. Press Redraw the screens to update the screens too." : "Step changed.");
+  } catch (err) { toast(err.message); }
+};
 $("inviteClose").onclick = () => { $("invite").hidden = true; };
 $("inviteCopy").onclick = () => navigator.clipboard.writeText($("inviteLink").value)
   .then(() => { $("invite").hidden = true; toast("Link copied. Send it to your team."); }, () => { $("inviteLink").select(); toast("Select the link and copy it."); });
