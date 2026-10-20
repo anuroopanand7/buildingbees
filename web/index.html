@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light only">
 <title>BuildingBees</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Balsamiq+Sans:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
 <style>
   /* Tokens. Honey is the brand hue: the mark and the node in focus only. Status colours are fixed. */
@@ -662,13 +662,11 @@
   }
   body { background: var(--bg); }
   /* Figma-style board: clear dots that move and scale with the board (applyView sets position and size). */
-  /* Honeycomb dots: the corners of a hexagon grid, four dots per 22.5 x 39 px tile (hexagon side 13 px). */
+  /* Board grid: a tiny mark where three lines meet at 120 degrees, on the corners of an implied honeycomb
+     (hexagon side 16 px, so one tile is 27.71 x 48 px with four marks). Bee without drawing literal cells. */
   #map, #start {
-    --hex: radial-gradient(circle at 75% 8.33%, var(--dot) 1.3px, transparent 1.5px),
-           radial-gradient(circle at 25% 25%, var(--dot) 1.3px, transparent 1.5px),
-           radial-gradient(circle at 25% 58.33%, var(--dot) 1.3px, transparent 1.5px),
-           radial-gradient(circle at 75% 75%, var(--dot) 1.3px, transparent 1.5px);
-    background-image: var(--hex); background-size: 22.5px 39px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='27.71' height='48' viewBox='0 0 27.71 48'%3E%3Cpath d='M20.78 4l0 -3.6M20.78 4l-3.12 1.8M20.78 4l3.12 1.8M6.93 12l-3.12 -1.8M6.93 12l3.12 -1.8M6.93 12l0 3.6M6.93 28l0 -3.6M6.93 28l-3.12 1.8M6.93 28l3.12 1.8M20.78 36l-3.12 -1.8M20.78 36l3.12 -1.8M20.78 36l0 3.6' fill='none' stroke='%23121210' stroke-opacity='.24' stroke-width='1.1' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-size: 27.71px 48px;
   }
   #map { background-color: var(--bg); }
   /* Calls to action: yellow, black outline, a hard black shadow that sinks when pressed. */
@@ -702,9 +700,35 @@
   .dock .dock-min[data-tip] { position: absolute; }
   .set-q.clash { border-top: 0; border: 1.5px solid var(--ink); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; background: var(--focus); }  /* [data-tip] sets position: relative; keep the button pinned inside */
   .ideas .btn.primary { background: var(--bee); color: var(--ink); }  /* the one-click sample is a call to action too */
+
+  /* Sketch wireframes: screens read as a pen sketch (like Balsamiq), not a finished mockup. Outlines live on
+     ::after layers that go through the #sketchy wobble filter; text never does, so it stays sharp and readable. */
+  .wf { font-family: "Balsamiq Sans", "Comic Neue", ui-rounded, sans-serif; position: relative; border-color: transparent; background: #fff; color: var(--ink); }
+  .wf, .wf-input, .wf-choice span, .wf-button, .wf-image, .wf-list i { position: relative; }
+  .wf::after, .wf-input::after, .wf-choice span::after, .wf-button::after, .wf-image::after, .wf-list i::after {
+    content: ""; position: absolute; inset: 0; border: 2px solid var(--ink); border-radius: inherit; filter: url(#sketchy); pointer-events: none;
+  }
+  /* A second, fainter pass of the pen slightly off the first: the double line is what makes it read as drawn by hand. */
+  .wf::before, .wf-button::before, .wf-image::before {
+    content: ""; position: absolute; inset: 1px -1px -1px 1px; border: 1.2px solid color-mix(in srgb, var(--ink) 45%, transparent); border-radius: inherit; filter: url(#sketchy2); pointer-events: none;
+  }
+  .wf-heading { font-weight: 700; }
+  .wf-text, .wf-input, .wf-detail { color: color-mix(in srgb, var(--ink) 68%, transparent); }
+  .wf-input, .wf-choice span { border-color: transparent; background: none; }
+  .wf-note { border-left: 2px dashed var(--ink); }
+  .wf-button { background: var(--bee); color: var(--ink); font-weight: 700; border-radius: 10px; }
+  /* An image is a crossed box, the oldest wireframe convention there is. */
+  .wf-image { background: linear-gradient(to top right, transparent calc(50% - .8px), color-mix(in srgb, var(--ink) 35%, transparent) 50%, transparent calc(50% + .8px)),
+                          linear-gradient(to bottom right, transparent calc(50% - .8px), color-mix(in srgb, var(--ink) 35%, transparent) 50%, transparent calc(50% + .8px)), #fff; }
+  /* A list row is an outlined row with a scribbled line of text in it. */
+  .wf-list i { background: linear-gradient(color-mix(in srgb, var(--ink) 22%, transparent), color-mix(in srgb, var(--ink) 22%, transparent)) 10px 50% / 55% 3px no-repeat; }
+  .wf.small { background: #fff; border-color: transparent; }
+  .wf.small::after { border-width: 1.3px; }
 </style>
 </head>
 <body>
+<!-- The pen wobble for sketch wireframes: noise bends each outline a few pixels, like a hand-drawn line. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><filter id="sketchy" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="4" xChannelSelector="R" yChannelSelector="G"/></filter><filter id="sketchy2" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="31" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="4" xChannelSelector="R" yChannelSelector="G"/></filter></svg>
 <!-- The chrome floats over the page as small islands, the way Excalidraw and Figma do. -->
 <div class="island brand" id="brand">
   <button class="tool" id="menuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="menu" aria-label="Menu" data-tip="Menu" data-tip-pos="bottom"><i class="ph ph-list" aria-hidden="true"></i></button>
@@ -1266,7 +1290,8 @@ function applyView(glide) {
   c.classList.toggle("glide", !!glide);
   c.style.transform = `translate(${VIEW.x}px, ${VIEW.y}px) scale(${VIEW.z})`;
   m.style.backgroundPosition = `${VIEW.x}px ${VIEW.y}px`;  // the dot grid moves with the board
-  m.style.backgroundSize = `${22.5 * VIEW.z}px ${39 * VIEW.z}px`;  // one honeycomb tile, scaled with the zoom
+  const lod = VIEW.z < 0.55 ? 2 : 1;  // zoomed far out, marks spread to every other cell so the board stays calm
+  m.style.backgroundSize = `${27.71 * VIEW.z * lod}px ${48 * VIEW.z * lod}px`;  // one grid tile, scaled with the zoom
   $("zoomPct").textContent = `${Math.round(VIEW.z * 100)}%`;
   // Lost the board after a drag? Offer a way back (tester report, 16 Oct: "like recenter in Google Maps").
   // Worked out from VIEW, not the on-screen rect, so it is right even while a glide is still animating.
