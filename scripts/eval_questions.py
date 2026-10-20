@@ -21,10 +21,7 @@ IDEAS = [
     "An internal tool for a logistics company: drivers upload proof of delivery photos and dispatchers approve them.",
     "A SaaS dashboard where a marketing team connects their ad accounts and gets a weekly spend report by email.",
 ]
-# Topics with a standard answer: asking about them wastes the team's time.
-STANDARD = re.compile(r"time ?out|retry|retries|double[- ]?(tap|click)|second tap|tap twice|debounc|idempot|spinner|"
-                      r"skeleton|loading state|password (rule|length)|session (length|expir)|paginat|rate limit|"
-                      r"file size|character limit", re.I)
+from src.core.ingest import STANDARD  # the same list the server filters with
 
 
 def words(t):

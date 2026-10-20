@@ -59,12 +59,21 @@ def _one_question(text: str) -> str:
     return text[:i + 1] if 0 <= i < len(text.rstrip()) - 1 and "?" in text[i + 1:] else text
 
 
+# Topics with an industry-standard answer: asking about them wastes the team's time (Ponna, 16 Oct: 70+ questions,
+# mostly these). The prompts forbid them; this catches what slips through on any engine. The eval uses it too.
+STANDARD = re.compile(r"time ?out|retry|retries|double[- ]?(tap|click)|second tap|tap twice|debounc|idempot|spinner|"
+                      r"skeleton|loading state|password (rule|length)|session (length|expir)|paginat|rate limit|"
+                      r"file size|character limit", re.I)
+
+
 def add_questions(engine: BuildingBeesEngine, questions: Iterable[XQuestion], source: str = "ai",
                   dedupe: bool = True) -> list:
     """Pins the engine's questions to their nodes, skipping unknown targets and near-duplicates; returns the ones added."""
     added = []
     for q in questions:
         if q.target_id not in engine.nodes or (dedupe and _already_asked(engine, q.question)):
+            continue
+        if source != "BuildingBees" and STANDARD.search(q.question):  # our own detail questions become defaults; a bee's never asks these
             continue
         try:
             cat = QuestionCategory(q.category.upper())

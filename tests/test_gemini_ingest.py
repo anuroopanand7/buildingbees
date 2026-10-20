@@ -22,7 +22,7 @@ EXTRACT = SpecExtract(
                success_screen_id="W02_DONE", failure_screen_id="W01_CART")],
     apis=[XAPI(id="API_PAY", method="POST", path="/pay", service="payments", vendor="", timeout_ms=0)],
     questions=[
-        XQuestion(target_id="API_PAY", category="backend", question="What if the gateway times out?",
+        XQuestion(target_id="API_PAY", category="backend", question="Which payment gateway do we use?",
                   is_blocking=True, suggested_options=["Retry once", "Fail fast"]),
         XQuestion(target_id="NOPE", category="PM", question="Dropped: unknown target", is_blocking=True,
                   suggested_options=[]),
@@ -68,7 +68,7 @@ class FakeGemini:
         return EXTRACT
 
     def interrogate(self, node_id, context_json, asked):
-        return [XQuestion(target_id=node_id, category="FRONTEND", question="Double tap on Pay?",
+        return [XQuestion(target_id=node_id, category="FRONTEND", question="Can buyers pay in instalments?",
                           is_blocking=True, suggested_options=[])]
 
 
@@ -87,7 +87,7 @@ def test_ingest_interrogate_resolve_flow(monkeypatch):
         assert kept["answer_text"] == "No, sign-in required"  # the decision travels with the board
         flow = next(n for n in second["nodes"] if n["id"] == "F_BUY")
         assert flow["metadata"]["steps"] == ["Open cart", "Pay", "See confirmation"]
-        assert c.post("/api/nodes/CTA_PAY/interrogate?engine=gemini").json()["added"][0]["question_text"] == "Double tap on Pay?"
+        assert c.post("/api/nodes/CTA_PAY/interrogate?engine=gemini").json()["added"][0]["question_text"] == "Can buyers pay in instalments?"
         screens = {s["screen_id"]: s for s in c.get("/api/screens").json()}
         assert screens["W01_CART"]["is_build_ready"] is False
         for q in screens["W01_CART"]["open_blocking_questions"]:
@@ -278,7 +278,7 @@ def test_brief_states_decisions_and_gaps(monkeypatch):
     assert brief.startswith("# Tiny Shop: product brief")
     assert "1. Open cart" in brief and "Cart (" in brief and "### S1 " in brief  # screens carry their short id
     assert "**Is guest checkout allowed?** No, sign-in required" in brief and "Queen Bee" in brief
-    assert "BLOCKS THE BUILD: What if the gateway times out?" in brief
+    assert "BLOCKS THE BUILD: Which payment gateway do we use?" in brief
     assert "timeout: NOT DECIDED" in brief and "vendor: none chosen" in brief
     assert "Empty: NOT DECIDED" not in brief  # an empty state is only printed when one was decided
     assert "\u2014" not in brief
@@ -305,7 +305,7 @@ def test_same_question_is_not_asked_twice():
     from src.core.ingest import add_questions
     g = build_graph_from_extract(EXTRACT)
     before = len(g.get_questions_for_node("API_PAY"))
-    dup = XQuestion(target_id="API_PAY", category="TESTER", question="What happens if the gateway times out?",
+    dup = XQuestion(target_id="API_PAY", category="TESTER", question="Which payment gateway should we use?",
                     is_blocking=True, suggested_options=[])
     new = XQuestion(target_id="API_PAY", category="BACKEND", question="Which currency do we charge in?",
                     is_blocking=True, suggested_options=[])
@@ -950,3 +950,13 @@ def test_nemotron_routing_and_daily_budget(monkeypatch):
         assert False, "the budget guard should stop the call"
     except RuntimeError as e:
         assert "budget" in str(e)
+
+
+def test_bees_never_ask_standard_details():
+    from src.core.ingest import add_questions
+    g = build_graph_from_extract(EXTRACT)
+    added = add_questions(g, [XQuestion(target_id="F_BUY", category="FRONTEND", question="What is the maximum file size for uploads?",
+                                        is_blocking=False, suggested_options=["5 MB"]),
+                              XQuestion(target_id="F_BUY", category="PM", question="Can guests check out?", is_blocking=True,
+                                        suggested_options=["Yes", "No"])], "Google Gemini")
+    assert [q.question_text for q in added] == ["Can guests check out?"]
