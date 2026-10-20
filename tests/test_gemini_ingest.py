@@ -918,3 +918,35 @@ def test_misalignments_go_to_the_product_owner(monkeypatch):
     settled = c.post("/api/conflicts/0/settle", json={"decision": "UPI and cash"}, headers=h).json()
     assert settled["conflicts"][0]["status"] == "settled"
     assert any("UPI and cash" in n["text"] and n["status"] == "open" for n in settled["comments"])
+
+
+def test_nemotron_routing_and_daily_budget(monkeypatch):
+    from src.adapters import nvidia_adapter as nv
+    calls = []
+
+    class Resp:
+        def __init__(self, model): self.model = model
+        def raise_for_status(self): pass
+        def json(self):
+            return {"usage": {"prompt_tokens": 100_000, "completion_tokens": 100_000},
+                    "choices": [{"message": {"content": FLOWS.model_dump_json() if "FLOW" in self.model else
+                                             Reaction(is_vague=False, note="ok", follow_up=[], flow_updates=[], user_updates=[], field_updates=[]).model_dump_json()}}]}
+
+    def fake_post(url, headers, json, timeout):
+        calls.append((json["model"], isinstance(json["messages"][1]["content"], list)))
+        return Resp("FLOW" if json["messages"][1]["content"] and "users" in str(json["messages"][1]["content"])[:20000] and "react" not in str(json["messages"][1]["content"])[:40] else "x")
+
+    monkeypatch.setattr(nv.httpx, "post", fake_post)
+    a = nv.NvidiaNemotronAdapter(api_key="k")
+    a.extract_flows(text="idea")
+    assert calls[-1] == (nv.DEFAULT_HEAVY_MODEL, False)  # drawing flows is heavy reasoning: Ultra
+    a.extract_flows(text="", image=(b"img", "image/png"))
+    assert calls[-1] == (nv.VISION_MODEL, True)  # a sketch photo goes to the vision model with an image part
+    spent = a.spent_today
+    assert spent > 0  # 100k in and 100k out on Ultra is about $0.40
+    a.spent_today = nv.DAILY_BUDGET_USD
+    try:
+        a.react("THE FOUNDER'S ANSWER: yes")
+        assert False, "the budget guard should stop the call"
+    except RuntimeError as e:
+        assert "budget" in str(e)

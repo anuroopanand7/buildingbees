@@ -2,8 +2,8 @@
 NVIDIA adapter: Nemotron through any OpenAI-compatible endpoint.
 Default endpoint is Nebius Token Factory, which the Nebius x NVIDIA hackathon requires. Set NVIDIA_BASE_URL
 and NVIDIA_MODEL from the Token Factory dashboard; any OpenAI-compatible endpoint serving Nemotron works.
-Same two jobs as the Gemini adapter, with the same output schemas, so the graph code
-does not care which engine ran. PDFs are converted to text first (no multimodal input).
+Same jobs as the Gemini adapter, with the same output schemas, so the graph code does not care which engine
+ran. PDFs are converted to text first; a photo of a sketch goes to the vision model.
 """
 
 import io
@@ -20,10 +20,16 @@ from src.adapters.spec_prompts import (
 )
 
 DEFAULT_BASE_URL = "https://api.tokenfactory.nebius.com/v1"  # the hackathon requires Nebius Token Factory
-DEFAULT_MODEL = "nvidia/Nemotron-3-Ultra-550b-a55b"  # the strongest Nemotron on Token Factory, for every call (18 Oct 2026: 1.5 s on a small check, valid JSON)
-# Screens and the plan are the heavy jobs; since 18 Oct 2026 every call uses Ultra, which answered a small
-# structured check in 1.5 s. Set NVIDIA_MODEL to nvidia/nemotron-3-super-120b-a12b to go back to Super.
+# Routing, as the Best Apps and Agents track asks: "Reach for Nemotron 3 Ultra when you need serious reasoning,
+# and let Nano or Super handle the fast, everyday calls." Ultra draws the flows, the screens and the plan; Super
+# reads each round of answers and notes (a few seconds, a third of the price).
+DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b"
 DEFAULT_HEAVY_MODEL = "nvidia/Nemotron-3-Ultra-550b-a55b"
+VISION_MODEL = "nvidia/Nemotron-3.5-Super-VL"  # reads a photo of a whiteboard or napkin sketch
+# Token Factory prices in US dollars per token, input and output (read from its /v1/models on 20 Oct 2026).
+PRICES = {DEFAULT_HEAVY_MODEL: (1.0e-6, 3.0e-6), DEFAULT_MODEL: (3.0e-7, 9.0e-7), VISION_MODEL: (3.0e-7, 9.0e-7)}
+# Spend guard: we have $25 of credit that must last until judging ends on 15 Dec, so a day may spend at most this.
+DAILY_BUDGET_USD = float(os.getenv("NVIDIA_DAILY_BUDGET_USD", "1.5"))
 
 
 def pdf_to_text(data: bytes) -> str:
@@ -52,24 +58,43 @@ class NvidiaNemotronAdapter:
         self.model = model or os.getenv("NVIDIA_MODEL") or DEFAULT_MODEL
         self.heavy_model = os.getenv("NVIDIA_HEAVY_MODEL") or DEFAULT_HEAVY_MODEL
         self.base_url = (base_url or os.getenv("NVIDIA_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
+        # shortcut: the spend count lives in memory (one Cloud Run instance, max-instances 1); a restart resets it.
+        # Move it to Firestore if the service ever runs more than one instance.
+        self._day, self.spent_today = "", 0.0
 
     @property
     def enabled(self) -> bool:
         """True when an NVIDIA (Nebius Token Factory) API key is set."""
         return bool(self.api_key)
 
-    def _generate(self, prompt: str, schema, model: Optional[str] = None):
+    def _spend(self, model: str, usage: dict) -> None:
+        """Adds one call's cost (from the token counts Token Factory returns) to today's total."""
+        price_in, price_out = PRICES.get(model, PRICES[DEFAULT_HEAVY_MODEL])
+        self.spent_today += usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out
+
+    def _generate(self, prompt: str, schema, model: Optional[str] = None, image: Optional[tuple] = None):
         """Calls Nemotron with the schema in the prompt and validates the JSON; one retry with the validation error when it does not fit."""
         if not self.enabled:
             raise EngineNotConfigured("NVIDIA_API_KEY is not set")
+        import time as _t
+        today = _t.strftime("%Y-%m-%d")
+        if today != self._day:
+            self._day, self.spent_today = today, 0.0
+        if self.spent_today >= DAILY_BUDGET_USD:
+            raise RuntimeError("Today's Nemotron budget is used up, so the demo keeps its credit for tomorrow. Please try again tomorrow.")
         instructions = (
             prompt
             + "\n\nReply with ONLY one JSON object matching this JSON Schema, no prose:\n"
             + json.dumps(schema.model_json_schema())
         )
+        user = instructions
+        if image:  # OpenAI-style image part: the vision model reads the sketch next to the instructions
+            import base64
+            user = [{"type": "text", "text": instructions},
+                    {"type": "image_url", "image_url": {"url": f"data:{image[1]};base64,{base64.b64encode(image[0]).decode()}"}}]
         messages = [
             {"role": "system", "content": "/no_think"},
-            {"role": "user", "content": instructions},
+            {"role": "user", "content": user},
         ]
         last_error = None
         for _ in range(2):  # one retry when the reply is not valid JSON for the schema
@@ -82,7 +107,9 @@ class NvidiaNemotronAdapter:
                 timeout=180,
             )
             resp.raise_for_status()
-            content = resp.json()["choices"][0]["message"]["content"] or ""
+            body = resp.json()
+            self._spend(model or self.model, body.get("usage") or {})
+            content = body["choices"][0]["message"]["content"] or ""
             try:
                 out = schema.model_validate_json(_first_json_object(content))
                 self.last_model = model or self.model
@@ -103,12 +130,16 @@ class NvidiaNemotronAdapter:
 
     def extract_flows(self, text: str = "", pdf_bytes: Optional[bytes] = None,
                       image: Optional[tuple] = None) -> FlowsExtract:
-        """Turns an idea or PDF into users, flows, branches and the first questions (stage one)."""
-        if image:
-            raise ValueError("Nemotron reads text only here; switch to Google Gemini to map a photo of a sketch")
+        """Turns an idea, a PDF or a photo of a sketch into users, flows, branches and the first questions (stage one).
+        Ultra reasons over text; a sketch photo goes to the vision model, which reads its boxes and arrows."""
         if pdf_bytes:
             text = pdf_to_text(pdf_bytes)
-        return self._generate(FLOWS_PROMPT + text[:60000], FlowsExtract)
+        if image:
+            note = ("\n(See the attached image: a photo of the founder's own sketch. Read its boxes, arrows and labels as "
+                    "their draft user flow: keep what it shows, and ask about what it leaves out.)")
+            return self._generate(FLOWS_PROMPT + (text or "(see the attached image)")[:60000] + note, FlowsExtract,
+                                  model=VISION_MODEL, image=image)
+        return self._generate(FLOWS_PROMPT + text[:60000], FlowsExtract, model=self.heavy_model)
 
     def react(self, prompt: str) -> Reaction:
         """A bee reads one answer: a sharper follow-up if it is vague, otherwise changes to the board."""
