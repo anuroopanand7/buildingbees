@@ -36,6 +36,9 @@ FALLBACK = {DEFAULT_HEAVY_MODEL: VISION_MODEL, VISION_MODEL: DEFAULT_HEAVY_MODEL
 PRICES = {DEFAULT_HEAVY_MODEL: (1.0e-6, 3.0e-6), DEFAULT_MODEL: (3.0e-7, 9.0e-7), VISION_MODEL: (3.0e-7, 9.0e-7)}
 # Spend guard: we have $25 of credit that must last until judging ends on 15 Dec, so a day may spend at most this.
 DAILY_BUDGET_USD = float(os.getenv("NVIDIA_DAILY_BUDGET_USD", "1.5"))
+# Ultra drew screens in 17 s in the A/B but took 162 s when busy (video test, 20 Oct). Past this many seconds
+# its fallback answers instead, so a person never waits minutes.
+HEAVY_TIMEOUT_S = float(os.getenv("NVIDIA_HEAVY_TIMEOUT_S", "45"))
 
 
 def pdf_to_text(data: bytes) -> str:
@@ -123,7 +126,7 @@ class NvidiaNemotronAdapter:
                 # Thinking off: left on, Nemotron 3 spends the whole token budget reasoning and the JSON is cut short.
                 json={"model": model or self.model, "messages": messages, "temperature": 0.2, "max_tokens": 8192,
                       "chat_template_kwargs": {"enable_thinking": False}},
-                timeout=180,
+                timeout=HEAVY_TIMEOUT_S if model == DEFAULT_HEAVY_MODEL else 180,  # a busy Ultra hands over
             )
             resp.raise_for_status()
             body = resp.json()

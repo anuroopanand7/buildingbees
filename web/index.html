@@ -437,7 +437,7 @@
 
   /* Working overlay: shown for every slow call, with what is happening and how long it has taken. */
   #working { position: fixed; inset: 48px 0 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 88%, transparent); z-index: 20; }
-  .working-card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: 26px 30px; min-width: 300px; text-align: center; }
+  .working-card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: 26px 30px; min-width: 300px; max-width: min(440px, 90vw); text-align: center; }
   .working-card .spinner { margin: 0 auto 14px; width: 28px; height: 28px; }
   .sketch { display: block; width: 168px; margin: 0 auto 16px; overflow: visible; }
   .sketch rect, .sketch path { fill: none; stroke: var(--text); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 140; stroke-dashoffset: 140; animation: pen 2.4s var(--ease-out) infinite; }
@@ -445,7 +445,7 @@
   @keyframes pen { 0% { stroke-dashoffset: 140; } 45%, 80% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
   @media (prefers-reduced-motion: reduce) { .sketch rect, .sketch path { animation: none; stroke-dashoffset: 0; } }
   .working-card b { display: block; }
-  .working-card span { display: block; color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .working-card span { display: block; color: var(--muted); font-size: 13px; margin-top: 4px; white-space: normal; }  /* long waits wrap instead of running off the card */
 
   @media (max-width: 900px) {
     #start { padding: 24px 16px; }
@@ -662,8 +662,15 @@
   }
   body { background: var(--bg); }
   /* Figma-style board: clear dots that move and scale with the board (applyView sets position and size). */
-  #map { background-color: var(--bg); background-image: radial-gradient(var(--dot) 1.3px, transparent 1.4px); }
-  #start { background-image: radial-gradient(var(--dot) 1.2px, transparent 1.3px); }
+  /* Honeycomb dots: the corners of a hexagon grid, four dots per 22.5 x 39 px tile (hexagon side 13 px). */
+  #map, #start {
+    --hex: radial-gradient(circle at 75% 8.33%, var(--dot) 1.3px, transparent 1.5px),
+           radial-gradient(circle at 25% 25%, var(--dot) 1.3px, transparent 1.5px),
+           radial-gradient(circle at 25% 58.33%, var(--dot) 1.3px, transparent 1.5px),
+           radial-gradient(circle at 75% 75%, var(--dot) 1.3px, transparent 1.5px);
+    background-image: var(--hex); background-size: 22.5px 39px;
+  }
+  #map { background-color: var(--bg); }
   /* Calls to action: yellow, black outline, a hard black shadow that sinks when pressed. */
   .btn.primary { background: var(--bee); color: var(--ink); border: 1.5px solid var(--ink); box-shadow: var(--pop); font-weight: 600; }
   .btn.primary:hover:not(:disabled) { background: var(--bee); border-color: var(--ink); box-shadow: var(--pop-hover); transform: translate(-1px, -1px); }
@@ -1259,7 +1266,7 @@ function applyView(glide) {
   c.classList.toggle("glide", !!glide);
   c.style.transform = `translate(${VIEW.x}px, ${VIEW.y}px) scale(${VIEW.z})`;
   m.style.backgroundPosition = `${VIEW.x}px ${VIEW.y}px`;  // the dot grid moves with the board
-  m.style.backgroundSize = `${22 * VIEW.z}px ${22 * VIEW.z}px`;
+  m.style.backgroundSize = `${22.5 * VIEW.z}px ${39 * VIEW.z}px`;  // one honeycomb tile, scaled with the zoom
   $("zoomPct").textContent = `${Math.round(VIEW.z * 100)}%`;
   // Lost the board after a drag? Offer a way back (tester report, 16 Oct: "like recenter in Google Maps").
   // Worked out from VIEW, not the on-screen rect, so it is right even while a glide is still animating.

@@ -980,3 +980,25 @@ def test_nemotron_falls_back_to_the_other_model(monkeypatch):
     a = nv.NvidiaNemotronAdapter(api_key="k")
     out = a._generate("prompt", FlowsExtract, model=nv.DEFAULT_HEAVY_MODEL)
     assert out.product_name == "Tiny Shop" and seen == [nv.DEFAULT_HEAVY_MODEL, nv.VISION_MODEL]
+
+
+def test_busy_ultra_times_out_and_super_vl_answers(monkeypatch):
+    """A slow Ultra gets a short timeout; when it runs out, Super VL answers so nobody waits minutes."""
+    from src.adapters import nvidia_adapter as nv
+    seen = []
+
+    def slow(url, headers, json, timeout):
+        seen.append((json["model"], timeout))
+        if json["model"] == nv.DEFAULT_HEAVY_MODEL:
+            raise nv.httpx.ReadTimeout("busy")
+        class R:
+            def raise_for_status(self):
+                pass
+            def json(self):
+                return {"usage": {}, "choices": [{"message": {"content": FLOWS.model_dump_json()}}]}
+        return R()
+
+    monkeypatch.setattr(nv.httpx, "post", slow)
+    out = nv.NvidiaNemotronAdapter(api_key="k")._generate("prompt", FlowsExtract, model=nv.DEFAULT_HEAVY_MODEL)
+    assert out.product_name == "Tiny Shop"
+    assert seen == [(nv.DEFAULT_HEAVY_MODEL, nv.HEAVY_TIMEOUT_S), (nv.VISION_MODEL, 180)]
