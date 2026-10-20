@@ -1,80 +1,62 @@
-# Nebius x NVIDIA Global AI Hackathon: Devpost entry draft
+# Devpost entry: Nebius x NVIDIA hackathon (rewritten 20 Oct 2026)
 
-Deadline: 30 Oct 2026, 10:00 am PDT (10:30 pm IST). Everything here describes the product as it runs today.
+**Deadline: 30 Oct 2026, 10:30 pm IST.** Track: Best Apps and Agents. Bonus: Best Use of Tavily.
+Needs: a working demo URL, a public YouTube video of 3 minutes or less showing Token Factory and Nemotron, a public repo with a licence, this text.
+Judged equally on technological implementation, design, potential impact and quality of idea.
 
-## Form fields
+**Demo URL (Nemotron only):** https://buildingbees-nemotron-853213660594.asia-south1.run.app
+**Repo:** https://github.com/anuroopanand7/buildingbees
+**Video:** (add the YouTube link)
 
-- **Project name:** BuildingBees
-- **Tagline:** Other tools guess what you meant. BuildingBees asks.
-- **Track:** Best Apps and Agents
-- **Bonus prize:** Best Use of Tavily
-- **Working demo:** https://buildingbees-853213660594.asia-south1.run.app (choose "NVIDIA Nemotron" on the start screen)
-- **Code:** https://github.com/anuroopanand7/buildingbees (MIT licence, shown at the top of the repository)
-- **Video:** public YouTube link, 3 minutes or less (script in `02_VIDEO_SCRIPT.md`)
-- **Built with:** NVIDIA Nemotron 3 Super, NVIDIA Nemotron 3 Ultra, Nebius Token Factory, Tavily, Python, FastAPI, Pydantic
+---
+
+## Project name
+BuildingBees
+
+## Tagline (one line)
+Agentic product planning on NVIDIA Nemotron: a team and AI bees plan the product with no gaps, so agents can build it without guessing.
 
 ## Inspiration
+I work as a consultant. For one of my clients, I suggested we build the whole product with an AI agent. I learned quickly that agents only go straight when the plan has no gaps. Otherwise they assume stuff and hallucinate.
 
-AI can turn one sentence into screens, diagrams or code. But one sentence leaves most decisions out, so the tool guesses: who the user is, what happens on a failure, which data is kept. The guesses look finished, so nobody questions them until they are in production.
+So for 7 days I ran a little ritual. Codex drew the user flows on a Figma board and left questions for every role. My team commented during the day, and every evening I fed their inputs back and redrew everything. After a week the plan was so clear that an agent could build it without guessing.
 
-A good product manager does the opposite. They draw the flow first and ask about every step before anyone designs a screen. I wanted a tool that behaves like that team, for founders who do not have one.
+Why do vibe coded products have bugs? Because there are so many gaps left in the plan that the agent fills them with guesses. BuildingBees is that 7 day ritual on one board, in a few hours.
 
 ## What it does
+- You say your idea in plain words, alone or with your team.
+- Nemotron draws the user flows first, with every split where things can go wrong, plus a feature list (F1, F2) and short ids for every flow, screen and API.
+- Six bees (product, design, frontend, backend, testing, compliance) ask only what your team actually has to decide, in rounds of up to 6 questions. A Scout Bee reads the web first with Tavily, so the questions are about real rules and real failures.
+- Everyone can comment on any card, like Figma comments. The board only changes when you press Update the board, and it redraws once per round.
+- When people disagree, the bees don't pick a side. They flag the misalignment for the product owner.
+- Then it draws the screens as specs (elements, buttons, the API behind each), runs a plan check, and writes the full plan: user stories with Given, When, Then tests, a feature list, a build order and every decision with who made it.
+- You can share the plan as one web page, download it, or give it to a coding agent through our MCP server.
 
-1. You say what you want to build, in two lines.
-2. A Scout Bee searches the web with Tavily for how products like yours work and where they go wrong.
-3. Nemotron draws the user flows. No screens yet.
-4. Six bees, each owning one part of the product (scope, design, frontend, backend, edge cases, compliance), ask what your idea leaves out, one question at a time. Questions that came from the research show their source.
-5. Nemotron reads every answer. A vague answer ("whatever is normal") is not accepted: the bee asks again, more precisely. A clear answer redraws the board in about two seconds, and the bee says what it changed.
-6. When the flows are agreed, Nemotron draws the screens: wireframes, buttons, the API behind each button, and the data model. The bees ask again, screen by screen.
-7. You get a Brief: every decision, every source, and everything still undecided marked NOT DECIDED. One link for engineers or a coding agent.
+## How we built it
+- **NVIDIA Nemotron 3 Ultra (550B) on Nebius Token Factory** does all the reasoning: drawing flows and features, reading every round of answers and notes, flagging misalignments, drawing screens and writing the plan. We call Token Factory's OpenAI-compatible API with JSON schema output and thinking switched off (`/no_think`), and validate every reply against a Pydantic schema before it touches the board.
+- **Tavily** powers the Scout Bee: one search per new board, shown as sources, never counted as a decision.
+- FastAPI on Google Cloud Run (scales to zero), Firestore for boards and tester feedback, a single-page canvas UI in plain JavaScript.
+- Guardrails in Python: vendors, timeouts and limits nobody stated are removed and turned into questions; standard details become visible defaults; a plan check blocks until nothing important is left to guess.
+- An MCP server (`scripts/mcp_server.py`) so Claude Code, Cursor or Codex can read the plan and leave notes for the bees.
+- 54 automated tests, all on fake engines, so no model calls in CI.
 
-A screen is "ready to build" only when nothing on it is left to guess.
+## Challenges we ran into
+- Our first version asked one tester 70+ questions. He called it "a never-ending Google form". We rebuilt the question rules so the bees only ask what the team must decide; it is about 9 per idea now.
+- With thinking on, Nemotron spent all its tokens reasoning and the JSON got cut off. Turning thinking off and asking for schema output made every reply clean.
+- Redrawing after every answer felt chaotic. We moved to rounds: everyone gives input, the board redraws once.
 
-## How I built it, and how it uses Nemotron on Token Factory
+## Accomplishments that we're proud of
+- On Nemotron 3 Ultra a full plan takes well under a minute end to end (measured 20 Oct: map 14.5 to 16.5 s, a round 3.5 s, 8 screens 18.5 s, the full plan 11 s).
+- Real testers on the in-app feedback board filed 21 reports; every one was fixed and redeployed.
+- A non-technical founder (Sravani, CustomDenimFit) planned her product with it and found decisions she had never thought about.
 
-Every model call runs on NVIDIA Nemotron 3 through Nebius Token Factory's OpenAI-compatible API. Two models share the work, following the track's advice to keep the big model for the hard job:
+## What we learned
+The plan matters more than the code. When the team puts its effort into planning, agents build better, with far fewer bugs.
 
-| Job | Model | Measured |
-|---|---|---|
-| Draw the flows and ask the first questions | Nemotron 3 Super | about 10 s, including the Tavily search |
-| Read each answer and redraw the board | Nemotron 3 Super | about 2 s |
-| Draw every screen, button, API and data entity | Nemotron 3 Ultra | about 8 s |
+## What's next for BuildingBees
+- Bring your own AI: run the bees on the team's own Claude, Codex, Antigravity or NVIDIA coding agents.
+- Plug in the team's git repo, so the plan starts from the real architecture.
+- Superintelligence as a service for product owners: experts give a few focused hours a day for a week of planning, get paid properly, and agents build from what they decided.
 
-- **Structured output without a structured-output API.** Each call carries a JSON Schema generated from Pydantic models. The reply is validated; if it fails, the error goes back to Nemotron once and it corrects itself.
-- **Thinking off.** With reasoning on, Nemotron 3 spent its whole token budget thinking and returned cut-off JSON. Turning it off (`enable_thinking: false`) took the flows call from a failure after two minutes to valid JSON in six seconds.
-- **Guesses are removed in code, not trusted to the prompt.** If Nemotron fills in a vendor or a timeout that appears nowhere in what the founder wrote or answered, the server blanks it and a bee asks about it.
-- **Token Factory's speed is the product.** An interview only works if the reply after each answer is quick. Two seconds feels like a colleague.
-
-The board is a graph (users, flows, screens, buttons, APIs, questions) in Python with FastAPI. The web app is one HTML file with no build step.
-
-## How it uses Tavily
-
-One Tavily search runs before the first question. The pages go to Nemotron as untrusted reference text with three rules: use them only to ask sharper questions, never draw a flow from them, never treat them as the founder's decision. In a test on "an app to book a haircut", the research produced questions about deposits for no-shows and limits on a stylist's daily bookings, each linked to the page it came from. The Brief lists every page read.
-
-This is the difference between a bee asking "what about payments?" and a bee asking "salons often take a deposit to cut no-shows: do we?".
-
-## Challenges
-
-- Getting a model to say "that is too vague" instead of politely accepting any answer.
-- Stopping the model from adding flows nobody asked for (sign-in, admin, refunds). It now has to ask whether they are wanted.
-- Nemotron's reasoning eating the output budget, described above.
-
-## What I am proud of
-
-- It refuses to guess, and you can see it refuse.
-- The same product runs on two engines behind one set of schemas.
-- 30 automated tests, including one that proves web research never becomes a decision.
-
-## What is next
-
-- Hand the Brief straight to a coding agent and let the bees review what it builds.
-- Team boards, so a real PM, designer and engineer can answer their own bee.
-
-## What is real, and what is not
-
-Real: everything above, live on the demo link. Not built: accounts, shared editing. The six bees are roles inside one model call, not six separate agents.
-
-## New or existing project
-
-Built for hackathons in October 2026. The NVIDIA Nemotron engine on Token Factory, the two-model split, the Tavily Scout Bee and source citations were all built during this hackathon's submission period.
+## Built with
+nvidia-nemotron, nebius-token-factory, tavily, python, fastapi, pydantic, google-cloud-run, firestore, javascript, mcp

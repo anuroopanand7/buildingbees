@@ -85,6 +85,8 @@ Both engines fill the same Pydantic schemas (`src/adapters/spec_prompts.py`), so
 
 ## NVIDIA Nemotron on Nebius Token Factory
 
+**Nemotron-only demo:** https://buildingbees-nemotron-853213660594.asia-south1.run.app (a second Cloud Run service with only the Nebius key, so every call goes to `nvidia/Nemotron-3-Ultra-550b-a55b`; measured 20 Oct: a map in 14.5 to 16.5 s, a round in 3.5 s, 8 screens in 18.5 s, the full plan in 11 s).
+
 Pick "NVIDIA Nemotron" on the start screen and every model call in the product runs on Nemotron 3 through Token Factory (`src/adapters/nvidia_adapter.py`). Two models share the work:
 
 | Job | Model | Why | Measured (11 Oct 2026) |
