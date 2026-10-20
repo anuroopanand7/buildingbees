@@ -939,7 +939,7 @@ def test_nemotron_routing_and_daily_budget(monkeypatch):
     monkeypatch.setattr(nv.httpx, "post", fake_post)
     a = nv.NvidiaNemotronAdapter(api_key="k")
     a.extract_flows(text="idea")
-    assert calls[-1] == (nv.DEFAULT_HEAVY_MODEL, False)  # drawing flows is heavy reasoning: Ultra
+    assert calls[-1] == (nv.FLOWS_MODEL, False)  # flows: Super VL won the A/B (same quality, 5x cheaper)
     a.extract_flows(text="", image=(b"img", "image/png"))
     assert calls[-1] == (nv.VISION_MODEL, True)  # a sketch photo goes to the vision model with an image part
     spent = a.spent_today
@@ -960,3 +960,23 @@ def test_bees_never_ask_standard_details():
                               XQuestion(target_id="F_BUY", category="PM", question="Can guests check out?", is_blocking=True,
                                         suggested_options=["Yes", "No"])], "Google Gemini")
     assert [q.question_text for q in added] == ["Can guests check out?"]
+
+
+def test_nemotron_falls_back_to_the_other_model(monkeypatch):
+    from src.adapters import nvidia_adapter as nv
+    seen = []
+
+    def flaky(url, headers, json, timeout):
+        seen.append(json["model"])
+        class R:
+            def raise_for_status(self):
+                if json["model"] == nv.DEFAULT_HEAVY_MODEL:
+                    raise nv.httpx.HTTPStatusError("503", request=None, response=None)
+            def json(self):
+                return {"usage": {}, "choices": [{"message": {"content": FLOWS.model_dump_json()}}]}
+        return R()
+
+    monkeypatch.setattr(nv.httpx, "post", flaky)
+    a = nv.NvidiaNemotronAdapter(api_key="k")
+    out = a._generate("prompt", FlowsExtract, model=nv.DEFAULT_HEAVY_MODEL)
+    assert out.product_name == "Tiny Shop" and seen == [nv.DEFAULT_HEAVY_MODEL, nv.VISION_MODEL]

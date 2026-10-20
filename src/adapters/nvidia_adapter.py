@@ -26,6 +26,12 @@ DEFAULT_BASE_URL = "https://api.tokenfactory.nebius.com/v1"  # the hackathon req
 DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b"
 DEFAULT_HEAVY_MODEL = "nvidia/Nemotron-3-Ultra-550b-a55b"
 VISION_MODEL = "nvidia/Nemotron-3.5-Super-VL"  # reads a photo of a whiteboard or napkin sketch
+# A/B on 4 ideas (20 Oct 2026): for drawing flows, Super VL matched Ultra on quality (7 questions an idea, 0 on
+# standard topics, 0 duplicates) at 6.6 s and $0.003 against 12 s and $0.014, and Ultra failed once in 4. For screens
+# Ultra drew about 50% richer specs (12 screens, 12 APIs against 9 and 6), so it keeps the screens and the plan.
+FLOWS_MODEL = VISION_MODEL
+# When a model errors or returns JSON that does not fit, the other one answers instead.
+FALLBACK = {DEFAULT_HEAVY_MODEL: VISION_MODEL, VISION_MODEL: DEFAULT_HEAVY_MODEL, DEFAULT_MODEL: VISION_MODEL}
 # Token Factory prices in US dollars per token, input and output (read from its /v1/models on 20 Oct 2026).
 PRICES = {DEFAULT_HEAVY_MODEL: (1.0e-6, 3.0e-6), DEFAULT_MODEL: (3.0e-7, 9.0e-7), VISION_MODEL: (3.0e-7, 9.0e-7)}
 # Spend guard: we have $25 of credit that must last until judging ends on 15 Dec, so a day may spend at most this.
@@ -73,6 +79,19 @@ class NvidiaNemotronAdapter:
         self.spent_today += usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out
 
     def _generate(self, prompt: str, schema, model: Optional[str] = None, image: Optional[tuple] = None):
+        """Calls one Nemotron model; if it errors or never fits the schema, its fallback model answers instead."""
+        model = model or self.model
+        try:
+            return self._generate_once(prompt, schema, model, image)
+        except RuntimeError:
+            raise  # the daily budget guard: no fallback, that would spend more
+        except Exception:
+            backup = FALLBACK.get(model)
+            if not backup or (image and backup != VISION_MODEL):
+                raise
+            return self._generate_once(prompt, schema, backup, image)
+
+    def _generate_once(self, prompt: str, schema, model: Optional[str] = None, image: Optional[tuple] = None):
         """Calls Nemotron with the schema in the prompt and validates the JSON; one retry with the validation error when it does not fit."""
         if not self.enabled:
             raise EngineNotConfigured("NVIDIA_API_KEY is not set")
@@ -139,7 +158,7 @@ class NvidiaNemotronAdapter:
                     "their draft user flow: keep what it shows, and ask about what it leaves out.)")
             return self._generate(FLOWS_PROMPT + (text or "(see the attached image)")[:60000] + note, FlowsExtract,
                                   model=VISION_MODEL, image=image)
-        return self._generate(FLOWS_PROMPT + text[:60000], FlowsExtract, model=self.heavy_model)
+        return self._generate(FLOWS_PROMPT + text[:60000], FlowsExtract, model=os.getenv("NVIDIA_FLOWS_MODEL") or FLOWS_MODEL)
 
     def react(self, prompt: str) -> Reaction:
         """A bee reads one answer: a sharper follow-up if it is vague, otherwise changes to the board."""

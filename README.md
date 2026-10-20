@@ -90,13 +90,13 @@ Every reasoning step runs on NVIDIA Nemotron models through the Nebius Token Fac
 
 | Job | Model | Measured 20 Oct 2026 |
 |---|---|---|
-| Draw the flows, splits and features from an idea | `nvidia/Nemotron-3-Ultra-550b-a55b` | 9 s, $0.011 |
+| Draw the flows, splits and features from an idea | `nvidia/Nemotron-3.5-Super-VL` (won an A/B against Ultra: same quality, 5x cheaper, 2x faster) | 6.6 s, $0.003 |
 | Read a round of answers and notes, flag misalignments | `nvidia/nemotron-3-super-120b-a12b` | 8 s, $0.002 |
 | Draw the screens, buttons and APIs | Ultra | 19 s, $0.028 |
 | Write the full plan (stories, tests, build order) | Ultra | 10 s, $0.017 |
 | Read a photo of a whiteboard sketch | `nvidia/Nemotron-3.5-Super-VL` | 7 s, $0.004 |
 
-A whole board costs about **$0.06**. Token Factory's OpenAI-compatible API let us reuse the same Pydantic schemas as the Gemini engine: we send the JSON Schema with thinking switched off (`/no_think`, `enable_thinking: false`), validate every reply, and retry once with the validation error. A daily spend guard (`NVIDIA_DAILY_BUDGET_USD`, default $1.50) is worked out from the token counts Token Factory returns, so the demo keeps running on the hackathon credit until judging ends. Tavily powers the Scout Bee (one web search per new board).
+A whole board costs about **$0.05**. Every call has a fallback model (Ultra and Super VL back each other up), so one busy model never stops a board. We chose the routing by measuring it: the same ideas drawn by Ultra, Super VL and Lightning, scored by `scripts/eval_questions.py` (questions per idea, standard-topic questions, duplicates), with time and cost. Token Factory's OpenAI-compatible API let us reuse the same Pydantic schemas as the Gemini engine: we send the JSON Schema with thinking switched off (`/no_think`, `enable_thinking: false`), validate every reply, and retry once with the validation error. A daily spend guard (`NVIDIA_DAILY_BUDGET_USD`, default $1.50) is worked out from the token counts Token Factory returns, so the demo keeps running on the hackathon credit until judging ends. Tavily powers the Scout Bee (one web search per new board).
 
 **Nemotron-only demo:** https://buildingbees-nemotron-853213660594.asia-south1.run.app (a second Cloud Run service with only the Nebius key, so every call goes to `nvidia/Nemotron-3-Ultra-550b-a55b`; measured 20 Oct: a map in 14.5 to 16.5 s, a round in 3.5 s, 8 screens in 18.5 s, the full plan in 11 s).
 
