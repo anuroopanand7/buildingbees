@@ -196,7 +196,7 @@ Every call takes the board id in an `X-Board` header or a `?board=` query parame
 claude mcp add buildingbees -- python3 scripts/mcp_server.py
 ```
 
-Tools: `get_plan` (the Brief, with ids F1, FL1, S1, B1, A1), `plan_check`, `open_questions`, `add_note` (a note on any part of the board; the bees apply it in the next round). Each takes the board id or link.
+Tools: `get_plan` (the Brief, with ids F1, FL1, S1, B1, A1), `plan_check`, `open_questions`, `add_note` (a note on any part of the board; the bees apply it in the next round), `get_item` (one part by its id, instead of the whole plan), `next_to_build` (the hard gate: only screens with no open blocking question are handed out; blocked ones come with the questions that block them) and `decision_log` (who decided what, when, and which options they turned down). Each takes the board id or link.
 
 **Bring your own AI.** The same server lets your agent's own model do the bees' thinking, so planning costs us nothing and you keep your model:
 

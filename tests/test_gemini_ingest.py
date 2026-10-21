@@ -869,7 +869,7 @@ def test_plan_check_share_page_and_agent_tools(monkeypatch):
     init = mcp_server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
     assert init["result"]["serverInfo"]["name"] == "buildingbees"
     names = [t["name"] for t in mcp_server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})["result"]["tools"]]
-    assert names == ["get_plan", "plan_check", "open_questions", "add_note", "start_board", "run_bees", "submit_answer", "answer_question"]
+    assert names == ["get_plan", "plan_check", "open_questions", "add_note", "get_item", "next_to_build", "decision_log", "start_board", "run_bees", "submit_answer", "answer_question"]
     assert mcp_server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
     assert mcp_server._board("https://x.run.app/?board=abc-1") == "abc-1"
 

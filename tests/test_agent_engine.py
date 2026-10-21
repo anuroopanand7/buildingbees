@@ -74,3 +74,35 @@ def test_prompt_tuning_checks_score_a_draft():
     broken.features = []
     bad = checks(broken)
     assert not bad["questions point at real users or flows"] and not bad["features listed and linked to flows"]
+
+
+def test_agent_view_item_ready_gate_decisions_and_ratings(monkeypatch):
+    """One part by short id, the ready/blocked gate, the decision log, and question ratings."""
+    from tests.test_gemini_ingest import FakeGemini
+    monkeypatch.setitem(server.engines, "gemini", FakeGemini())
+    monkeypatch.setattr(server.tavily, "research", lambda text: [])
+    h = {"X-Board": "agent-view-test"}
+    server.boards.pop(h["X-Board"], None)
+    client.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "a shop"}, headers=h)
+    g = client.post("/api/expand?engine=gemini", headers=h).json()
+    ids = g["short_ids"]
+    screen = next(ids[n["id"]] for n in g["nodes"] if n["layer"] == "SCREEN")
+
+    one = client.get(f"/api/item/{screen.lower()}", headers=h).json()  # ids are case-insensitive
+    assert one["id"] == screen and one["kind"] == "screen" and "ready_to_build" in one
+    assert client.get("/api/item/ZZ9", headers=h).status_code == 404
+
+    wave = client.get("/api/ready", headers=h).json()
+    assert {x["id"] for x in wave["ready"]} | {x["id"] for x in wave["blocked"]} >= {screen}
+    assert all(x["blocked_by"] for x in wave["blocked"])  # nothing blocked is handed out without its reason
+
+    q = next(n for n in g["nodes"] if n["layer"] == "QUESTION" and n["question_status"] == "OPEN")
+    client.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "Yes", "by": "Founder"}, headers=h)
+    log = client.get("/api/decisions", headers=h).json()["decisions"]
+    assert any(d["decision"] == "Yes" and d["decided_by"] == "Founder" for d in log)
+
+    r = client.post(f"/api/questions/{q['id']}/rate", json={"rating": "crucial", "by": "Founder"}, headers=h).json()
+    client.post(f"/api/questions/{q['id']}/rate", json={"rating": "obvious", "by": "Founder"}, headers=h)
+    again = client.post(f"/api/questions/{q['id']}/rate", json={"rating": "reword", "by": "Dev"}, headers=h).json()
+    assert [x["rating"] for x in again["ratings"]] == ["obvious", "reword"]  # one rating per person, latest wins
+    assert client.post(f"/api/questions/{q['id']}/rate", json={"rating": "meh"}, headers=h).status_code == 400

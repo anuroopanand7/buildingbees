@@ -44,6 +44,7 @@ from src.core.schema import (
 from src.core.question_engine import SocraticQuestionEngine
 from src.adapters.gemini_adapter import GoogleGeminiAdapter
 from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
+from src.core.agent_view import decision_log, item as plan_item, ready_wave
 from src.adapters.agent_adapter import AgentAdapter, NeedAgent, SCHEMAS as AGENT_SCHEMAS
 from src.adapters.nvidia_adapter import pdf_to_text
 from src.adapters.spec_prompts import AUDIENCE, BATCH_NOTE, REACT_PROMPT
@@ -1142,6 +1143,53 @@ def get_brief() -> str:
 def get_plan_check() -> Dict[str, Any]:
     """The quality gate before a plan goes to a builder: blockers (must be settled) and gaps (worth fixing)."""
     return plan_check(_board())
+
+
+@app.get("/api/item/{short_id}")
+def get_plan_item(short_id: str) -> Dict[str, Any]:
+    """One part of the plan by its short id (F1, FL1, S2, B3, A1), for an agent that needs a slice, not the whole Brief."""
+    try:
+        return plan_item(_board(), short_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e.args[0]))
+
+
+@app.get("/api/ready")
+def get_ready_wave() -> Dict[str, Any]:
+    """The hard gate for builders: screens safe to build now, and blocked ones with the questions that block them."""
+    return ready_wave(_board())
+
+
+@app.get("/api/decisions")
+def get_decisions() -> Dict[str, Any]:
+    """The decision log: who decided what, when, and which options they turned down."""
+    return {"decisions": decision_log(_board())}
+
+
+RATINGS = {"crucial", "obvious", "reword"}
+
+
+class RateRequest(BaseModel):
+    rating: str
+    by: str = ""
+
+
+@app.post("/api/questions/{question_id}/rate")
+def rate_question(question_id: str, payload: RateRequest) -> Dict[str, Any]:
+    """A person rates a bee's question: crucial (keep asking this), obvious (never ask), or reword (unclear).
+    These labels feed the question-quality eval and, later, a small decision model (Laya, parked 21 Oct 2026)."""
+    g = _board()
+    q = g.get_node(question_id)
+    if not isinstance(q, QuestionNode):
+        raise HTTPException(status_code=404, detail="Question not found")
+    if payload.rating not in RATINGS:
+        raise HTTPException(status_code=400, detail=f"rating must be one of {sorted(RATINGS)}")
+    who = (payload.by or _role.get() or "someone").strip()[:60]
+    ratings = [r for r in q.metadata.get("ratings", []) if r.get("by") != who][-20:]  # one rating per person
+    ratings.append({"rating": payload.rating, "by": who, "at": datetime.datetime.utcnow().isoformat()})
+    q.metadata["ratings"] = ratings
+    _set_graph(g)
+    return {"id": q.id, "ratings": ratings}
 
 
 @app.get("/api/share", response_class=HTMLResponse)

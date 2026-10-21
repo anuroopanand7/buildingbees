@@ -735,6 +735,9 @@
   .wf-list i { background: linear-gradient(color-mix(in srgb, var(--ink) 22%, transparent), color-mix(in srgb, var(--ink) 22%, transparent)) 10px 50% / 55% 3px no-repeat; }
   .wf.small { background: #fff; border-color: transparent; }
   .wf.small::after { border-width: 1.3px; }
+  .rate { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .rate-chip { border: 1px solid var(--line-strong); border-radius: 999px; padding: 2px 9px; font-size: 12px; background: none; cursor: pointer; color: var(--ink); }
+  .rate-chip[aria-pressed="true"] { background: var(--bee); border-color: var(--ink); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -1483,7 +1486,7 @@ function renderPM() {
       <span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Needed before building" : "Good to know"}</span>
       ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o, i) => `<button class="option" data-q="${esc(q.id)}" data-opt="${esc(o)}">${esc(o)}${i === 0 && q.metadata?.why ? '<span class="rec">Recommended</span>' : ""}</button>`).join("")}</div>` : '<div style="height:12px"></div>'}
       <div class="field"><label for="own">Tap one or more suggestions, or answer in your own words, then send</label><div class="send-row"><input id="own" data-answer="${esc(q.id)}" placeholder="Or type your own answer and press Enter" autocomplete="off"><button class="btn primary" data-send="${esc(q.id)}" aria-label="Send your answer"><i class="ph ph-paper-plane-right" aria-hidden="true"></i></button></div></div>
-      <div class="ask-foot"><button class="link" data-skip="${esc(q.id)}">Not sure yet, ask me later</button>${S.mode !== "team" && q.suggested_options?.length ? `<button class="link" data-decide="${esc(q.id)}" data-tip="Takes the recommended answer; you can change it later in the Brief" data-tip-pos="top"><i class="ph ph-magic-wand" aria-hidden="true"></i> Decide for me</button>` : ""}<span class="muted">${pmQueue().length - 1} more for you</span></div>
+      <div class="ask-foot"><button class="link" data-skip="${esc(q.id)}">Not sure yet, ask me later</button>${S.mode !== "team" && q.suggested_options?.length ? `<button class="link" data-decide="${esc(q.id)}" data-tip="Takes the recommended answer; you can change it later in the Brief" data-tip-pos="top"><i class="ph ph-magic-wand" aria-hidden="true"></i> Decide for me</button>` : ""}<span class="muted">${pmQueue().length - 1} more for you</span></div>${rateRow(q)}
       ${S.mode === "team" ? `<div class="ask-foot"><span class="muted">Answering as ${esc(byLine())}</span><button class="link" data-role-change>Change</button></div>` : ""}
       ${S.stage === "flows" ? '<div class="ask-foot"><button class="link" id="drawBtn">Skip the rest and draw the screens</button></div>' : ""}
       ${details > 1 && q.metadata?.source === "BuildingBees" ? `<div class="ask-foot"><button class="btn" id="defaultsBtn" style="width:100%">Use the first suggestion for all ${details} remaining details</button></div>` : ""}`;
@@ -1639,7 +1642,7 @@ function renderNoteList() {
   $("noteList").innerHTML = qs.map((q) => `<div class="note-item ask"><div class="who">${beeIcon(q.category, true)}<b>${esc(bee(q.category)[0])}</b><span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Needed before building" : "Good to know"}</span></div>
       <p class="q">${esc(q.question_text)}</p>${q.metadata?.why ? `<p class="why"><i class="ph ph-lightbulb" aria-hidden="true"></i> ${esc(q.metadata.why)}</p>` : ""}
       ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o, i) => `<button class="option" data-fill="${esc(q.id)}" data-fopt="${esc(o)}">${esc(o)}${i === 0 && q.metadata?.why ? '<span class="rec">Recommended</span>' : ""}</button>`).join("")}</div>` : ""}
-      <div class="send-row"><input id="reply-${esc(q.id)}" placeholder="Reply to the bee" autocomplete="off" aria-label="Your reply"><button class="btn primary sm" data-reply="${esc(q.id)}">Reply</button>${q.suggested_options?.length ? `<button class="link" data-reply-decide="${esc(q.id)}"><i class="ph ph-magic-wand" aria-hidden="true"></i> Decide for me</button>` : ""}</div></div>`).join("") + list.map((c) => `<div class="note-item"><p>${esc(c.text)}</p><span class="muted">${esc(c.by || "You")} · ${c.status === "open" ? "waiting" : "applied"}</span>${c.status === "open" ? `<button class="link" data-note-del="${esc(c.id)}">Take back</button>` : ""}</div>`).join("");
+      <div class="send-row"><input id="reply-${esc(q.id)}" placeholder="Reply to the bee" autocomplete="off" aria-label="Your reply"><button class="btn primary sm" data-reply="${esc(q.id)}">Reply</button>${q.suggested_options?.length ? `<button class="link" data-reply-decide="${esc(q.id)}"><i class="ph ph-magic-wand" aria-hidden="true"></i> Decide for me</button>` : ""}</div>${rateRow(q)}</div>`).join("") + list.map((c) => `<div class="note-item"><p>${esc(c.text)}</p><span class="muted">${esc(c.by || "You")} · ${c.status === "open" ? "waiting" : "applied"}</span>${c.status === "open" ? `<button class="link" data-note-del="${esc(c.id)}">Take back</button>` : ""}</div>`).join("");
 }
 const waitingAnswers = () => byLayer("QUESTION").filter((q) => q.question_status === "ANSWERED" && q.metadata?.pending);
 const waitingNotes = () => (S.comments || []).filter((c) => c.status === "open");
@@ -1706,7 +1709,7 @@ function renderSet(ask, cite) {
           <span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Needed before building" : "Good to know"}</span></div>
         <div class="question"><span class="qn">${n + 1}.</span> ${esc(q.question_text)}</div>
         ${q.metadata?.why ? `<div class="why"><i class="ph ph-lightbulb" aria-hidden="true"></i> ${esc(q.metadata.why)}</div>` : ""}
-        ${cite(q)}
+        ${cite(q)}${rateRow(q)}
         ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o, i) => `<button class="option" data-sq="${esc(q.id)}" data-sopt="${esc(o)}" aria-pressed="${d.opts.includes(o)}">${esc(o)}${i === 0 && q.metadata?.why ? '<span class="rec">Recommended</span>' : ""}</button>`).join("")}</div>` : ""}
         <div class="send-row"><input data-sown="${esc(q.id)}" value="${esc(d.text)}" aria-label="Your own answer to question ${n + 1}" placeholder="Or type your own answer" autocomplete="off">
           ${q.suggested_options?.length ? `<button class="link" data-sdecide="${esc(q.id)}" title="Takes the recommended answer; you can change it later"><i class="ph ph-magic-wand" aria-hidden="true"></i> Decide for me</button>` : ""}</div>
@@ -1769,6 +1772,13 @@ async function answer(qid, text, beesDecided = false) {
   reveal(document.querySelector("#flows .changed"));
 }
 let toastTimer = null;
+// Rate a bee's question (moat research, 21 Oct 2026): real labels for the question-quality eval, and later for a small
+// decision model (Laya). One rating per person; the latest wins.
+const RATES = [["crucial", "Crucial"], ["obvious", "Obvious, don't ask"], ["reword", "Unclear"]];
+const raterName = () => (typeof WHO !== "undefined" && WHO) || (typeof ROLE !== "undefined" && ROLE) || "You";
+const rateRow = (q) => { const mine = (q.metadata?.ratings || []).find((r) => r.by === raterName())?.rating;
+  return `<div class="rate" role="group" aria-label="Was this a good question?"><span>Good question?</span>${RATES.map(([k, l]) =>
+    `<button class="rate-chip" data-rate="${esc(q.id)}" data-rating="${k}" aria-pressed="${mine === k}">${l}</button>`).join("")}</div>`; };
 // A short bee clip (Anusree's Gemini loops in /bees) plays next to some messages, e.g. the happy hop when a round is done.
 const beeClip = (name) => `<video class="bee-clip" src="/bees/${name}.mp4" poster="/bees/${name}.png" muted loop autoplay playsinline aria-hidden="true"></video>`;
 function toast(text, clip) {
@@ -1845,6 +1855,12 @@ document.addEventListener("click", (e) => {
     $("flowEdit").hidden = false; return $("flowEditText").focus();
   }
   if (t.dataset.skip) { PM.skipped.add(t.dataset.skip); return render(); }
+  if (t.dataset.rate) {  // a person rates a bee's question; saved on the question, no model call
+    const q = S.nodes[t.dataset.rate];
+    api(`/api/questions/${encodeURIComponent(t.dataset.rate)}/rate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rating: t.dataset.rating, by: raterName() }) })
+      .then((r) => { if (q) { q.metadata = q.metadata || {}; q.metadata.ratings = r.ratings; } toast("Thanks. The bees learn from this."); render(); }).catch(fail);
+    return;
+  }
   if (t.dataset.mode) {
     store.set("bb_mode", t.dataset.mode); modePicked = true; renderMode();
     $("composer").hidden = false; return $("prd").focus();

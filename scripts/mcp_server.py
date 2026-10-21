@@ -38,6 +38,17 @@ TOOLS = [
      "inputSchema": {"type": "object", "properties": {"board": {"type": "string"}, "target": {"type": "string"},
                                                      "text": {"type": "string"}, "step": {"type": "integer"}},
                      "required": ["board", "target", "text"]}},
+    {"name": "get_item", "description": "One part of the plan by its short id (F1 feature, FL1 flow, S2 screen, B3 button, "
+     "A1 API): what it is, what it links to, its decisions and its open questions. Use this instead of re-reading the "
+     "whole plan while you build one part.",
+     "inputSchema": {"type": "object", "properties": {"board": {"type": "string"}, "id": {"type": "string"}},
+                     "required": ["board", "id"]}},
+    {"name": "next_to_build", "description": "The hard gate: screens that are safe to build now, in order, and blocked ones "
+     "with the questions that block them. Build ONLY what is ready; never guess around a blocked screen.",
+     "inputSchema": {"type": "object", "properties": {"board": {"type": "string"}}, "required": ["board"]}},
+    {"name": "decision_log", "description": "Who decided what and when, and which options they turned down. Read it before "
+     "changing behaviour that a person decided.",
+     "inputSchema": {"type": "object", "properties": {"board": {"type": "string"}}, "required": ["board"]}},
     {"name": "start_board", "description": "Bring your own AI: start a new board from an idea, with YOUR model doing the bees' "
      "thinking (no BuildingBees model cost). Returns a board id, a link the person can open to watch the board, and a task: "
      "a prompt plus a JSON Schema. Answer the task with submit_answer. mode is 'solo' or 'team'.",
@@ -119,6 +130,19 @@ def run_tool(name: str, args: dict) -> str:
     if name == "add_note":
         _call("/api/comments", b, {"target": args["target"], "step": int(args.get("step") or 0), "text": args["text"], "by": "Coding agent"})
         return "Note added. The team sees it, and the bees apply it when the round is processed."
+    if name == "get_item":
+        return json.dumps(_call(f"/api/item/{urllib.parse.quote(args['id'])}", b), indent=1)
+    if name == "next_to_build":
+        w = _call("/api/ready", b)
+        lines = [f"READY ({len(w['ready'])}): " + (", ".join(f"{r['id']} {r['title']}" for r in w["ready"]) or "nothing yet")]
+        lines += [f"BLOCKED {x['id']} {x['title']}: " + "; ".join(x["blocked_by"]) for x in w["blocked"]]
+        if w.get("build_order"):
+            lines.append("Plan build order: " + " -> ".join(w["build_order"]))
+        return "\n".join(lines + [w["rule"]])
+    if name == "decision_log":
+        d = _call("/api/decisions", b)["decisions"]
+        return "\n".join(f"- [{x['about']}] {x['question']} => {x['decision']} (by {x['decided_by']}, {x['decided_at'][:16]})"
+                         + (f"; turned down: {', '.join(x['turned_down'])}" if x["turned_down"] else "") for x in d) or "No decisions yet."
     if name == "start_board":
         b = "agent-" + secrets.token_hex(4)  # a fresh board; the id is also the link
         return f"Board {b} started.\n" + _task_or_done(b, "/api/ingest-prd?engine=agent",
