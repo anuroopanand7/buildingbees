@@ -1059,7 +1059,7 @@ function render() {
   const lc = S.lastCall;
   $("trace").hidden = !lc;
   if (lc) {
-    $("trace").innerHTML = `<i class="ph ph-cpu" aria-hidden="true"></i><span>Last update by <b>${esc(lc.engine)}</b> in ${lc.seconds}s</span><span class="ok"><i class="ph ph-check-circle" aria-hidden="true"></i>checked</span>`;
+    $("trace").innerHTML = `<i class="ph ph-cpu" aria-hidden="true"></i><span>Last update by <b>${esc(lc.engine)}</b>${lc.engine === "Your own AI" ? " (via MCP)" : ` in ${lc.seconds}s`}</span><span class="ok"><i class="ph ph-check-circle" aria-hidden="true"></i>checked</span>`;
     $("trace").dataset.tip = `Model: ${lc.model || lc.engine}. "Checked" means the reply was validated against our schema before it touched your board.`;
     $("trace").dataset.tipPos = "top";
   }
