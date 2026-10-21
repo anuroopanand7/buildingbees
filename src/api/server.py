@@ -44,6 +44,7 @@ from src.core.schema import (
 from src.core.question_engine import SocraticQuestionEngine
 from src.adapters.gemini_adapter import GoogleGeminiAdapter
 from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
+from src.adapters.agent_adapter import AgentAdapter, NeedAgent, SCHEMAS as AGENT_SCHEMAS
 from src.adapters.nvidia_adapter import pdf_to_text
 from src.adapters.spec_prompts import AUDIENCE, BATCH_NOTE, REACT_PROMPT
 from src.api import feedback
@@ -221,7 +222,8 @@ async def _select_board(request, call_next):
         if auth:
             await run_in_threadpool(lambda: _remember_board(_uid(auth), bid))
     return response
-engines = {e.key: e for e in (GoogleGeminiAdapter(), NvidiaNemotronAdapter())}
+engines = {e.key: e for e in (GoogleGeminiAdapter(), NvidiaNemotronAdapter(), AgentAdapter())}
+engines["agent"].board = lambda: _board_id.get()  # bring your own AI: answers are kept per board
 app.include_router(feedback.router)  # the beta testers' feedback board (src/api/feedback.py)
 
 
@@ -440,6 +442,8 @@ def react_to_answer(question_id: str, engine: str) -> Dict[str, Any]:
     started = time.time()
     try:
         r = eng.react(prompt)
+    except NeedAgent:
+        raise  # bring your own AI: hand the prompt to the person's agent, not a 502
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"{eng.label} could not process the answer: {e}")
     _trace(g, eng, started)
@@ -549,6 +553,8 @@ def react_to_answers(payload: BatchRequest, engine: str) -> Dict[str, Any]:
     started = time.time()
     try:
         r = eng.react(prompt)
+    except NeedAgent:
+        raise  # bring your own AI: hand the prompt to the person's agent, not a 502
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"{eng.label} could not process the answers: {e}")
     _trace(g, eng, started)
@@ -725,7 +731,7 @@ def _engine(name: str):
     """Every AI call names its engine; the hackathon rules require each track to run on its sponsor's models."""
     eng = engines.get(name)
     if not eng:
-        raise HTTPException(status_code=400, detail=f"Unknown engine '{name}'. Choose 'gemini' or 'nvidia'.")
+        raise HTTPException(status_code=400, detail=f"Unknown engine '{name}'. Choose 'gemini', 'nvidia' or 'agent' (your own AI).")
     if not eng.enabled:
         raise HTTPException(status_code=503, detail=f"{eng.label} is not configured. Add its API key to .env and restart.")
     now = time.time()
@@ -770,6 +776,8 @@ def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None, mode: s
         _trace(g, eng, started)
         # The spec is only what the founder said: research never counts as a decision.
         g.spec_text = (text or (pdf_to_text(pdf_bytes) if pdf_bytes else "A photo of the founder's sketch"))[:SPEC_LIMIT]
+    except NeedAgent:
+        raise  # bring your own AI: hand the prompt to the person's agent, not a 502
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"{eng.label} could not read the spec: {e}")
     g.sources = [{"title": s["title"], "url": s["url"]} for s in sources]
@@ -836,6 +844,8 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     started = time.time()
     try:
         g = build_graph_from_extract(eng.extract_spec(text=brief[:SPEC_LIMIT + 8000]), eng.label)
+    except NeedAgent:
+        raise  # bring your own AI: hand the prompt to the person's agent, not a 502
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"{eng.label} could not draw the screens: {e}")
     _trace(g, eng, started)
@@ -895,6 +905,8 @@ def interrogate_node(node_id: str, engine: str) -> Dict[str, Any]:
     asked = [q.question_text for q in graph.get_questions_for_node(node_id)]
     try:
         questions = eng.interrogate(node_id, json.dumps(context, default=str)[:12000], asked)
+    except NeedAgent:
+        raise  # bring your own AI: hand the prompt to the person's agent, not a 502
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"{eng.label} interrogation failed: {e}")
     added = add_questions(graph, questions, eng.label)
@@ -1013,6 +1025,24 @@ def delete_comment(comment_id: str) -> Dict[str, Any]:
     return get_graph_state()
 
 
+class AgentAnswer(BaseModel):
+    kind: str
+    answer: Any
+
+
+@app.post("/api/agent/answer")
+def agent_answer(payload: AgentAnswer) -> Dict[str, Any]:
+    """Bring your own AI: the person's agent posts the JSON its model wrote for the prompt a 409 handed it.
+    It is checked against the schema now, so a bad answer fails here with the reason, not later on the board."""
+    if payload.kind not in AGENT_SCHEMAS:
+        raise HTTPException(status_code=400, detail=f"kind must be one of {sorted(AGENT_SCHEMAS)}")
+    try:
+        engines["agent"].put(payload.kind, payload.answer)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"That JSON does not fit the {payload.kind} schema: {e}")
+    return {"stored": payload.kind, "next": "Repeat the request that asked for it."}
+
+
 class FeatureRequest(BaseModel):
     text: str
 
@@ -1042,6 +1072,8 @@ def add_feature(payload: FeatureRequest, engine: str) -> Dict[str, Any]:
     started = time.time()
     try:
         new = build_flows_graph(eng.extract_flows(text=lead + text), eng.label)
+    except NeedAgent:
+        raise  # bring your own AI: hand the prompt to the person's agent, not a 502
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"{eng.label} could not add the feature: {e}")
     _trace(g, eng, started)
@@ -1086,6 +1118,8 @@ def write_plan(engine: str) -> Dict[str, Any]:
     started = time.time()
     try:
         x = eng.write_plan(audience(g) + "\n\n" + build_brief(g, with_plan=False)[:40000])
+    except NeedAgent:
+        raise  # bring your own AI: hand the prompt to the person's agent, not a 502
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"{eng.label} could not write the plan: {e}")
     _trace(g, eng, started)

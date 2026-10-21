@@ -91,7 +91,7 @@ def test_api_endpoints():
     res = client.get("/api/status")
     assert res.status_code == 200
     tracks = res.json()
-    assert set(tracks["engines"]) == {"gemini", "nvidia"}
+    assert set(tracks["engines"]) == {"gemini", "nvidia", "agent"}  # agent: bring your own AI over MCP
 
     # 5. Blast radius API
     res = client.get("/api/blast-radius/API32_DELIVERY_CHECK")

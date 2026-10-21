@@ -198,6 +198,14 @@ claude mcp add buildingbees -- python3 scripts/mcp_server.py
 
 Tools: `get_plan` (the Brief, with ids F1, FL1, S1, B1, A1), `plan_check`, `open_questions`, `add_note` (a note on any part of the board; the bees apply it in the next round). Each takes the board id or link.
 
+**Bring your own AI.** The same server lets your agent's own model do the bees' thinking, so planning costs us nothing and you keep your model:
+
+1. `start_board` with your idea returns a board link and a task: our prompt plus the JSON Schema the answer must fit.
+2. Your model writes the JSON and the agent calls `submit_answer`. We validate it against the same Pydantic schema Gemini and Nemotron use, so a wrong shape comes back with the reason. Then the board draws it.
+3. `open_questions`, then `answer_question` with the person's answers (the agent relays decisions, never invents them), then `run_bees` with `update`, `screens` or `plan`. Each step is one more task and answer.
+
+Open the link to watch the flows, questions and screens appear on the board as your agent works. On the server this is a third engine, `engine=agent`: when no answer is waiting it returns HTTP 409 with the prompt and schema instead of calling a model (`src/adapters/agent_adapter.py`).
+
 ## Known limits
 
 - Boards are saved to Firestore on Cloud Run, so a board and its Brief link survive the server sleeping. Run locally, boards live in memory and the browser keeps the backup copy. Sign in with Google (Firebase Authentication) is optional: signed in, every board you work on is listed under "My boards" on any device.

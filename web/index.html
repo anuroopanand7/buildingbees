@@ -1917,7 +1917,7 @@ async function drawScreens() {
 }
 // One click for judges and first-time visitors: a B2B idea that shows splits and real product questions.
 $("sampleBtn").onclick = () => {
-  if (!engineReady()) { S.engine = S.engines.gemini?.enabled ? "gemini" : Object.keys(S.engines).find((k) => S.engines[k]?.enabled) || null; store.set("bb_engine", S.engine || ""); renderEngine(); }
+  if (!engineReady()) { S.engine = S.engines.gemini?.enabled ? "gemini" : Object.keys(ENGINE_COPY).find((k) => S.engines[k]?.enabled) || null;  /* never "agent": that engine is for MCP clients, not the browser */ store.set("bb_engine", S.engine || ""); renderEngine(); }
   $("prd").value = "A B2B tool where clients book and pay for consultations with advisors in a firm.";
   $("buildBtn").click();
 };
