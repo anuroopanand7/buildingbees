@@ -83,3 +83,38 @@ Saved the tuned prompt to src/adapters/tuned/flows_nemotron.txt.
 
 Baseline 41/48. Total spend $0.194.
 
+# Prompt tuning log (2026-10-21 17:53)
+
+Baseline: 43/48 checks passed. Failures:
+- A B2B tool where clients book and pay for consultations with: FAILED risky flows have a failure split
+- An internal tool for a logistics company: drivers upload pro: FAILED risky flows have a failure split
+- A SaaS dashboard where a marketing team connects their ad ac: FAILED risky flows have a failure split
+- A tuition centre app in Pune: parents see attendance and tes: FAILED risky flows have a failure split
+- A dog walking app in Bangalore: owners book a walker by the : FAILED risky flows have a failure split
+
+Round 1: edit would delete existing guidance (33 words), skipped.
+
+Round 2: add_constraint: The prompt correctly instructs drawing splits but lacks explicit emphasis on ensuring all possible outcomes—especially failures—are either handled via known pat
+  edit: 'At most 3 branches per flow; leave branches empty when the flow has no real split. If a split exists due to risk (payment failure, slot taken, upload rejected), always draw the branch and either: (a) '
+  score 42/48 vs 43/48: reverted. Spend so far $0.029.
+
+Round 3: edit would delete existing guidance (9 words), skipped.
+
+Round 4: edit would delete existing guidance (33 words), skipped.
+
+Round 5: edit would delete existing guidance (10 words), skipped.
+
+Round 6: edit would delete existing guidance (10 words), skipped.
+
+Round 7: add_constraint: The prompt correctly instructs to create failure splits but does not require explicit documentation of what constitutes a 'real product failure' beyond examples
+  edit: 'If the input does not say, still draw the split where a real product clearly can fail (a payment, a slot or stock someone else can take, an upload, a check that can say no). Treat any payment attempt,'
+  score 42/48 vs 43/48: reverted. Spend so far $0.049.
+
+Round 8: edit would delete existing guidance (40 words), skipped.
+
+Round 9: edit would delete existing guidance (42 words), skipped.
+
+Round 10: edit would delete existing guidance (36 words), skipped.
+
+Baseline 43/48. Total spend $0.052.
+
