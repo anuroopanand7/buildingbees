@@ -837,8 +837,19 @@ def test_team_rounds_are_processed_by_the_owner(monkeypatch):
     assert c.post("/api/flows/F_BUY/steps", json={"steps": ["x"]}, headers={**h, "X-Role": "DESIGN"}).status_code == 403
     Reactor.reaction = Reaction(is_vague=False, note="Done.", follow_up=[], user_updates=[], field_updates=[], flow_updates=[])
     c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "No, sign-in required", "later": True}, headers=h)
-    ok = c.post("/api/questions/react-batch?engine=gemini", json={}, headers={**h, "X-Role": "PM"})
-    assert ok.status_code == 200  # the product manager processes the round
+    # a self-picked "PM" no longer counts on an owned board (Roger, 21 Oct 2026): only an owner-issued link does
+    assert c.post("/api/questions/react-batch?engine=gemini", json={}, headers={**h, "X-Role": "PM"}).status_code == 403
+    assert c.post("/api/invites", json={"role": "PM"}, headers=h).status_code == 403  # only the owner hands out roles
+    monkeypatch.setattr(server, "_uid", lambda auth: "owner-uid" if auth == "Bearer owner" else "")
+    tok = c.post("/api/invites", json={"role": "PM"}, headers={**h, "Authorization": "Bearer owner"}).json()["token"]
+    assert tok not in c.get("/api/graph", headers=h).text  # tokens never appear in the board anyone can read
+    pm = {**h, "X-Invite": tok, "X-Role": "BACKEND"}  # the link's role wins over a picked one
+    assert c.post("/api/join", json={"name": "Asha"}, headers=pm).json()["role"] == "PM"
+    assert c.get("/api/graph", headers=h).json()["roster"] == [{"name": "Asha", "role": "PM", "joined": True}]
+    ok = c.post("/api/questions/react-batch?engine=gemini", json={}, headers=pm)
+    assert ok.status_code == 200  # the product manager the owner invited processes the round
+    c.post(f"/api/invites/{tok}/revoke", headers={**h, "Authorization": "Bearer owner"})
+    assert c.post("/api/join", json={}, headers=pm).status_code == 404  # a revoked link stops working
 
 
 def test_states_only_where_they_are_real():

@@ -209,7 +209,7 @@ Open the link to watch the flows, questions and screens appear on the board as y
 ## Known limits
 
 - Boards are saved to Firestore on Cloud Run, so a board and its Brief link survive the server sleeping. Run locally, boards live in memory and the browser keeps the backup copy. Sign in with Google (Firebase Authentication) is optional: signed in, every board you work on is listed under "My boards" on any device.
-- A board link still opens that board for anyone who has it; boards are not private to their owner yet. Teammates see each other's answers on a 15 second refresh, not live cursors.
+- A board link still opens that board for anyone who has it; boards are not private to their owner yet. On a team board the owner hands out roles with role links; only a link can make someone product manager. Teammates see each other's answers on a 15 second refresh, not live cursors.
 
 ## Built with
 

@@ -738,6 +738,8 @@
   .rate { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--muted); }
   .rate-chip { border: 1px solid var(--line-strong); border-radius: 999px; padding: 2px 9px; font-size: 12px; background: none; cursor: pointer; color: var(--ink); }
   .rate-chip[aria-pressed="true"] { background: var(--bee); border-color: var(--ink); font-weight: 600; }
+  .team-row { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  .team-row .muted { flex: 1; }
 </style>
 </head>
 <body>
@@ -779,8 +781,13 @@
   <div class="brief-sheet">
     <div class="brief-bar"><b>Invite your team</b><button class="icon-btn" id="inviteClose" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button></div>
     <div class="fb-body">
-      <p style="margin:0 0 10px">Send this link to your team. Each person picks their role (product manager, client, designer, frontend, backend, tester) and answers only their own bees. The board owner or the product manager processes each round.</p>
+      <div id="inviteRoles" hidden>
+        <p style="margin:0 0 10px">Give each person a role link. The role is fixed by the link, it shows next to everything they decide, and only a link can make someone product manager (they can then apply rounds).</p>
+        <div class="send-row"><select id="inviteRole" aria-label="Role for the new link" style="border:1px solid var(--line-strong);border-radius:999px;padding:8px 12px;font:inherit;font-size:13px"></select><button class="btn" id="inviteMake">Make a role link</button></div>
+      </div>
+      <p id="inviteNote" style="margin:10px 0">Send this link to your team. Each person picks their role and answers only their own bees. The board owner or the product manager they invited processes each round.</p>
       <div class="send-row"><input id="inviteLink" readonly aria-label="Link to this board" style="flex:1;border:1px solid var(--line-strong);border-radius:999px;padding:8px 12px;font:inherit;font-size:13px"><button class="btn primary" id="inviteCopy">Copy link</button></div>
+      <div id="teamList" style="margin-top:14px"></div>
     </div>
   </div>
 </div>
@@ -967,6 +974,12 @@ const store = {
 // Each browser gets its own board; the server keys boards by this id.
 const LINKED = new URLSearchParams(location.search).get("board");
 let BOARD = LINKED || store.get("bb_board");
+// A role link from the board's owner (?invite=...): it fixes this person's role, and only it can make someone the
+// product manager on an owned board (Roger, 21 Oct 2026). Kept per board, so it survives a reload.
+const INVITE_URL = new URLSearchParams(location.search).get("invite");
+if (INVITE_URL && BOARD) store.set("bb_invite_" + BOARD, INVITE_URL);
+const invite = () => (BOARD && store.get("bb_invite_" + BOARD)) || "";
+const isOwner = () => !S.owner || AUTH.user?.uid === S.owner;
 // A board is answered by a team. Each person says who they are once; they then hear only from their own bees.
 // The product manager hears from every bee, and owns the Compliance Bee's questions.
 // A client (an agency's customer) answers only the business questions: who it is for, scope, rules, money, legal.
@@ -984,7 +997,7 @@ const engineReady = () => !!(S.engine && S.engines[S.engine] && S.engines[S.engi
 // Sign-in is optional (Firebase Authentication). Signed in, every board you work on is kept under your account.
 const AUTH = { user: null, sdk: null, fb: null };
 async function api(path, opts = {}) {
-  const headers = { ...(opts.headers || {}), "X-Board": BOARD, "X-Role": ROLE || "" };
+  const headers = { ...(opts.headers || {}), "X-Board": BOARD, "X-Role": ROLE || "", "X-Invite": invite() };
   if (AUTH.user) { try { headers.Authorization = "Bearer " + await AUTH.user.getIdToken(); } catch (e) {} }
   const res = await fetch(path, { ...opts, headers });
   const body = await res.json().catch(() => ({}));
@@ -1006,7 +1019,7 @@ async function load() {
   }
   if (!LINKED) store.set("bb_graph", g.total_nodes ? JSON.stringify({ product_name: g.product_name, spec_text: g.spec_text, entities: g.entities, sources: g.sources, needs_redraw: g.needs_redraw, comments: g.comments, signoffs: g.signoffs, nodes: g.nodes, edges: g.edges }) : "");
   S.stage = g.stage; S.needsRedraw = g.needs_redraw; S.comments = g.comments || []; S.round = g.round || 1; S.rounds = g.rounds || []; S.roundQ = new Set(g.round_questions || []);
-  S.ids = g.short_ids || {}; S.features = g.features || []; S.owner = g.owner || ""; S.conflicts = g.conflicts || []; S.sources = g.sources || []; S.mode = g.mode || "solo"; S.spec = g.spec_text || ""; S.lastCall = g.last_call;
+  S.ids = g.short_ids || {}; S.features = g.features || []; S.owner = g.owner || ""; S.roster = g.roster || []; S.conflicts = g.conflicts || []; S.sources = g.sources || []; S.mode = g.mode || "solo"; S.spec = g.spec_text || ""; S.lastCall = g.last_call;
   S.nodes = {}; S.fwd = {}; S.rev = {}; S.screens = {};
   g.nodes.forEach((n) => (S.nodes[n.id] = n));
   g.edges.forEach((e) => {
@@ -1456,10 +1469,19 @@ function renderPM() {
     ask.innerHTML = `<div class="thinking"><div class="spinner"></div><div><b>The bees are looking deeper</b><div class="about">Checking "${esc(PM.thinking)}" for gaps...</div></div></div>`;
     return;
   }
+  if (S.mode === "team" && !ROLE && invite()) {  // arrived with the owner's role link: the role comes from the link
+    ask.innerHTML = `<div class="question">You were invited to this board</div>
+      <div class="about" style="margin-bottom:10px">The owner gave you a role. Add your name so the team sees who answered.</div>
+      <div class="field"><label for="who">Your name</label><input id="who" value="${esc(WHO || AUTH.user?.displayName || "")}" autocomplete="name"></div>
+      <div class="ask-foot"><button class="btn primary sm" data-join>Join the board</button></div>`;
+    return;
+  }
   if (S.mode === "team" && !ROLE) {  // first visit to a team board from this browser: who is answering?
     ask.innerHTML = `<div class="question">Who is answering here?</div>
       <div class="about" style="margin-bottom:10px">Your team shares this board. Each person answers their own bees; the product manager sees every question, and a client sees only the business ones.</div>
-      <div class="options">${Object.entries(ROLES).map(([k, v]) => `<button class="option" data-role="${k}">${esc(v)}</button>`).join("")}</div>
+      <div class="options">${Object.entries(ROLES).map(([k, v]) => k === "PM" && !isOwner()
+        ? `<button class="option" disabled data-tip="Only the board's owner can make someone product manager. Ask them for a role link." data-tip-pos="top">${esc(v)}</button>`
+        : `<button class="option" data-role="${k}">${esc(v)}</button>`).join("")}</div>
       <div class="field"><label for="who">Your name (optional, shown next to your answers)</label><input id="who" value="${esc(WHO || AUTH.user?.displayName || "")}" autocomplete="name"></div>
       <div class="ask-foot"><button class="link" data-invite>Copy the link for your team</button></div>`;
     return;
@@ -1496,7 +1518,7 @@ function renderPM() {
   if (S.mode === "team" && ROLE !== "PM" && open.length) {  // the rest belong to teammates
     ask.innerHTML = `<div class="question">Nothing for you as ${esc(ROLES[ROLE])} right now.</div>
       <div class="about" style="margin-bottom:10px">${open.length} question${open.length === 1 ? " is" : "s are"} waiting for your teammates. The board updates as they answer.</div>
-      <div class="ask-foot"><button class="link" data-invite>Copy the link for your team</button><button class="link" data-role-change>Change your role</button></div>`;
+      <div class="ask-foot"><button class="link" data-invite>Copy the link for your team</button>${invite() ? "" : '<button class="link" data-role-change>Change your role</button>'}</div>`;
     return;
   }
   if (S.stage === "flows") {
@@ -1585,7 +1607,7 @@ function beeNote(cat, text) {
   noteTimer = setTimeout(() => { n.hidden = true; }, 9000);
 }
 // Team boards follow Roger's ritual: everyone adds input, the owner or the product manager processes the round.
-const mayProcess = () => S.mode !== "team" || ROLE === "PM" || !S.owner || AUTH.user?.uid === S.owner;
+const mayProcess = () => S.mode !== "team" || (ROLE === "PM" && (invite() || !S.owner)) || !S.owner || AUTH.user?.uid === S.owner;
 // Solo: the round's questions are frozen when it starts (at most 6), so the count never grows mid-round.
 const inRound = (q) => S.mode === "team" || !S.roundQ?.size || S.roundQ.has(q.id);
 const roundLeft = () => openQuestions().filter((q) => inRound(q) && mine(q)).length;
@@ -1865,6 +1887,13 @@ document.addEventListener("click", (e) => {
     store.set("bb_mode", t.dataset.mode); modePicked = true; renderMode();
     $("composer").hidden = false; return $("prd").focus();
   }
+  if ("join" in t.dataset) {  // the role link's role is fixed by the server; the name goes on the team list
+    WHO = ($("who")?.value || "").trim().slice(0, 40);
+    api("/api/join", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: WHO }) })
+      .then((r) => { ROLE = r.role; store.set("bb_role", ROLE); store.set("bb_name", WHO); toast(`You joined as ${r.label}.`); return load(); })
+      .catch((err) => { store.set("bb_invite_" + BOARD, ""); fail(err); render(); });
+    return;
+  }
   if (t.dataset.role) {
     ROLE = t.dataset.role; WHO = ($("who")?.value || "").trim().slice(0, 40);
     store.set("bb_role", ROLE); store.set("bb_name", WHO); PM.bee = null; return render();
@@ -1873,7 +1902,7 @@ document.addEventListener("click", (e) => {
   if ("invite" in t.dataset || t.id === "teamBtn") {
     menu(false);
     if (S.mode !== "team") api("/api/mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "team" }) }).then(load).catch(fail);
-    $("inviteLink").value = boardLink(); $("invite").hidden = false; return $("inviteLink").select();
+    $("inviteLink").value = boardLink(); $("invite").hidden = false; renderTeam(); return $("inviteLink").select();
   }
   if (t.dataset.send) { const i = $("own"); return answer(t.dataset.send, i?.value || "").catch(fail); }
   if (t.dataset.bee) { PM.bee = PM.bee === t.dataset.bee ? null : t.dataset.bee; PM.quiet = true; dockMin(false); return render(); }  // filter only; the board stays still
@@ -2035,6 +2064,22 @@ $("stepEditSave").onclick = async () => {
   } catch (err) { toast(err.message); }
 };
 $("inviteClose").onclick = () => { $("invite").hidden = true; };
+// The owner's team panel: role links (made, copied, revoked) and who joined with each. Others see the team list only.
+async function renderTeam() {
+  const own = isOwner();
+  $("inviteRoles").hidden = !own;
+  $("inviteRole").innerHTML = Object.entries(ROLES).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
+  let rows = (S.roster || []).map((r) => ({ ...r, label: ROLES[r.role] || r.role }));
+  if (own) { try { rows = (await api("/api/invites")).invites; } catch (e) {} }
+  $("teamList").innerHTML = rows.length ? `<div class="h">Team</div>` + rows.map((r) => `<div class="team-row"><b>${esc(r.name || "Not joined yet")}</b><span class="muted">${esc(r.label)}${r.revoked ? " · revoked" : ""}</span>${own && r.token && !r.revoked
+    ? `<button class="link" data-copy-invite="${esc(r.token)}">Copy link</button><button class="link" data-revoke="${esc(r.token)}">Revoke</button>` : ""}</div>`).join("") : "";
+}
+$("inviteMake").onclick = () => api("/api/invites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: $("inviteRole").value }) })
+  .then((r) => { $("inviteLink").value = `${boardLink()}&invite=${encodeURIComponent(r.token)}`; $("inviteNote").textContent = `A link for one ${r.label}. Send it to that person only.`; $("inviteLink").select(); renderTeam(); })
+  .catch(fail);
+$("teamList").onclick = (e) => { const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.copyInvite) { $("inviteLink").value = `${boardLink()}&invite=${encodeURIComponent(b.dataset.copyInvite)}`; return $("inviteLink").select(); }
+  if (b.dataset.revoke) api(`/api/invites/${encodeURIComponent(b.dataset.revoke)}/revoke`, { method: "POST" }).then(renderTeam).catch(fail); };
 $("inviteCopy").onclick = () => navigator.clipboard.writeText($("inviteLink").value)
   .then(() => { $("invite").hidden = true; toast("Link copied. Send it to your team."); }, () => { $("inviteLink").select(); toast("Select the link and copy it."); });
 $("noteSave").onclick = async () => {

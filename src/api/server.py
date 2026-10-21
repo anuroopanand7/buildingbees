@@ -83,6 +83,7 @@ boards: "OrderedDict[str, BuildingBeesEngine]" = OrderedDict()
 _board_id: ContextVar[str] = ContextVar("board_id", default="default")
 _auth: ContextVar[str] = ContextVar("auth", default="")  # this request's Authorization header, to record who made a board
 _role: ContextVar[str] = ContextVar("role", default="")  # the role a teammate picked on a team board (X-Role header)
+_invite: ContextVar[str] = ContextVar("invite", default="")  # an owner-issued role link's token (X-Invite header)
 log = logging.getLogger("buildingbees")
 
 _store = None   # Firestore collection of boards
@@ -109,7 +110,7 @@ def _save_board(bid: str) -> None:
         return
     try:
         # One compressed blob: a board with a long spec stays far under Firestore's 1 MiB document limit.
-        blob = zlib.compress(json.dumps(_state(g), default=str).encode())
+        blob = zlib.compress(json.dumps({**_state(g), "invites": getattr(g, "invites", {})}, default=str).encode())  # tokens only in storage
         _doc(bid).set({"data": blob, "updated": datetime.datetime.now(datetime.timezone.utc)})
     except Exception as e:
         log.warning("Could not save board: %s", e)
@@ -215,6 +216,7 @@ async def _select_board(request, call_next):
     _board_id.set(bid)
     _auth.set(request.headers.get("authorization", ""))
     _role.set((request.headers.get("x-role") or "")[:20].upper())
+    _invite.set((request.headers.get("x-invite") or request.query_params.get("invite") or "")[:64])
     response = await call_next(request)
     if (request.method == "POST" and request.url.path.startswith("/api/") and response.status_code < 400
             and not request.url.path.startswith(("/api/feedback", "/api/me/boards/"))):  # not the open board's business
@@ -288,6 +290,8 @@ def _state(graph: BuildingBeesEngine) -> Dict[str, Any]:
         "short_ids": short_ids(graph),
         "mode": getattr(graph, "mode", "solo"),
         "owner": getattr(graph, "owner", ""),
+        "roster": [{"name": i.get("name", ""), "role": i["role"], "joined": bool(i.get("name"))}  # never the tokens
+                   for i in getattr(graph, "invites", {}).values() if not i.get("revoked")],
         "plan": getattr(graph, "plan", None),
         "plan_decisions": getattr(graph, "plan_decisions", 0),
         "last_call": getattr(graph, "last_call", None),  # engine pill: which model answered, how fast
@@ -328,7 +332,8 @@ def resolve_question(question_id: str, payload: QuestionResolveRequest) -> Dict[
     node.question_status = QuestionStatus.ANSWERED
     node.answer_text = payload.answer_text
     node.answered_at = datetime.datetime.utcnow().isoformat()
-    node.metadata["answered_by"] = payload.by.strip()[:60]
+    inv = _member(graph)  # a role from an owner-issued link is the one the decision log trusts
+    node.metadata["answered_by"] = (f"{inv.get('name') or 'Someone'} ({ROLE_LABELS[inv['role']]})" if inv else payload.by.strip())[:60]
     if payload.later:
         node.metadata["pending"] = True  # applied with everything else waiting, by /api/questions/react-batch
     if payload.bees_decided:
@@ -481,7 +486,37 @@ def _may_process(g: BuildingBeesEngine) -> bool:
     if getattr(g, "mode", "solo") != "team":
         return True
     owner = getattr(g, "owner", "")
-    return _role.get() == "PM" or not owner or _uid(_auth.get()) == owner
+    return _eff_role(g) == "PM" or not owner or _uid(_auth.get()) == owner
+
+
+# Team roles the owner hands out (Roger, 21 Oct 2026). Before this anyone could pick "product manager" and process
+# rounds. Now, on a board with an owner, the PM role (and the right to process) comes only from an owner-issued link;
+# other roles can still be picked, but a role from a link is the one the decision log trusts.
+ROLE_LABELS = {"PM": "Product manager", "CLIENT": "Client", "DESIGN": "Designer", "FRONTEND": "Frontend",
+               "BACKEND": "Backend", "TESTER": "Tester"}
+
+
+def _member(g: BuildingBeesEngine) -> Optional[Dict[str, Any]]:
+    """The owner-issued invite this request carries, if it is valid and not revoked."""
+    tok = _invite.get()
+    inv = getattr(g, "invites", {}).get(tok) if tok else None
+    return inv if inv and not inv.get("revoked") else None
+
+
+def _eff_role(g: BuildingBeesEngine) -> str:
+    """The role this request acts in: the invite's role if it has one; a self-picked role otherwise, except that a
+    self-picked PM counts only on a board nobody owns."""
+    inv = _member(g)
+    if inv:
+        return inv["role"]
+    r = _role.get()
+    return "" if (r == "PM" and getattr(g, "owner", "")) else r
+
+
+def _is_owner(g: BuildingBeesEngine) -> bool:
+    """The signed-in owner, or anyone on a board nobody has claimed (it was made signed out)."""
+    owner = getattr(g, "owner", "")
+    return not owner or _uid(_auth.get()) == owner
 
 
 def _after_reaction(g: BuildingBeesEngine, stage: str, eng) -> None:
@@ -584,7 +619,7 @@ def react_to_answers(payload: BatchRequest, engine: str) -> Dict[str, Any]:
         g.rounds = (getattr(g, "rounds", []) + [{
             "n": getattr(g, "round", 1), "at": datetime.datetime.utcnow().isoformat(), "answers": len(qs), "notes": len(notes),
             "changed": [getattr(g.nodes.get(i), "title", i) for i in changed][:20], "note": r.note[:300],
-            "asked": len(added), "by": "the product manager" if _role.get() == "PM" else ""}])[-50:]
+            "asked": len(added), "by": "the product manager" if _eff_role(g) == "PM" else ""}])[-50:]
         g.round = getattr(g, "round", 1) + 1
         _start_round(g)
     return {"is_vague": r.is_vague, "note": r.note[:300], "changed": changed, "follow_up": [a.id for a in added]}
@@ -686,7 +721,12 @@ class RestoreRequest(BaseModel):
 @app.post("/api/restore")
 def restore_board(payload: RestoreRequest) -> Dict[str, Any]:
     """Rebuilds a board from the copy the browser kept (after the server slept)."""
-    _set_graph(_rebuild(payload.model_dump()))
+    old, new = _board(), _rebuild(payload.model_dump())
+    if getattr(old, "owner", "") or getattr(old, "invites", {}):  # a browser copy may not change who owns the board
+        new.owner, new.invites = old.owner, getattr(old, "invites", {})
+    elif "invites" in payload.model_fields_set:
+        new.invites = {}
+    _set_graph(new)
     return get_graph_state()
 
 
@@ -706,6 +746,7 @@ def _rebuild(d: Dict[str, Any]) -> BuildingBeesEngine:
     g.short_ids = dict(d.get("short_ids") or {})
     g.mode = d.get("mode") if d.get("mode") in AUDIENCE else "solo"
     g.owner = d.get("owner", "")
+    g.invites = dict(d.get("invites") or {})
     g.plan, g.plan_decisions = d.get("plan"), int(d.get("plan_decisions") or 0)
     g.needs_redraw = bool(d.get("needs_redraw"))
     for n in d["nodes"][:2000]:
@@ -861,6 +902,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     g.short_ids = dict(getattr(old, "short_ids", {}))  # S1 stays S1 when the screens are redrawn
     g.mode = getattr(old, "mode", "solo")
     g.owner = getattr(old, "owner", "")
+    g.invites = getattr(old, "invites", {})
     g.plan, g.plan_decisions = getattr(old, "plan", None), getattr(old, "plan_decisions", 0)
     strip_guesses(g, g.spec_text + " " + " ".join(q.answer_text or "" for q in decisions))
     for f in flows:  # the steps the user agreed to stay on the flow
@@ -1145,6 +1187,64 @@ def get_plan_check() -> Dict[str, Any]:
     return plan_check(_board())
 
 
+class InviteRequest(BaseModel):
+    role: str
+
+
+@app.post("/api/invites")
+def create_invite(payload: InviteRequest) -> Dict[str, Any]:
+    """The owner makes a link for one role. Only such a link can make someone product manager on an owned board."""
+    g = _board()
+    if not _is_owner(g):
+        raise HTTPException(status_code=403, detail="Only the board's owner can invite people to a role.")
+    role = payload.role.upper()
+    if role not in ROLE_LABELS:
+        raise HTTPException(status_code=400, detail=f"role must be one of {sorted(ROLE_LABELS)}")
+    import secrets
+    tok = secrets.token_urlsafe(12)
+    g.invites = {**getattr(g, "invites", {}), tok: {"role": role, "at": datetime.datetime.utcnow().isoformat(), "name": ""}}
+    g.mode = "team"
+    return {"token": tok, "role": role, "label": ROLE_LABELS[role]}
+
+
+@app.get("/api/invites")
+def list_invites() -> Dict[str, Any]:
+    """The owner's view of the team: every role link, who joined with it, and whether it was revoked."""
+    g = _board()
+    if not _is_owner(g):
+        raise HTTPException(status_code=403, detail="Only the board's owner can see the role links.")
+    return {"invites": [{"token": t, **i, "label": ROLE_LABELS.get(i["role"], i["role"])} for t, i in getattr(g, "invites", {}).items()]}
+
+
+@app.post("/api/invites/{token}/revoke")
+def revoke_invite(token: str) -> Dict[str, Any]:
+    """The owner switches a role link off; whoever used it falls back to a self-picked role without PM rights."""
+    g = _board()
+    if not _is_owner(g):
+        raise HTTPException(status_code=403, detail="Only the board's owner can revoke a role link.")
+    inv = getattr(g, "invites", {}).get(token)
+    if not inv:
+        raise HTTPException(status_code=404, detail="No such role link")
+    inv["revoked"] = True
+    return {"revoked": token}
+
+
+class JoinRequest(BaseModel):
+    name: str = ""
+
+
+@app.post("/api/join")
+def join_board(payload: JoinRequest) -> Dict[str, Any]:
+    """A teammate opens their role link: their name goes on the team list and their role is fixed by the link."""
+    g = _board()
+    inv = _member(g)
+    if not inv:
+        raise HTTPException(status_code=404, detail="This role link is not valid any more. Ask the board's owner for a new one.")
+    if payload.name.strip():
+        inv["name"] = payload.name.strip()[:40]
+    return {"role": inv["role"], "label": ROLE_LABELS[inv["role"]], "name": inv.get("name", "")}
+
+
 @app.get("/api/item/{short_id}")
 def get_plan_item(short_id: str) -> Dict[str, Any]:
     """One part of the plan by its short id (F1, FL1, S2, B3, A1), for an agent that needs a slice, not the whole Brief."""
@@ -1184,7 +1284,8 @@ def rate_question(question_id: str, payload: RateRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail="Question not found")
     if payload.rating not in RATINGS:
         raise HTTPException(status_code=400, detail=f"rating must be one of {sorted(RATINGS)}")
-    who = (payload.by or _role.get() or "someone").strip()[:60]
+    inv = _member(g)
+    who = (f"{inv.get('name') or 'Someone'} ({ROLE_LABELS[inv['role']]})" if inv else (payload.by or _role.get() or "someone")).strip()[:60]
     ratings = [r for r in q.metadata.get("ratings", []) if r.get("by") != who][-20:]  # one rating per person
     ratings.append({"rating": payload.rating, "by": who, "at": datetime.datetime.utcnow().isoformat()})
     q.metadata["ratings"] = ratings
