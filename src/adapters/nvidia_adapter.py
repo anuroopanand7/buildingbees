@@ -36,6 +36,10 @@ FALLBACK = {DEFAULT_HEAVY_MODEL: VISION_MODEL, VISION_MODEL: DEFAULT_HEAVY_MODEL
 PRICES = {DEFAULT_HEAVY_MODEL: (1.0e-6, 3.0e-6), DEFAULT_MODEL: (3.0e-7, 9.0e-7), VISION_MODEL: (3.0e-7, 9.0e-7)}
 # Spend guard: we have $25 of credit that must last until judging ends on 15 Dec, so a day may spend at most this.
 DAILY_BUDGET_USD = float(os.getenv("NVIDIA_DAILY_BUDGET_USD", "1.5"))
+# The flows prompt tuned for Nemotron by scripts/optimize_prompt.py (yes/no checks, one edit per round, kept only when
+# the score rises). Nebius cannot fine-tune Nemotron, so this is how it adapts to our job. Gemini keeps the shared prompt.
+_TUNED = os.path.join(os.path.dirname(__file__), "tuned", "flows_nemotron.txt")
+FLOWS_PROMPT_NEMOTRON = open(_TUNED).read() if os.path.exists(_TUNED) else FLOWS_PROMPT
 # Ultra drew screens in 17 s in the A/B but took 162 s when busy (video test, 20 Oct). Past this many seconds
 # its fallback answers instead, so a person never waits minutes.
 HEAVY_TIMEOUT_S = float(os.getenv("NVIDIA_HEAVY_TIMEOUT_S", "45"))
@@ -159,9 +163,9 @@ class NvidiaNemotronAdapter:
         if image:
             note = ("\n(See the attached image: a photo of the founder's own sketch. Read its boxes, arrows and labels as "
                     "their draft user flow: keep what it shows, and ask about what it leaves out.)")
-            return self._generate(FLOWS_PROMPT + (text or "(see the attached image)")[:60000] + note, FlowsExtract,
+            return self._generate(FLOWS_PROMPT_NEMOTRON + (text or "(see the attached image)")[:60000] + note, FlowsExtract,
                                   model=VISION_MODEL, image=image)
-        return self._generate(FLOWS_PROMPT + text[:60000], FlowsExtract, model=os.getenv("NVIDIA_FLOWS_MODEL") or FLOWS_MODEL)
+        return self._generate(FLOWS_PROMPT_NEMOTRON + text[:60000], FlowsExtract, model=os.getenv("NVIDIA_FLOWS_MODEL") or FLOWS_MODEL)
 
     def react(self, prompt: str) -> Reaction:
         """A bee reads one answer: a sharper follow-up if it is vague, otherwise changes to the board."""

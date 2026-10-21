@@ -62,3 +62,15 @@ def test_mcp_bring_your_own_ai_remembers_the_task_and_repeats_it(monkeypatch):
     done = mcp_server.run_tool("submit_answer", {"board": board, "answer": {"any": "json"}})
     assert calls == ["/api/ingest-prd?engine=agent", "/api/agent/answer", "/api/ingest-prd?engine=agent"]
     assert "1 flows" in done and "1 open questions" in done and board not in mcp_server.PENDING
+
+
+def test_prompt_tuning_checks_score_a_draft():
+    """The optimizer's yes/no checks: a tidy draft passes the structural ones, a broken one fails them."""
+    from scripts.optimize_prompt import checks
+    good = checks(FLOWS)
+    assert good["no standard-detail questions"] and good["questions point at real users or flows"]
+    broken = FLOWS.model_copy(deep=True)
+    broken.questions[0].target_id = "NOPE"
+    broken.features = []
+    bad = checks(broken)
+    assert not bad["questions point at real users or flows"] and not bad["features listed and linked to flows"]

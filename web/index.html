@@ -448,6 +448,8 @@
   @media (prefers-reduced-motion: reduce) { .sketch rect, .sketch path { animation: none; stroke-dashoffset: 0; } }
   .working-card .bee-fly { display: block; margin: -8px auto 4px; border-radius: 50%; mix-blend-mode: multiply; }  /* the bee flies a loop while the model works; its white frame vanishes on the card */
   .working-card .bee-fly + .sketch { display: none; }
+  /* The why, before anything else: a first-time visitor (BSR, 20 Oct) asked who made this, why, and towards what end. */
+  #start .why { display: inline-block; margin: 0 0 14px; padding: 6px 12px; border: 1.5px solid var(--ink); border-radius: 12px; background: var(--bee); font-size: 14px; font-weight: 600; color: var(--ink); }
   .bee-clip { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; mix-blend-mode: multiply; vertical-align: middle; margin-right: 8px; flex: none; }
   @media (prefers-reduced-motion: reduce) { .bee-clip { display: none; } }
   .cite .scout { width: 20px; height: 20px; border-radius: 50%; box-shadow: 0 0 0 1.2px var(--ink); vertical-align: middle; margin-right: 4px; background: #fff; }  /* the Scout Bee with binoculars */
@@ -817,6 +819,7 @@
 <main id="start" hidden>
   <div class="start-inner">
    <div>
+    <p class="why">Agents build only what is decided. BuildingBees gets your team to decide everything first.</p>
     <h1>Other tools guess. We ask.</h1>
     <p class="lead">Tell us what you want to build. Six bees map the flows, ask your product team what the idea leaves out, and redraw the board with every answer. Nothing gets built on a guess.</p>
     <div class="who-first" id="modeSeg" role="group" aria-label="Who is building this">
