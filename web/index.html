@@ -107,6 +107,8 @@
   .hive .n { color: var(--bad); font-weight: 600; }
   .bee { flex: none; width: 30px; height: 30px; display: grid; place-items: center; background: var(--accent); color: #2b1f00; font-size: 15px; clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%); }
   .bee.sm { width: 20px; height: 20px; font-size: 11px; }
+  .bee img { width: 100%; height: 100%; object-fit: contain; }
+  .bee:has(img) { background: #fff; clip-path: none; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--ink); }  /* portrait in a round frame */
   .msg-row { display: flex; gap: 10px; align-items: flex-start; }
   .msg-body { min-width: 0; }
   .who { font-size: 12px; font-weight: 600; margin-bottom: 3px; }
@@ -444,6 +446,9 @@
   .sketch rect:nth-of-type(2) { animation-delay: .35s; } .sketch rect:nth-of-type(3) { animation-delay: .7s; } .sketch path { stroke: var(--accent); animation-delay: .5s; }
   @keyframes pen { 0% { stroke-dashoffset: 140; } 45%, 80% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
   @media (prefers-reduced-motion: reduce) { .sketch rect, .sketch path { animation: none; stroke-dashoffset: 0; } }
+  .working-card .bee-fly { display: block; margin: -8px auto 4px; border-radius: 50%; mix-blend-mode: multiply; }  /* the bee flies a loop while the model works; its white frame vanishes on the card */
+  .working-card .bee-fly + .sketch { display: none; }
+  @media (prefers-reduced-motion: reduce) { .working-card .bee-fly { display: none; } .working-card .bee-fly + .sketch { display: block; } }
   .working-card b { display: block; }
   .working-card span { display: block; color: var(--muted); font-size: 13px; margin-top: 4px; white-space: normal; }  /* long waits wrap instead of running off the card */
 
@@ -921,7 +926,7 @@
 <div id="toast" hidden role="alert"></div>
 
 <div id="working" hidden role="status" aria-live="polite">
-  <div class="working-card"><svg class="sketch" viewBox="0 0 168 44" aria-hidden="true"><rect x="2" y="8" width="40" height="28" rx="7"/><rect x="64" y="8" width="40" height="28" rx="7"/><rect x="126" y="8" width="40" height="28" rx="7"/><path d="M42 22 H64 M104 22 H126"/></svg><b id="workingTitle"></b><span id="workingStep"></span><span class="mono" id="workingTime"></span></div>
+  <div class="working-card"><video class="bee-fly" src="/bees/thinking.mp4" poster="/bees/thinking.png" width="120" height="120" muted loop playsinline autoplay aria-hidden="true"></video><svg class="sketch" viewBox="0 0 168 44" aria-hidden="true"><rect x="2" y="8" width="40" height="28" rx="7"/><rect x="64" y="8" width="40" height="28" rx="7"/><rect x="126" y="8" width="40" height="28" rx="7"/><path d="M42 22 H64 M104 22 H126"/></svg><b id="workingTitle"></b><span id="workingStep"></span><span class="mono" id="workingTime"></span></div>
 </div>
 
 <script>
@@ -936,7 +941,8 @@ const BEES = {
   COMPLIANCE: ["Compliance Bee", "privacy and rules", "ph-shield-check", "What data do we keep, and are we allowed to?"],
 };
 const bee = (cat) => BEES[cat] || BEES.PM;
-const beeIcon = (cat, sm) => `<span class="bee ${sm ? "sm" : ""}" aria-hidden="true"><i class="ph ${bee(cat)[2]}"></i></span>`;
+// Each bee has its own still portrait (Gemini art, one shared body, a prop per role); unknown roles fall back to the Queen.
+const beeIcon = (cat, sm) => `<span class="bee ${sm ? "sm" : ""}" aria-hidden="true"><img src="/bees/${BEES[cat] ? cat : "PM"}.png" alt="" width="30" height="30" decoding="async"></span>`;
 const MAX_ROUNDS = 3; // shortcut: caps automatic deep-dives per board to protect the free model quota
 let S = { nodes: {}, fwd: {}, rev: {}, screens: {}, engines: {}, engine: null, selected: null, view: "screens" };  // view: once screens exist, show "flows" or "screens"
 let PM = { skipped: new Set(), asked: new Set(), rounds: 0, thinking: "", error: "", focus: null, lastFocus: null, bee: null, front: null, reacting: "", changed: new Set(), draft: {} };

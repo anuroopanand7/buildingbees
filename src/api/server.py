@@ -251,6 +251,7 @@ def audience(g_or_mode) -> str:
 
 
 app.mount("/examples", StaticFiles(directory=os.path.join(WEB_DIR, "examples")), name="examples")
+app.mount("/bees", StaticFiles(directory=os.path.join(WEB_DIR, "bees")), name="bees")  # bee art drawn with Gemini, 20 Oct 2026
 
 
 @app.get("/api/graph")
