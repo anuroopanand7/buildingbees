@@ -204,7 +204,7 @@ Tools: `get_plan` (the Brief, with ids F1, FL1, S1, B1, A1), `plan_check`, `open
 2. Your model writes the JSON and the agent calls `submit_answer`. We validate it against the same Pydantic schema Gemini and Nemotron use, so a wrong shape comes back with the reason. Then the board draws it.
 3. `open_questions`, then `answer_question` with the person's answers (the agent relays decisions, never invents them), then `run_bees` with `update`, `screens` or `plan`. Each step is one more task and answer.
 
-Open the link to watch the flows, questions and screens appear on the board as your agent works. On the server this is a third engine, `engine=agent`: when no answer is waiting it returns HTTP 409 with the prompt and schema instead of calling a model (`src/adapters/agent_adapter.py`).
+Open the link to watch the flows, questions and screens appear on the board as your agent works. The agent skill in `skills/buildingbees/SKILL.md` teaches any coding agent this loop (`npx skills add <this repo>/tree/main/skills/buildingbees`). On the server this is a third engine, `engine=agent`: when no answer is waiting it returns HTTP 409 with the prompt and schema instead of calling a model (`src/adapters/agent_adapter.py`).
 
 ## Known limits
 
