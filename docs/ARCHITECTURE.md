@@ -36,14 +36,15 @@ sequenceDiagram
 |---|---|---|
 | `src/adapters/spec_prompts.py` | Every prompt and every output schema. Both engines fill the same Pydantic models. | `FLOWS_PROMPT`, `INGEST_PROMPT`, `INTERROGATE_PROMPT`, `REACT_PROMPT`, `XBranch`, `XFlowPlan`, `Reaction` |
 | `src/adapters/gemini_adapter.py` | Gemini API with structured output; falls over across models and retries once after a short pause when Gemini is busy. | `_generate`, `extract_flows`, `extract_spec`, `react` |
-| `src/adapters/nvidia_adapter.py` | Nemotron on Nebius Token Factory (OpenAI-compatible). Thinking is turned off so the JSON is not cut short. | `_generate` |
+| `src/adapters/nvidia_adapter.py` | Nemotron on Nebius Token Factory (OpenAI-compatible). Thinking is turned off so the JSON is not cut short. Routing from an A/B test: Super VL draws flows and reads sketch photos, Ultra draws screens and writes the plan, Super reads each round. Ultra and Super VL back each other up on an error or bad JSON, and a busy Ultra hands over after `NVIDIA_HEAVY_TIMEOUT_S` (45 s). A daily spend guard (`NVIDIA_DAILY_BUDGET_USD`) counts cost from the token usage. | `_generate`, `_generate_once`, `_spend` |
 | `src/adapters/tavily.py` | The Scout Bee: one web search; results go into the prompt as untrusted reference text. | `research`, `as_prompt` |
 | `src/core/ingest.py` | Turns engine output into the board graph, and owns the question rules that need no model call. | `build_flows_graph`, `build_graph_from_extract`, `clean_branches`, `ask_open_branches`, `add_gap_questions`, `add_gap_defaults`, `apply_gap_default`, `strip_guesses` |
 | `src/core/graph.py` | The board (nodes, edges) and the "ready to build" rule. | `evaluate_branch_readiness` |
 | `src/core/brief.py` | Writes the Brief from the board. No model call. | `build_brief`, `decision_count` |
 | `src/api/server.py` | FastAPI app: one board per `X-Board` id, Firestore persistence, sign-in, rate limits. | `_apply_reaction`, `react_to_answer`, `expand`, `sign_off` |
-| `web/index.html` | The whole UI, vanilla JS: canvas board, bee rail, question dock, roles, Brief viewer. | `renderMap`, `branchRows`, `drawWires`, `pmQueue`, `answer` |
+| `web/index.html` | The whole UI, vanilla JS: canvas board (a grid of three-line vertex marks that thins out when zoomed far out), bee rail, question dock, roles, Brief viewer. Screens render as sketch wireframes (Balsamiq Sans, an SVG wobble filter on outlines only, so text stays sharp). | `renderMap`, `branchRows`, `drawWires`, `pmQueue`, `answer` |
 | `src/api/feedback.py` | Testers' feedback board (Firestore `feedback`): reports, votes, comments, statuses, three confirmations resolve. | `create_report`, `toggle_vote`, `confirm_fixed` |
+| `web/bees/` | Bee art made with Gemini: one portrait per bee (`PM.png` ... `SCOUT.png`) and short loops that start and end on the same frame (`thinking.mp4` in the working card, `done.mp4` when a round finishes, `idle.mp4` when no questions wait). Reduced motion shows stills only. | |
 | `scripts/eval_questions.py` | Question-quality check on four sample ideas. Run after every prompt change. | `run` |
 
 ## The question rules (what the bees may and may not ask)

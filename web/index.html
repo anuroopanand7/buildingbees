@@ -448,6 +448,10 @@
   @media (prefers-reduced-motion: reduce) { .sketch rect, .sketch path { animation: none; stroke-dashoffset: 0; } }
   .working-card .bee-fly { display: block; margin: -8px auto 4px; border-radius: 50%; mix-blend-mode: multiply; }  /* the bee flies a loop while the model works; its white frame vanishes on the card */
   .working-card .bee-fly + .sketch { display: none; }
+  .bee-clip { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; mix-blend-mode: multiply; vertical-align: middle; margin-right: 8px; flex: none; }
+  @media (prefers-reduced-motion: reduce) { .bee-clip { display: none; } }
+  .cite .scout { width: 20px; height: 20px; border-radius: 50%; box-shadow: 0 0 0 1.2px var(--ink); vertical-align: middle; margin-right: 4px; background: #fff; }  /* the Scout Bee with binoculars */
+  #toast .bee-clip { mix-blend-mode: normal; background: #fff; }  /* the toast is dark, so the clip keeps its white circle */
   @media (prefers-reduced-motion: reduce) { .working-card .bee-fly { display: none; } .working-card .bee-fly + .sketch { display: block; } }
   .working-card b { display: block; }
   .working-card span { display: block; color: var(--muted); font-size: 13px; margin-top: 4px; white-space: normal; }  /* long waits wrap instead of running off the card */
@@ -1418,7 +1422,7 @@ function renderPM() {
   }).join("") + (S.sources?.length ? `<button data-scout aria-label="Scout Bee: ${S.sources.length} pages read" data-tip="Scout Bee: research\nRead ${S.sources.length} pages before the bees asked. Click to see them." data-tip-pos="right"><span class="bee" aria-hidden="true"><i class="ph ph-binoculars"></i></span></button>` : "");
   // Collapsed question: a single line that says who is waiting.
   const waiting = pmQueue()[0];
-  $("dockPill").innerHTML = waiting ? `${beeIcon(waiting.category, true)}<span><b>${esc(bee(waiting.category)[0])}</b> has a question for you</span><i class="ph ph-caret-up" aria-hidden="true"></i>` : `<span>No questions waiting</span><i class="ph ph-caret-up" aria-hidden="true"></i>`;
+  $("dockPill").innerHTML = waiting ? `${beeIcon(waiting.category, true)}<span><b>${esc(bee(waiting.category)[0])}</b> has a question for you</span><i class="ph ph-caret-up" aria-hidden="true"></i>` : `${beeClip("idle")}<span>No questions waiting</span><i class="ph ph-caret-up" aria-hidden="true"></i>`;
 
   const thread = $("thread");
   const hello = `<div class="msg-row">${beeIcon("PM")}<div class="msg-body"><div class="who">Queen Bee <span>product and scope</span></div><div class="bubble">${S.stage === "flows"
@@ -1426,7 +1430,7 @@ function renderPM() {
     : "The screens are drawn from your decisions. Now we go through them one by one."}</div></div></div>`;
   // Scout Bee: the pages read on the web before anyone asked a question.
   const scout = S.sources?.length ? `<div class="msg-row"><span class="bee" aria-hidden="true"><i class="ph ph-binoculars"></i></span><div class="msg-body"><div class="who">Scout Bee <span>research</span></div><div class="bubble">Before we asked anything, I read ${S.sources.length} page${S.sources.length === 1 ? "" : "s"} about products like yours. Where a question comes from one, it says so.<details class="read"><summary>Show the ${S.sources.length} page${S.sources.length === 1 ? "" : "s"}</summary><ol class="sources">${S.sources.map((s) => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a></li>`).join("")}</ol></details></div></div></div>` : "";
-  const cite = (q) => q.metadata?.cite?.url ? `<div class="cite"><i class="ph ph-binoculars" aria-hidden="true"></i> From the Scout Bee's reading: <a href="${esc(q.metadata.cite.url)}" target="_blank" rel="noopener noreferrer">${esc(q.metadata.cite.title)}</a></div>` : "";
+  const cite = (q) => q.metadata?.cite?.url ? `<div class="cite"><img class="scout" src="/bees/SCOUT.png" alt="" width="20" height="20"> From the Scout Bee's reading: <a href="${esc(q.metadata.cite.url)}" target="_blank" rel="noopener noreferrer">${esc(q.metadata.cite.title)}</a></div>` : "";
   thread.innerHTML = hello + scout + done.map((q) => `
     <div class="msg-row">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(bee(q.category)[0])}</div><div class="bubble">${esc(q.question_text)}</div></div></div>
     <div class="mine"><div class="bubble">${esc(q.answer_text)}</div><div>${q.metadata?.default ? '<span class="by">Standard default</span>' : q.metadata?.answered_by ? `<span class="by">${esc(q.metadata.answered_by)}</span>` : ""}<button class="link" data-reopen="${esc(q.id)}">Change</button></div></div>
@@ -1667,7 +1671,7 @@ async function updateBoard() {
   } catch (err) { PM.error = err.message; toast(err.message); }
   PM.reacting = ""; PM.sketch = null;
   await load();
-  if (!PM.error) toast(roundLeft() ? `Round ${S.round - 1} done. Round ${S.round}: ${roundLeft()} question${roundLeft() > 1 ? "s" : ""}.` : `Round ${S.round - 1} done. Nothing blocks the build now: draw the screens when you are ready.`);
+  if (!PM.error) toast(roundLeft() ? `Round ${S.round - 1} done. Round ${S.round}: ${roundLeft()} question${roundLeft() > 1 ? "s" : ""}.` : `Round ${S.round - 1} done. Nothing blocks the build now: draw the screens when you are ready.`, "done");
   reveal(document.querySelector("#flows .changed"));
 }
 // Solo founders answer in sets: every open question about one flow or screen (3 to 7, topped up from what
@@ -1762,8 +1766,11 @@ async function answer(qid, text, beesDecided = false) {
   reveal(document.querySelector("#flows .changed"));
 }
 let toastTimer = null;
-function toast(text) {
+// A short bee clip (Anusree's Gemini loops in /bees) plays next to some messages, e.g. the happy hop when a round is done.
+const beeClip = (name) => `<video class="bee-clip" src="/bees/${name}.mp4" poster="/bees/${name}.png" muted loop autoplay playsinline aria-hidden="true"></video>`;
+function toast(text, clip) {
   $("toast").textContent = text; $("toast").hidden = false;
+  if (clip) $("toast").insertAdjacentHTML("afterbegin", beeClip(clip));
   clearTimeout(toastTimer); toastTimer = setTimeout(() => ($("toast").hidden = true), 6000);
 }
 const fail = (err) => { PM.error = err.message; toast(err.message); };
