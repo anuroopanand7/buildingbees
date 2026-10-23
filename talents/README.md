@@ -38,6 +38,11 @@ Rules (from the 23 Oct 2026 research with Argon):
 | Bee | Talent | Skill | Status |
 |---|---|---|---|
 | Poke | failure paths | [failure-exits](poke/failure-paths/SKILL.md) | In use (enforced in code) |
+| Shield | local rules | [india-dpdp-gst](shield/local-rules/india-dpdp-gst/SKILL.md) | **In use**: `src/core/skills.py` adds it to every prompt of a board that looks Indian. A/B on Nemotron, Pune tuition idea: the Compliance Bee goes from asking only about data retention to also asking if under-18s use the app and if the centre is GST registered |
+| North | scope shaping | [no-tech-in-requirements](north/scope-shaping/no-tech-in-requirements/SKILL.md) | Written, not wired (our prompts already keep tech out of the PRD; test before wiring) |
+| Pixel | screen states | [four-states](pixel/screen-states/four-states/SKILL.md) | Written, not wired (states are already asked where real) |
+| Bolt | data modelling | [who-can-do-what](bolt/data-modelling/who-can-do-what/SKILL.md) | Written, not wired (the schema doc already has an access line per table) |
 
-Next, by rank: Poke `3 exits` upgrade, North `specify-no-tech-stack`, North `brainstorm-socratic-cap`, Bolt `role-resource-matrix`,
-Pixel `frontend-4-states`, Kala `design-tokens`, Shield `india-dpdp-gst`, Poke `gherkin-given-when-then`.
+The last three were drafted by DeepSeek through OpenCode on 23 Oct 2026 (it follows the format well but writes about 30% too long, with filler bullets), then rewritten and checked by Claude.
+
+Next, by rank: Poke `3 exits` upgrade, North `brainstorm-socratic-cap`, Kala `design-tokens`, Shield `stride-threat-model`, Poke `gherkin-given-when-then`, Pixel `wcag-accessibility-gate`.

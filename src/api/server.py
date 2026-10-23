@@ -45,6 +45,7 @@ from src.core.schema import (
 from src.adapters.gemini_adapter import GoogleGeminiAdapter
 from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.core.docs import build_docs
+from src.core.skills import local_rules
 from src.adapters.spec_prompts import TALENTS
 from src.core.agent_view import decision_log, item as plan_item, ready_wave
 from src.adapters.agent_adapter import AgentAdapter, NeedAgent, SCHEMAS as AGENT_SCHEMAS
@@ -270,7 +271,8 @@ class IngestPRDRequest(BaseModel):
 def audience(g_or_mode) -> str:
     """The AUDIENCE instruction for a board (or a mode name): how many questions, and in whose words."""
     mode = g_or_mode if isinstance(g_or_mode, str) else getattr(g_or_mode, "mode", "solo")
-    return AUDIENCE.get(mode, AUDIENCE["solo"])
+    pack = "" if isinstance(g_or_mode, str) else local_rules(getattr(g_or_mode, "spec_text", ""))  # Shield's India pack
+    return AUDIENCE.get(mode, AUDIENCE["solo"]) + pack
 
 
 app.mount("/examples", StaticFiles(directory=os.path.join(WEB_DIR, "examples")), name="examples")
@@ -824,7 +826,7 @@ def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None, mode: s
     """Stage one: flows and the questions about them. No screens are drawn yet."""
     mode = mode if mode in AUDIENCE else "solo"
     sources = tavily.research(text)  # Scout Bee; empty without a key, and for PDFs
-    lead = audience(mode) + "\n\nTHE IDEA:\n"  # how to ask, then what the founder actually said
+    lead = audience(mode) + local_rules(text) + "\n\nTHE IDEA:\n"  # how to ask, then what the founder actually said
     started = time.time()
     try:
         extra = {"image": image} if image else {}  # only Gemini reads images; older engines take no such argument

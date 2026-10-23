@@ -198,3 +198,32 @@ def test_risky_steps_always_get_a_failure_exit_and_a_test_bee_question():
     g = build_flows_graph(x)
     asked = [q.question_text for q in g.nodes.values() if getattr(q, "category", None) and q.category.value == "TESTER"]
     assert any("Pay went through" in t for t in asked) and not any("Browse" in t for t in asked)
+
+
+def test_every_skill_has_its_header_and_stays_in_its_token_cap():
+    """Lint for talents/: a skill needs the agreed header keys, and its body must fit max_tokens (about 4 characters each)."""
+    import glob
+    import os
+    keys = ["name", "description", "owner_bee", "talent", "version", "source", "license", "max_tokens"]
+    root = os.path.join(os.path.dirname(__file__), "..", "talents")
+    files = glob.glob(os.path.join(root, "**", "SKILL.md"), recursive=True)
+    assert files
+    for path in files:
+        head, body = open(path).read().split("\n---\n", 1)
+        found = [ln.split(":")[0] for ln in head.splitlines()[1:] if ":" in ln]
+        assert found == keys, path
+        cap = int([ln for ln in head.splitlines() if ln.startswith("max_tokens")][0].split(":")[1])
+        assert len(body) / 4 <= cap * 1.1, f"{path} is about {len(body) // 4} tokens, cap {cap}"
+        assert "—" not in body
+
+
+def test_the_india_pack_is_added_only_for_indian_products():
+    """Shield's India skill joins the prompt for an Indian idea (on every later call too), never for others."""
+    from src.core.skills import local_rules
+    from scripts.eval_questions import IDEAS
+    assert "GSTIN" in local_rules("A tuition centre app in Pune: parents pay monthly fees by UPI")
+    assert not any(local_rules(i) for i in IDEAS)  # the four standard test ideas are untouched
+    assert server.audience("solo") == server.audience("solo")
+    g = server.BuildingBeesEngine()
+    g.spec_text = "fees in rupees for a school in Delhi"
+    assert "LOCAL RULES" in server.audience(g) and "LOCAL RULES" not in server.audience(server.BuildingBeesEngine())

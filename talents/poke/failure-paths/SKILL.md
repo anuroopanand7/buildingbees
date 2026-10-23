@@ -6,7 +6,7 @@ talent: failure_paths
 version: 1
 source: ours (talent-skills research, 23 Oct 2026; idea "3-exit node")
 license: ours
-max_tokens: 150
+max_tokens: 220
 ---
 
 # Failure exits
