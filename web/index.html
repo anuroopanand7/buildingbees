@@ -779,6 +779,9 @@
   /* The founder's own answer bubble was ink-on-ink; give it a lighter carbon. */
   .dock .mine .bubble { background: #2e2e35; color: var(--text); }
   .dock .bubble, .dock .idea-text { background: #222227; color: var(--text); }
+  .talents { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .talent { font-size: 11.5px; line-height: 1.3; border: 1px solid var(--line-strong); border-radius: 8px; padding: 3px 7px; color: var(--muted); }
+  .talent b { color: var(--ink); font-weight: 600; margin-right: 2px; }
 </style>
 </head>
 <body>
@@ -1001,6 +1004,18 @@ const BEES = {
   COMPLIANCE: ["Compliance Bee", "privacy and rules", "ph-shield-check", "What data do we keep, and are we allowed to?", "Shield", "Guards people's data and the rules."],
 };
 const bee = (cat) => BEES[cat] || BEES.PM;
+// Each bee has talents, and a talent is a set of skills (Roger, 23 Oct 2026: "a talent is a collection of skills, like
+// Claude skills"). Shown on the start screen and in the bee rail, so people see what each bee is good at.
+const TALENTS = {
+  PM: [["Scope shaping", ["core user", "must vs later", "out of scope"]], ["Business rules", ["money flows", "pricing", "success metric"]], ["Team alignment", ["settling disagreements", "sign-off", "decision log"]]],
+  DESIGN: [["Experience flow", ["first impression", "navigation", "empty states"]], ["Visual language", ["palette", "typography", "components"]], ["Voice", ["wording", "tone", "error messages"]]],
+  FRONTEND: [["Screen states", ["loading", "empty", "error", "success"]], ["Interaction", ["forms and validation", "gestures", "offline"]], ["Accessibility", ["contrast", "screen readers", "keyboard"]]],
+  BACKEND: [["Data modelling", ["entities", "relations", "access rules"]], ["Integrations", ["payments", "messaging", "third-party APIs"]], ["Reliability", ["retries and time-outs", "duplicate requests", "scale"]]],
+  TESTER: [["Edge cases", ["double taps", "two people at once", "odd input"]], ["Failure paths", ["payment fails", "network drops", "half-saved data"]], ["Acceptance", ["given-when-then checks", "test data"]]],
+  COMPLIANCE: [["Privacy", ["personal data kept", "how long", "consent"]], ["Security", ["sign-in", "roles", "who sees what"]], ["Local rules", ["data protection law", "tax and invoices", "age limits"]]],
+};
+const talentsText = (cat) => (TALENTS[cat] || []).map(([t, skills]) => `${t}: ${skills.join(", ")}`).join("\n");
+const talentsHtml = (cat) => `<span class="talents">${(TALENTS[cat] || []).map(([t, skills]) => `<span class="talent" title="${esc(skills.join(", "))}"><b>${esc(t)}</b> ${esc(skills.join(" · "))}</span>`).join("")}</span>`;
 const beeTitle = (cat) => `${bee(cat)[4]} the ${bee(cat)[0]}`;
 // Each bee has its own still portrait (Gemini art, one shared body, a prop per role); unknown roles fall back to the Queen.
 const beeIcon = (cat, sm) => `<span class="bee ${sm ? "sm" : ""}" aria-hidden="true"><img src="/bees/${BEES[cat] ? cat : "PM"}.png" alt="" width="30" height="30" decoding="async"></span>`;
@@ -1480,7 +1495,7 @@ function renderPM() {
   const now = pmQueue()[0]?.category;
   $("hive").innerHTML = Object.keys(BEES).map((c) => {
     const n = open.filter((q) => q.category === c).length, asked = all.filter((q) => q.category === c).length;
-    const tip = `${beeTitle(c)}: ${bee(c)[1]}. ${bee(c)[5]}\n${n ? `${n} question${n > 1 ? "s" : ""} for you. Click to hear only from this bee.` : asked ? "All answered" : "Nothing to ask yet"}`;
+    const tip = `${beeTitle(c)}: ${bee(c)[1]}. ${bee(c)[5]}\nTalents:\n${talentsText(c)}\n${n ? `${n} question${n > 1 ? "s" : ""} for you. Click to hear only from this bee.` : asked ? "All answered" : "Nothing to ask yet"}`;
     return `<button data-bee="${c}" aria-pressed="${PM.bee === c}" class="${n ? "" : "quiet"} ${c === now ? "asking" : ""}" aria-label="${esc(bee(c)[0])}, ${n} open" data-tip="${esc(tip)}" data-tip-pos="right">${beeIcon(c)}${n ? `<span class="badge">${n}</span>` : asked ? '<span class="done"><i class="ph ph-check" aria-hidden="true"></i></span>' : ""}</button>`;
   }).join("") + (S.sources?.length ? `<button data-scout aria-label="Scout Bee: ${S.sources.length} pages read" data-tip="Scout Bee: research\nRead ${S.sources.length} pages before the bees asked. Click to see them." data-tip-pos="right"><span class="bee" aria-hidden="true"><i class="ph ph-binoculars"></i></span></button>` : "");
   // Collapsed question: a single line that says who is waiting.
@@ -2389,7 +2404,7 @@ $("engineBtn").onclick = () => {
   menu(false); toast(`Switched to ${S.engines[S.engine]?.label || S.engine}. The next update and the next drawing use it; the board stays as it is.`);  // Sravani, 17 Oct: "no changes happening"
 };
 
-$("crew").innerHTML = Object.entries(BEES).map(([c, [role, , , asks, name, voice]]) => `<li>${beeIcon(c)}<span><b>${name} the ${role}</b><span>${voice} ${asks}</span></span></li>`).join("")
+$("crew").innerHTML = Object.entries(BEES).map(([c, [role, , , asks, name, voice]]) => `<li>${beeIcon(c)}<span><b>${name} the ${role}</b><span>${voice} ${asks}</span>${talentsHtml(c)}</span></li>`).join("")
   + '<li id="scoutCrew" hidden><span class="bee" aria-hidden="true"><i class="ph ph-binoculars"></i></span><span><b>Scout Bee</b><span>Reads the web first, so the others ask about real rules and real failures.</span></span></li>';
 $("prd").value = store.get("bb_spec") || "";
 load().catch((err) => { $("start").hidden = false; say(err.message, true); });
