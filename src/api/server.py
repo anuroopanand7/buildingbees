@@ -45,7 +45,7 @@ from src.core.schema import (
 from src.adapters.gemini_adapter import GoogleGeminiAdapter
 from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.core.docs import build_docs
-from src.core.skills import local_rules
+from src.core.skills import for_call
 from src.adapters.spec_prompts import TALENTS
 from src.core.agent_view import decision_log, item as plan_item, ready_wave
 from src.adapters.agent_adapter import AgentAdapter, NeedAgent, SCHEMAS as AGENT_SCHEMAS
@@ -268,11 +268,12 @@ class IngestPRDRequest(BaseModel):
     mode: str = "solo"  # "solo": one founder, plain questions; "team": several people answer by role
 
 
-def audience(g_or_mode) -> str:
-    """The AUDIENCE instruction for a board (or a mode name): how many questions, and in whose words."""
+def audience(g_or_mode, call: str = "", text: str = "") -> str:
+    """The AUDIENCE instruction for a board (or a mode name): how many questions, and in whose words, plus the skills
+    this kind of call carries (talents/). For a mode name, `text` is the idea; for a board its spec is used."""
     mode = g_or_mode if isinstance(g_or_mode, str) else getattr(g_or_mode, "mode", "solo")
-    pack = "" if isinstance(g_or_mode, str) else local_rules(getattr(g_or_mode, "spec_text", ""))  # Shield's India pack
-    return AUDIENCE.get(mode, AUDIENCE["solo"]) + pack
+    spec = text if isinstance(g_or_mode, str) else getattr(g_or_mode, "spec_text", "")
+    return AUDIENCE.get(mode, AUDIENCE["solo"]) + for_call(call, spec)
 
 
 app.mount("/examples", StaticFiles(directory=os.path.join(WEB_DIR, "examples")), name="examples")
@@ -826,7 +827,7 @@ def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None, mode: s
     """Stage one: flows and the questions about them. No screens are drawn yet."""
     mode = mode if mode in AUDIENCE else "solo"
     sources = tavily.research(text)  # Scout Bee; empty without a key, and for PDFs
-    lead = audience(mode) + local_rules(text) + "\n\nTHE IDEA:\n"  # how to ask, then what the founder actually said
+    lead = audience(mode, "map", text) + "\n\nTHE IDEA:\n"  # how to ask, then what the founder actually said
     started = time.time()
     try:
         extra = {"image": image} if image else {}  # only Gemini reads images; older engines take no such argument
@@ -889,7 +890,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     asked = [n for n in old.nodes.values() if isinstance(n, QuestionNode)]
     decisions = [q for q in asked if q.question_status == QuestionStatus.ANSWERED]
     brief = "\n".join([
-        audience(old) + "\n\nTHE SPEC:",
+        audience(old, "screens") + "\n\nTHE SPEC:",
         getattr(old, "spec_text", ""),
         "\nAGREED USERS AND FLOWS (keep exactly these ids, and give every screen one of these flow ids):",
         json.dumps({
@@ -1181,7 +1182,7 @@ def write_plan(engine: str) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail="Map an idea first")
     started = time.time()
     try:
-        x = eng.write_plan(audience(g) + "\n\n" + build_brief(g, with_plan=False)[:40000])
+        x = eng.write_plan(audience(g, "plan") + "\n\n" + build_brief(g, with_plan=False)[:40000])
     except NeedAgent:
         raise  # bring your own AI: hand the prompt to the person's agent, not a 502
     except Exception as e:
@@ -1212,7 +1213,7 @@ def write_docs(engine: str) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail="Draw the screens first; the docs are written from them")
     started = time.time()
     try:
-        x = eng.write_docs(audience(g) + "\n\n" + build_brief(g)[:40000])
+        x = eng.write_docs(audience(g, "docs") + "\n\n" + build_brief(g)[:40000])
     except NeedAgent:
         raise  # bring your own AI: hand the prompt to the person's agent, not a 502
     except Exception as e:

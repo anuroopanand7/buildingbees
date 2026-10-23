@@ -39,10 +39,10 @@ Rules (from the 23 Oct 2026 research with Argon):
 |---|---|---|---|
 | Poke | failure paths | [failure-exits](poke/failure-paths/SKILL.md) | In use (enforced in code) |
 | Shield | local rules | [india-dpdp-gst](shield/local-rules/india-dpdp-gst/SKILL.md) | **In use**: `src/core/skills.py` adds it to every prompt of a board that looks Indian. A/B on Nemotron, Pune tuition idea: the Compliance Bee goes from asking only about data retention to also asking if under-18s use the app and if the centre is GST registered |
-| North | scope shaping | [no-tech-in-requirements](north/scope-shaping/no-tech-in-requirements/SKILL.md) | Written, not wired (our prompts already keep tech out of the PRD; test before wiring) |
-| Pixel | screen states | [four-states](pixel/screen-states/four-states/SKILL.md) | Written, not wired (states are already asked where real) |
-| Bolt | data modelling | [who-can-do-what](bolt/data-modelling/who-can-do-what/SKILL.md) | Written, not wired (the schema doc already has an access line per table) |
+| North | scope shaping | [no-tech-in-requirements](north/scope-shaping/no-tech-in-requirements/SKILL.md) | Tested, not wired: technology mentions across 6 ideas 0 without it, 0 with it. The prompts already keep tech out |
+| Pixel | screen states | [four-states](pixel/screen-states/four-states/SKILL.md) | Tested, not wired: screens that show a list or picture with their own loading, empty and error words: 92% without it, 94% with it. The prompts already write them |
+| Bolt | data modelling | [who-can-do-what](bolt/data-modelling/who-can-do-what/SKILL.md) | Tested, not wired: schema tables with a clear who-reads, who-changes line: 8 of 10 without it, 6 of 10 with it (one run, noisy; no gain) |
 
-The last three were drafted by DeepSeek through OpenCode on 23 Oct 2026 (it follows the format well but writes about 30% too long, with filler bullets), then rewritten and checked by Claude.
+Test any skill with `.venv/bin/python -m scripts.eval_skills <name>`; a skill is wired only if it moves its number. The last three were drafted by DeepSeek through OpenCode on 23 Oct 2026 (it follows the format well but writes about 30% too long, with filler bullets), then rewritten and checked by Claude.
 
 Next, by rank: Poke `3 exits` upgrade, North `brainstorm-socratic-cap`, Kala `design-tokens`, Shield `stride-threat-model`, Poke `gherkin-given-when-then`, Pixel `wcag-accessibility-gate`.
