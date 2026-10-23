@@ -749,6 +749,36 @@
   .bee-trail { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 27; overflow: visible; }
   .bee-trail polyline { fill: none; stroke: var(--ink); stroke-width: 2; stroke-dasharray: 2 7; stroke-linecap: round; opacity: .55; }
   .bee-flyer { position: fixed; left: 0; top: 0; width: 36px; height: 36px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1.5px var(--ink); pointer-events: none; z-index: 28; }
+
+  /* ── Dark question dock (Roger, 23 Oct 2026): the dock is a carbon panel with light text while the board stays light.
+     Scoped variables re-colour everything that reads them; the rules below fix the spots that hard-code a light
+     background or a dark text colour. --ink is NOT changed: it is the dark text on yellow (--bee) surfaces. */
+  .dock { --island: #17171a; --panel: #222227; --fill: #222227; --line: #3a3a40; --line-strong: #3a3a40; --text: #f3f1ea; --muted: #aaa79d;
+          --edge-hover: #f3f1ea; --focus: #2a2514; --ok: #6fd3a8; --ok-soft: #173026; --warn: #f0b25e; --warn-soft: #3a2c14; --bad: #ff9a8a; --bad-soft: #3a2320;
+          color: var(--text); }
+  .dock .link, .dock .tool, .dock .dock-pill, .dock .question, .dock .who { color: var(--text); }
+  .dock .who span, .dock .cite, .dock .why, .dock .muted, .dock .dock-pill .ph { color: var(--muted); }
+  .dock .who .about { color: var(--text); }
+  .dock :focus-visible { outline-color: #f3f1ea; }
+  /* Choices and secondary buttons: lighter-carbon fill, light edge instead of the black outline. */
+  .dock .option, .dock .btn:not(.primary):not(.ghost), .dock .dock-min { background: #222227; color: var(--text); border-color: #3a3a40; }
+  .dock .option:hover, .dock .btn:not(.primary):not(.ghost):hover:not(:disabled) { background: #2c2c33; border-color: #aaa79d; box-shadow: none; }
+  /* Selected option, rating chip and primary button stay yellow with dark text. */
+  .dock .option[aria-pressed="true"], .dock .rate-chip[aria-pressed="true"] { background: var(--bee); color: var(--ink); border-color: var(--bee); box-shadow: none; }
+  .dock .option .rec { background: var(--ink); color: var(--bee); }
+  .dock .rate-chip { color: var(--text); border-color: #3a3a40; }
+  /* Inputs. */
+  .dock input { background: #222227; color: var(--text); border-color: #3a3a40; }
+  .dock input::placeholder { color: var(--muted); opacity: 1; }
+  /* Banners above the question: dark amber coach, dark green bee note, dark amber clash card. */
+  .dock #coach { background: #2a2514; border-bottom-color: #5a4a14; color: var(--text); }
+  .dock #coach .ph { color: var(--bee); }
+  .dock #beeNote { background: var(--ok-soft); border-bottom-color: #3a3a40; color: var(--text); }
+  .dock .set-q.clash { background: #2a2514; border-color: #5a4a14; }
+  .dock .set-foot { background: #17171a; }
+  /* The founder's own answer bubble was ink-on-ink; give it a lighter carbon. */
+  .dock .mine .bubble { background: #2e2e35; color: var(--text); }
+  .dock .bubble, .dock .idea-text { background: #222227; color: var(--text); }
 </style>
 </head>
 <body>
