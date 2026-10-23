@@ -2,7 +2,7 @@
 BuildingBees Automated Test Suite
 Verifies:
 1. Core Graph DAG traversal and node registration
-2. Socratic Question Engine inspection checklists
+2. (removed 23 Oct 2026: the Socratic inspection engine, replaced by the bees and the plan check)
 3. Stop-Rule enforcement ("Assumption is not approval")
 4. Blast radius calculation
 5. FastAPI REST API endpoints
@@ -21,7 +21,6 @@ from src.core.schema import (
     NodeStatus
 )
 from src.data.pcos_fixture import build_pcos_graph
-from src.core.question_engine import SocraticQuestionEngine
 from src.api.server import app
 
 

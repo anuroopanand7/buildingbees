@@ -94,6 +94,8 @@ sequenceDiagram
 - On Cloud Run it is saved to Firestore collection `boards` (document id is the SHA-1 of the board id, value is zlib-compressed JSON) after every successful POST. Locally boards live in memory and the browser keeps a backup copy.
 - Signed-in users (Firebase Authentication, Google) get a list of their boards in collection `users`.
 
+**Saving safely (audit, 23 Oct 2026).** A failed Firestore read returns 503 and never an empty board (the next write would save it over the real one). A failed save returns 503 instead of a silent OK. The middleware saves the exact board object the request used (`_touched`), so a board pushed out of the 300-board memory cache mid-request still gets its write. `/api/restore` only refills a board the server lost; it never overwrites one with content. Production packages are pinned in `requirements.txt`; `requirements-dev.txt` adds pytest.
+
 ## Run, test, check, deploy
 
 ```bash

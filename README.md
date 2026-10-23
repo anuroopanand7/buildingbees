@@ -127,7 +127,7 @@ Requires Python 3.9 or newer.
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+.venv/bin/pip install -r requirements-dev.txt
 cp .env.example .env   # then add GEMINI_API_KEY and/or NVIDIA_API_KEY, and optionally TAVILY_API_KEY
 .venv/bin/python -m uvicorn src.api.server:app --port 8000
 ```

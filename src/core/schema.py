@@ -11,11 +11,6 @@ import uuid
 import datetime
 
 
-class EngineTrack(str, Enum):
-    GOOGLE_GEMINI = "GOOGLE_GEMINI"
-    NVIDIA_NEMO = "NVIDIA_NEMO"
-
-
 class NodeLayer(str, Enum):
     USER = "USER"
     FLOW = "FLOW"

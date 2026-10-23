@@ -106,3 +106,41 @@ def test_agent_view_item_ready_gate_decisions_and_ratings(monkeypatch):
     again = client.post(f"/api/questions/{q['id']}/rate", json={"rating": "reword", "by": "Dev"}, headers=h).json()
     assert [x["rating"] for x in again["ratings"]] == ["obvious", "reword"]  # one rating per person, latest wins
     assert client.post(f"/api/questions/{q['id']}/rate", json={"rating": "meh"}, headers=h).status_code == 400
+
+
+class _BrokenStore:
+    """A Firestore stand-in whose reads fail, like a timeout or a short outage."""
+    def document(self, bid):
+        raise RuntimeError("firestore timeout")
+
+
+def test_a_failed_board_read_never_turns_into_an_empty_board(monkeypatch):
+    """Audit fix 1: a read error is a 503, and nothing is saved, so the real board is never overwritten."""
+    saved = []
+    monkeypatch.setattr(server, "_store", _BrokenStore())
+    monkeypatch.setattr(server, "_doc", lambda bid: _BrokenStore().document(bid))
+    monkeypatch.setattr(server, "_save_board", lambda bid, g=None: saved.append(bid) or True)
+    h = {"X-Board": "flaky-store-board"}
+    server.boards.pop(h["X-Board"], None)
+    r = client.post("/api/questions/x/rate", json={"rating": "crucial"}, headers=h)
+    assert r.status_code == 503 and saved == []
+    assert "flaky-store-board" not in server.boards
+
+
+def test_restore_never_overwrites_a_board_with_content(monkeypatch):
+    """Audit fix 2: /api/restore only refills an empty board."""
+    monkeypatch.setattr(server.tavily, "research", lambda text: [])
+    h = {"X-Board": "restore-guard"}
+    server.boards.pop(h["X-Board"], None)
+    client.post("/api/agent/answer", json={"kind": "flows", "answer": FLOWS.model_dump()}, headers=h)
+    real = client.post("/api/ingest-prd?engine=agent", json={"prd_markdown": "soap"}, headers=h).json()
+    junk = {"nodes": [], "edges": [], "product_name": "VANDAL"}
+    after = client.post("/api/restore", json=junk, headers=h).json()
+    assert after["product_name"] == real["product_name"] and len(after["nodes"]) == len(real["nodes"])
+
+
+def test_a_failed_save_is_reported_not_hidden(monkeypatch):
+    """Audit fix 3: when the save fails the person gets a 503, not a silent OK."""
+    monkeypatch.setattr(server, "_save_board", lambda bid, g=None: False)
+    r = client.post("/api/agent/answer", json={"kind": "flows", "answer": FLOWS.model_dump()}, headers={"X-Board": "save-fails"})
+    assert r.status_code == 503 and "not saved" in r.json()["detail"]

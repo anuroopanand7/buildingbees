@@ -7,7 +7,7 @@ Socratic Question Engine, and Dual Hackathon Track Adapters.
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, PlainTextResponse
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import datetime
@@ -41,7 +41,6 @@ from src.core.schema import (
     QuestionStatus,
     QuestionCategory
 )
-from src.core.question_engine import SocraticQuestionEngine
 from src.adapters.gemini_adapter import GoogleGeminiAdapter
 from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.core.agent_view import decision_log, item as plan_item, ready_wave
@@ -83,7 +82,8 @@ boards: "OrderedDict[str, BuildingBeesEngine]" = OrderedDict()
 _board_id: ContextVar[str] = ContextVar("board_id", default="default")
 _auth: ContextVar[str] = ContextVar("auth", default="")  # this request's Authorization header, to record who made a board
 _role: ContextVar[str] = ContextVar("role", default="")  # the role a teammate picked on a team board (X-Role header)
-_invite: ContextVar[str] = ContextVar("invite", default="")  # an owner-issued role link's token (X-Invite header)
+_invite: ContextVar[str] = ContextVar("invite", default="")
+_touched: ContextVar[list] = ContextVar("touched")  # the board objects this request used, so the save writes those  # an owner-issued role link's token (X-Invite header)
 log = logging.getLogger("buildingbees")
 
 _store = None   # Firestore collection of boards
@@ -103,17 +103,19 @@ def _doc(bid: str):
     return _store.document(hashlib.sha1(bid.encode()).hexdigest())
 
 
-def _save_board(bid: str) -> None:
-    """Saves a board to Firestore as compressed JSON (Cloud Run only; a no-op locally)."""
-    g = boards.get(bid)
+def _save_board(bid: str, g: Optional[BuildingBeesEngine] = None) -> bool:
+    """Saves a board to Firestore as compressed JSON (Cloud Run only; a no-op locally). False when the save failed."""
+    g = g or boards.get(bid)
     if _store is None or g is None:
-        return
+        return True
     try:
         # One compressed blob: a board with a long spec stays far under Firestore's 1 MiB document limit.
         blob = zlib.compress(json.dumps({**_state(g), "invites": getattr(g, "invites", {})}, default=str).encode())  # tokens only in storage
         _doc(bid).set({"data": blob, "updated": datetime.datetime.now(datetime.timezone.utc)})
+        return True
     except Exception as e:
         log.warning("Could not save board: %s", e)
+        return False
 
 
 def _load_board(bid: str) -> Optional[BuildingBeesEngine]:
@@ -124,8 +126,9 @@ def _load_board(bid: str) -> Optional[BuildingBeesEngine]:
         snap = _doc(bid).get()
         return _rebuild(json.loads(zlib.decompress(snap.get("data")))) if snap.exists else None
     except Exception as e:
+        # Never fall back to an empty board here: the next write would save it over the real one.
         log.warning("Could not load board: %s", e)
-        return None
+        raise HTTPException(status_code=503, detail="Could not load this board just now. Please try again in a moment.")
 
 
 # Sign-in (Firebase Authentication, Google accounts). Optional: without FIREBASE_WEB_CONFIG the product
@@ -196,7 +199,16 @@ def _board() -> BuildingBeesEngine:
         while len(boards) > MAX_BOARDS:
             boards.popitem(last=False)
     boards.move_to_end(bid)
+    _touch(boards[bid])
     return boards[bid]
+
+
+def _touch(g: BuildingBeesEngine) -> None:
+    """Notes the board a request worked on (eviction from `boards` must not lose its write)."""
+    try:
+        _touched.get().append(g)
+    except LookupError:  # outside a request (tests calling helpers directly)
+        pass
 
 
 class _BoardProxy:
@@ -217,10 +229,13 @@ async def _select_board(request, call_next):
     _auth.set(request.headers.get("authorization", ""))
     _role.set((request.headers.get("x-role") or "")[:20].upper())
     _invite.set((request.headers.get("x-invite") or request.query_params.get("invite") or "")[:64])
+    used: list = []
+    _touched.set(used)
     response = await call_next(request)
     if (request.method == "POST" and request.url.path.startswith("/api/") and response.status_code < 400
             and not request.url.path.startswith(("/api/feedback", "/api/me/boards/"))):  # not the open board's business
-        await run_in_threadpool(_save_board, bid)
+        if not await run_in_threadpool(_save_board, bid, used[-1] if used else None):
+            return JSONResponse(status_code=503, content={"detail": "Your change was not saved. Please try again."})
         auth = request.headers.get("authorization", "")
         if auth:
             await run_in_threadpool(lambda: _remember_board(_uid(auth), bid))
@@ -311,13 +326,6 @@ def get_branch_readiness(screen_id: str) -> Dict[str, Any]:
         return readiness.model_dump()
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
-
-
-@app.post("/api/inspect")
-def run_socratic_inspection() -> Dict[str, Any]:
-    """Runs automated Socratic Question Engine checklists over the entire graph."""
-    results = SocraticQuestionEngine(_board()).run_full_graph_inspection()
-    return results
 
 
 @app.post("/api/questions/{question_id}/resolve")
@@ -690,6 +698,7 @@ def get_blast_radius(node_id: str) -> Dict[str, Any]:
 def _set_graph(new_graph) -> None:
     """Replaces the current request's board."""
     boards[_board_id.get()] = new_graph
+    _touch(new_graph)
 
 
 LAYER_CLASSES = {c.model_fields["layer"].default.value: c for c in
@@ -721,7 +730,10 @@ class RestoreRequest(BaseModel):
 @app.post("/api/restore")
 def restore_board(payload: RestoreRequest) -> Dict[str, Any]:
     """Rebuilds a board from the copy the browser kept (after the server slept)."""
-    old, new = _board(), _rebuild(payload.model_dump())
+    old = _board()
+    if old.nodes:  # restore only refills a board the server lost; it never overwrites one that has content
+        return get_graph_state()
+    new = _rebuild(payload.model_dump())
     if getattr(old, "owner", "") or getattr(old, "invites", {}):  # a browser copy may not change who owns the board
         new.owner, new.invites = old.owner, getattr(old, "invites", {})
     elif "invites" in payload.model_fields_set:
