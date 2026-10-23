@@ -87,6 +87,29 @@ field app), run before and after each change, scored without a model judge: deci
 questions repeating an answered one (under 5%), risky steps with a failure exit (100%), names that agree across the 6
 docs, and tokens per accepted decision (must not rise). `scripts/eval_questions.py` is the start of this.
 
+## Second review (23 Oct 2026, Argon, on our real stack)
+
+Checked against Nebius's own docs: **prefix caching on Token Factory is implicit and automatic** (no key or opt-in, best
+effort), the cache is shared within one model, and the response reports `usage.prompt_tokens_details.cached_tokens`
+(`prompt_tokens` includes cached tokens). `prompt_cache_key` only helps routing and is not a security boundary. So a
+Plan call and a Docs call that both use Ultra share a cache only if their prompts start with the same bytes.
+
+Rules added by the review:
+13. **Pass structure, not prose, between calls.** Screens, Plan and Docs get a compact table of flows, screens, APIs and
+    decisions, not the 40,000 to 60,000 character Markdown Brief; the Brief is only for the human to read.
+14. **Server-side ids only.** The model never invents short ids; it refers to existing ones or a temporary reference,
+    and the server mints the next FL, S, B, A, D, Q number from a counter that never goes back (deleted ids are archived).
+15. **Put required behaviour in the schema,** not only in prose: risky steps carry required failure exits; a decision
+    carries `topic_key`, `is_model_pick` and `rejected_values`. A required field is something a cheaper model cannot
+    forget without failing validation and retrying.
+16. **Split the Docs call** into three (TRD, design brief, schema) that share one prefix, so each has room to write and
+    a validation error redoes one document, not all three.
+17. **Guard board writes.** One lock per board around read, model call and write (a slow model call must not drop a
+    teammate's answer), and a bounded memory cache.
+18. **MCP work package** under about 2,500 tokens: role and guardrails (do not read the person's local files, do not write
+    app code), the decision digest, the slice, what changed this round, the reply contract, and the board revision so a
+    stale answer is refused.
+
 ## Order of work (after the 30 Oct submission)
 
 1. A single prompt compiler (rules 2, 3, 4, 5): shared prefix, slices by structure, decisions at the tail; cache hits
