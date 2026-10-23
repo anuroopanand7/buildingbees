@@ -188,6 +188,10 @@ Every call takes the board id in an `X-Board` header or a `?board=` query parame
 | GET | `/api/share?board=` | The whole plan as one standalone interactive web page, no sign-in |
 | POST | `/api/restore`, `/api/reset` | Put a saved board back; clear the board |
 
+## The 6 docs (stage three)
+
+After flows and screens, the Brief viewer has a tab for each document a team needs before an agent writes code: **PRD, TRD, App flow, UI/UX design brief, Backend schema, Implementation plan**, plus **AGENTS.md**, the build prompt. Each shows how much of it is decided. PRD, app flow and plan are cut from the board with no AI call; "Write the tech docs" makes one engine call (Nemotron Ultra on the NVIDIA track) for the TRD, the design brief and the schema, and any team choice it cannot make (which WhatsApp provider, parent consent) comes back as a question from the bee that owns it, never as a guess; engineering defaults it proposes are labelled "(recommended)". "All docs (.zip)" downloads `docs/*.md` and `AGENTS.md` for a repo; agents read them with the MCP tool `get_doc`.
+
 ## For coding agents (MCP)
 
 `scripts/mcp_server.py` makes BuildingBees an MCP server (standard library only), so a coding agent can read the plan and talk back to the bees while it builds:

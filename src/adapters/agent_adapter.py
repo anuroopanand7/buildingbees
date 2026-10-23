@@ -16,12 +16,12 @@ from typing import Dict, List, Optional
 from fastapi import HTTPException
 
 from src.adapters.spec_prompts import (
-    FlowsExtract, PlanExtract, INTERROGATE_PROMPT, QuestionList, Reaction, SpecExtract, XQuestion, FLOWS_PROMPT,
+    DOCS_PROMPT, DocsExtract, FlowsExtract, PlanExtract, INTERROGATE_PROMPT, QuestionList, Reaction, SpecExtract, XQuestion, FLOWS_PROMPT,
     INGEST_PROMPT, PLAN_PROMPT,
 )
 
 # One stored answer per board and per kind of call; an answer is used once.
-SCHEMAS = {"flows": FlowsExtract, "spec": SpecExtract, "react": Reaction, "plan": PlanExtract, "questions": QuestionList}
+SCHEMAS = {"docs": DocsExtract, "flows": FlowsExtract, "spec": SpecExtract, "react": Reaction, "plan": PlanExtract, "questions": QuestionList}
 
 
 class NeedAgent(HTTPException):
@@ -81,6 +81,10 @@ class AgentAdapter:
     def write_plan(self, board_text: str) -> PlanExtract:
         """User stories, features, build order, glossary."""
         return self._take("plan", PLAN_PROMPT + board_text)
+
+    def write_docs(self, board_text: str) -> DocsExtract:
+        """The TRD, design brief and schema."""
+        return self._take("docs", DOCS_PROMPT + board_text)
 
     def interrogate(self, node_id: str, context_json: str, asked: List[str]) -> List[XQuestion]:
         """More questions on one screen, button or API."""

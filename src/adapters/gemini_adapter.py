@@ -10,7 +10,7 @@ import os
 from typing import List, Optional
 
 from src.adapters.spec_prompts import (  # noqa: F401  (re-exported for callers)
-    FLOWS_PROMPT, FlowsExtract, PLAN_PROMPT, PlanExtract, INGEST_PROMPT, INTERROGATE_PROMPT, QuestionList, Reaction, SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
+    DOCS_PROMPT, DocsExtract, FLOWS_PROMPT, FlowsExtract, PLAN_PROMPT, PlanExtract, INGEST_PROMPT, INTERROGATE_PROMPT, QuestionList, Reaction, SpecExtract, XAPI, XCTA, XFlow, XQuestion, XScreen, XUser,
 )
 
 DEFAULT_MODEL = "gemini-3.7-flash"  # strong and steady: 24 s on a full flow plan (17 Oct 2026)
@@ -148,6 +148,10 @@ class GoogleGeminiAdapter:
     def write_plan(self, board_json: str) -> PlanExtract:
         """Writes user stories with acceptance criteria, a feature list, a build order and a glossary from the board."""
         return self._generate([PLAN_PROMPT + board_json], PlanExtract)
+
+    def write_docs(self, board_text: str) -> DocsExtract:
+        """Writes the TRD, the design brief and the backend schema from the board."""
+        return self._generate([DOCS_PROMPT + board_text], DocsExtract)
 
     def interrogate(self, node_id: str, context_json: str, asked: List[str]) -> List[XQuestion]:
         """Looks for further product questions on one screen, button or API."""

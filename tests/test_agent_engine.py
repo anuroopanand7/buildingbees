@@ -144,3 +144,40 @@ def test_a_failed_save_is_reported_not_hidden(monkeypatch):
     monkeypatch.setattr(server, "_save_board", lambda bid, g=None: False)
     r = client.post("/api/agent/answer", json={"kind": "flows", "answer": FLOWS.model_dump()}, headers={"X-Board": "save-fails"})
     assert r.status_code == 503 and "not saved" in r.json()["detail"]
+
+
+def test_six_docs_from_the_board_and_the_docs_call(monkeypatch):
+    """Stage three: PRD, app flow and plan come from the board; TRD, design brief and schema from one engine call,
+    whose open team choices become questions; everything zips for a repo."""
+    import io
+    import zipfile
+    from src.adapters.spec_prompts import DocsExtract, XQuestion, XTable, XColumn, XTech, XToken
+    from tests.test_gemini_ingest import FakeGemini
+    fake = FakeGemini()
+    flow_id = FLOWS.flows[0].id
+    fake.write_docs = lambda text: DocsExtract(
+        problem="Buyers cannot order soap online.", success_metric="20 orders in the first month",
+        stack=[XTech(area="Payments", choice="NOT DECIDED (open question: which provider?)"),
+               XTech(area="Database", choice="PostgreSQL")],
+        design_tokens=[XToken(name="primary", value="#FFC800", use="buttons")],
+        tables=[XTable(name="orders", columns=[XColumn(name="id", type="uuid")], access="buyer reads own")],
+        questions=[XQuestion(target_id=flow_id, category="DESIGN", question="Which brand colours should the shop use?",
+                             is_blocking=True, suggested_options=["Warm yellow", "Calm green"])])
+    monkeypatch.setitem(server.engines, "gemini", fake)
+    monkeypatch.setattr(server.tavily, "research", lambda text: [])
+    h = {"X-Board": "six-docs"}
+    server.boards.pop(h["X-Board"], None)
+    client.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "a soap shop"}, headers=h)
+    assert client.post("/api/docs?engine=gemini", headers=h).status_code == 400  # screens come first
+    client.post("/api/expand?engine=gemini", headers=h)
+    before = {d["name"]: d for d in client.get("/api/docs", headers=h).json()["docs"]}
+    assert before["trd"]["ready"] == 0 and "Not written yet" in before["trd"]["markdown"]
+    g = client.post("/api/docs?engine=gemini", headers=h).json()
+    assert any(n.get("question_text") == "Which brand colours should the shop use?" for n in g["nodes"])  # asked, not guessed
+    docs = {d["name"]: d for d in client.get("/api/docs", headers=h).json()["docs"]}
+    assert set(docs) == {"prd", "trd", "flow", "design", "schema", "plan", "agents"}
+    assert "20 orders" in docs["prd"]["markdown"] and "#FFC800" in docs["design"]["markdown"]
+    assert "PostgreSQL (recommended)" in docs["trd"]["markdown"]  # a pick nobody made is labelled, never passed off as decided
+    assert "buyer reads own" in docs["schema"]["markdown"] and "NOT DECIDED" in docs["agents"]["markdown"]
+    names = zipfile.ZipFile(io.BytesIO(client.get("/api/docs.zip", headers=h).content)).namelist()
+    assert "AGENTS.md" in names and "docs/SCHEMA.md" in names

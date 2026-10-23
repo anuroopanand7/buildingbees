@@ -4,7 +4,7 @@ Provides REST endpoints and state synchronization for the Semantic Zoom Canvas,
 Socratic Question Engine, and Dual Hackathon Track Adapters.
 """
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, PlainTextResponse
@@ -13,6 +13,7 @@ from typing import Dict, Any, List, Optional
 import datetime
 import hashlib
 import json
+import re
 import logging
 import os
 import time
@@ -43,6 +44,7 @@ from src.core.schema import (
 )
 from src.adapters.gemini_adapter import GoogleGeminiAdapter
 from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
+from src.core.docs import build_docs
 from src.core.agent_view import decision_log, item as plan_item, ready_wave
 from src.adapters.agent_adapter import AgentAdapter, NeedAgent, SCHEMAS as AGENT_SCHEMAS
 from src.adapters.nvidia_adapter import pdf_to_text
@@ -308,6 +310,7 @@ def _state(graph: BuildingBeesEngine) -> Dict[str, Any]:
         "roster": [{"name": i.get("name", ""), "role": i["role"], "joined": bool(i.get("name"))}  # never the tokens
                    for i in getattr(graph, "invites", {}).values() if not i.get("revoked")],
         "plan": getattr(graph, "plan", None),
+        "docs": getattr(graph, "docs", None),
         "plan_decisions": getattr(graph, "plan_decisions", 0),
         "last_call": getattr(graph, "last_call", None),  # engine pill: which model answered, how fast
         # Stage one agrees the flows; screens are only drawn after that.
@@ -721,6 +724,7 @@ class RestoreRequest(BaseModel):
     mode: str = "solo"
     owner: str = ""
     plan: Optional[Dict[str, Any]] = None
+    docs: Optional[Dict[str, Any]] = None
     plan_decisions: int = 0
     needs_redraw: bool = False
     nodes: List[Dict[str, Any]]
@@ -760,6 +764,7 @@ def _rebuild(d: Dict[str, Any]) -> BuildingBeesEngine:
     g.owner = d.get("owner", "")
     g.invites = dict(d.get("invites") or {})
     g.plan, g.plan_decisions = d.get("plan"), int(d.get("plan_decisions") or 0)
+    g.docs = d.get("docs")
     g.needs_redraw = bool(d.get("needs_redraw"))
     for n in d["nodes"][:2000]:
         cls = LAYER_CLASSES.get(n.get("layer"))
@@ -916,6 +921,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     g.owner = getattr(old, "owner", "")
     g.invites = getattr(old, "invites", {})
     g.plan, g.plan_decisions = getattr(old, "plan", None), getattr(old, "plan_decisions", 0)
+    g.docs = getattr(old, "docs", None)
     strip_guesses(g, g.spec_text + " " + " ".join(q.answer_text or "" for q in decisions))
     for f in flows:  # the steps the user agreed to stay on the flow
         if f.id in g.nodes:
@@ -1191,6 +1197,55 @@ def get_brief() -> str:
     if not graph.nodes:
         raise HTTPException(status_code=404, detail="There is nothing on the board yet")
     return build_brief(_board())
+
+
+@app.post("/api/docs")
+def write_docs(engine: str) -> Dict[str, Any]:
+    """Stage three: the TRD, the UI/UX design brief and the backend schema, in one engine call. Team choices the board
+    has not made come back as questions from the bee that owns them, never as guesses."""
+    eng = _engine(engine)
+    g = _board()
+    if not any(n.layer.value == "SCREEN" for n in g.nodes.values()):
+        raise HTTPException(status_code=400, detail="Draw the screens first; the docs are written from them")
+    started = time.time()
+    try:
+        x = eng.write_docs(audience(g) + "\n\n" + build_brief(g)[:40000])
+    except NeedAgent:
+        raise  # bring your own AI: hand the prompt to the person's agent, not a 502
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"{eng.label} could not write the docs: {e}")
+    _trace(g, eng, started)
+    added = add_questions(g, x.questions[:6])
+    g.round_questions = list(getattr(g, "round_questions", []) or []) + [q.id for q in added]  # asked in this round
+    # The model does not always label its own picks; a stack choice nobody on the board said is marked recommended.
+    said = (getattr(g, "spec_text", "") + " " + " ".join(q.answer_text or "" for q in g.nodes.values()
+                                                       if isinstance(q, QuestionNode))).lower()
+    for t in x.stack:
+        low, word = t.choice.lower(), re.sub(r"[^a-z0-9]", "", t.choice.split()[0].lower()) if t.choice.split() else ""
+        if "not decided" not in low and "(recommended)" not in low and word and word not in said:
+            t.choice += " (recommended)"
+    g.docs = x.model_dump(exclude={"questions"})
+    return get_graph_state()
+
+
+@app.get("/api/docs")
+def get_docs(request: Request) -> Dict[str, Any]:
+    """The 6 docs and AGENTS.md as Markdown, each with how ready it is (no model call)."""
+    link = f"{str(request.base_url).rstrip('/')}/?board={_board_id.get()}"
+    return {"docs": build_docs(_board(), link)}
+
+
+@app.get("/api/docs.zip")
+def get_docs_zip(request: Request):
+    """All the docs as one zip a team drops into their repo, so a coding agent finds them."""
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for d in get_docs(request)["docs"]:
+            z.writestr(f"docs/{d['file']}" if d["file"] != "AGENTS.md" else "AGENTS.md", d["markdown"])
+    return Response(buf.getvalue(), media_type="application/zip",
+                    headers={"Content-Disposition": 'attachment; filename="buildingbees-docs.zip"'})
 
 
 @app.get("/api/plan-check")

@@ -2,7 +2,7 @@
 
 from typing import List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # ---- Structured output schemas (what Gemini must return) ----
@@ -234,6 +234,86 @@ Rules:
 - glossary: 3 to 10 of the product's own words, each with a one-line meaning.
 - Follow the AUDIENCE for the voice: everyday words for one founder, precise technical terms for a team.
 - No em dashes.
+
+THE BOARD (its current Brief, Markdown):
+"""
+
+
+class XTech(BaseModel):
+    """One technical choice for the TRD: an area (frontend, database, hosting, payments) and what is used."""
+    area: str
+    choice: str           # the decided choice, or "NOT DECIDED (open question: ...)"
+    why: str = ""
+
+
+class XToken(BaseModel):
+    """One design token for the UI/UX brief (a colour, a radius, a spacing step)."""
+    name: str
+    value: str
+    use: str = ""
+
+
+class XColumn(BaseModel):
+    name: str
+    type: str
+    note: str = ""
+
+
+class XTable(BaseModel):
+    """One table of the backend schema, with who may read and write it."""
+    name: str
+    columns: List[XColumn]
+    relations: List[str] = []
+    access: str = ""
+
+
+class DocsExtract(BaseModel):
+    """What the board does not hold yet for the 6 docs a team needs before building (Roger, 23 Oct 2026):
+    the TRD, the UI/UX design brief and the backend schema, plus the PRD's problem and success metric."""
+    problem: str
+    success_metric: str
+    stack: List[XTech] = []
+    architecture: str = ""
+    integrations: List[str] = []
+    security: List[str] = []
+    nonfunctional: List[str] = []
+    design_tokens: List[XToken] = []
+    typography: str = ""
+    components: List[str] = []
+    voice: str = ""
+    accessibility: List[str] = []
+    tables: List[XTable] = Field(min_length=1)  # required: a long reply tends to drop the last field, so validation makes the model retry
+    questions: List[XQuestion] = []
+
+
+DOCS_PROMPT = """You are the BuildingBees tech lead and design lead. The board below is the agreed plan of a product. Write
+what a team still needs, next to the PRD, app flow and build plan the board already has: the technical requirements
+(TRD), the UI/UX design brief, and the backend schema.
+
+Rules:
+- Use the board: its flows, screens, buttons, APIs, data, decisions and what is out of scope. Never invent a business
+  rule, a number or a feature, and never present your own pick as decided.
+- Anything the board has not decided is one of two kinds. (a) A choice that changes the product for its users or its
+  money (which payment or messaging provider, who can see whose data, consent, the brand colours if the founder has a
+  brand): write "NOT DECIDED (open question: ...)" and ask it in "questions", with 2 to 4 suggested_options, the one
+  you recommend first. (b) An engineering default a team can change later (framework, database, hosting, spacing):
+  you may recommend it, and end the choice with " (recommended)". At most 6 questions, never about standard
+  details (password rules, time-outs, page sizes).
+  Question categories: BACKEND for stack, schema and integrations; DESIGN for the design brief; COMPLIANCE for
+  privacy, security and data rules. target_id is a flow or screen id from the board.
+- problem: the user's problem in one sentence. success_metric: one measurable sign the product works, from the
+  board's decisions; NOT DECIDED with a question if the board has none.
+- TRD: stack (frontend, backend, database, auth, hosting, payments or messaging when the product has them),
+  architecture in 2 to 4 sentences, integrations (each third-party service and what it is for), security (sign-in,
+  roles, who sees what, personal data kept and for how long), nonfunctional (speed, scale, offline, languages)
+  only where the board implies them.
+- Design brief: design_tokens (6 to 10: colours with hex values, radius, spacing) that fit the product's users, each
+  "use" ending with " (recommended)" unless the board decided it;
+  typography; components (the reusable parts the screens need, read off the wireframes: buttons, cards, inputs,
+  lists); voice (how the product speaks); accessibility (3 to 5 concrete checks).
+- Schema: tables for every entity the flows store, columns with types, relations, and "access": who may read
+  and write the table. Use the board's own words for names.
+- Follow the AUDIENCE for the words. Use the board's ids (FL1, S2, A1) when you point at a part. No em dashes.
 
 THE BOARD (its current Brief, Markdown):
 """

@@ -49,6 +49,10 @@ TOOLS = [
     {"name": "decision_log", "description": "Who decided what and when, and which options they turned down. Read it before "
      "changing behaviour that a person decided.",
      "inputSchema": {"type": "object", "properties": {"board": {"type": "string"}}, "required": ["board"]}},
+    {"name": "get_doc", "description": "One of the 6 docs a team needs before building, as Markdown with how ready it is: "
+     "prd, trd, flow, design, schema, plan, or agents (AGENTS.md, the build prompt). Read agents first.",
+     "inputSchema": {"type": "object", "properties": {"board": {"type": "string"}, "name": {"type": "string"}},
+                     "required": ["board", "name"]}},
     {"name": "start_board", "description": "Bring your own AI: start a new board from an idea, with YOUR model doing the bees' "
      "thinking (no BuildingBees model cost). Returns a board id, a link the person can open to watch the board, and a task: "
      "a prompt plus a JSON Schema. Answer the task with submit_answer. mode is 'solo' or 'team'.",
@@ -143,6 +147,12 @@ def run_tool(name: str, args: dict) -> str:
         d = _call("/api/decisions", b)["decisions"]
         return "\n".join(f"- [{x['about']}] {x['question']} => {x['decision']} (by {x['decided_by']}, {x['decided_at'][:16]})"
                          + (f"; turned down: {', '.join(x['turned_down'])}" if x["turned_down"] else "") for x in d) or "No decisions yet."
+    if name == "get_doc":
+        docs = {d["name"]: d for d in _call("/api/docs", b)["docs"]}
+        d = docs.get(args.get("name", ""))
+        if not d:
+            raise ValueError(f"name must be one of {sorted(docs)}")
+        return f"({d['ready']}% decided)\n\n{d['markdown']}"
     if name == "start_board":
         b = "agent-" + secrets.token_hex(4)  # a fresh board; the id is also the link
         return f"Board {b} started.\n" + _task_or_done(b, "/api/ingest-prd?engine=agent",

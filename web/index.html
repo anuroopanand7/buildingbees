@@ -740,6 +740,15 @@
   .rate-chip[aria-pressed="true"] { background: var(--bee); border-color: var(--ink); font-weight: 600; }
   .team-row { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; }
   .team-row .muted { flex: 1; }
+  .doc-tabs { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 18px 0; }
+  .doc-tabs:empty { display: none; }
+  .doc-tabs button { border: 1.5px solid var(--line-strong); border-radius: 999px; background: var(--panel); padding: 4px 10px; font: inherit; font-size: 12.5px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; color: var(--ink); }
+  .doc-tabs button[aria-selected="true"] { background: var(--bee); border-color: var(--ink); font-weight: 600; }
+  .doc-tabs .pct { font-size: 11px; color: var(--muted); }
+  .doc-tabs .pct.done { color: #1a7f37; }
+  .bee-trail { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 27; overflow: visible; }
+  .bee-trail polyline { fill: none; stroke: var(--ink); stroke-width: 2; stroke-dasharray: 2 7; stroke-linecap: round; opacity: .55; }
+  .bee-flyer { position: fixed; left: 0; top: 0; width: 36px; height: 36px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1.5px var(--ink); pointer-events: none; z-index: 28; }
 </style>
 </head>
 <body>
@@ -928,14 +937,17 @@
   <div class="brief-sheet">
     <div class="brief-bar"><b>Product brief</b>
       <button class="btn" id="briefPlan" title="User stories with acceptance criteria, a feature list and a build order, written from the board"><i class="ph ph-list-checks" aria-hidden="true"></i>Write the full plan</button>
+      <button class="btn" id="briefDocs" title="The TRD, the UI/UX design brief and the backend schema, written from the screens (one AI call); team choices come back as questions"><i class="ph ph-files" aria-hidden="true"></i>Write the tech docs</button>
       <button class="btn primary" id="briefSign" title="Approve this scope as it stands"><i class="ph ph-seal-check" aria-hidden="true"></i>Sign off</button>
       <button class="btn" id="briefCopy"><i class="ph ph-copy" aria-hidden="true"></i>Copy</button>
       <button class="btn" id="briefAgent" title="A link an AI coding agent (Claude Code, Cursor, Jules) can read to build from this plan"><i class="ph ph-robot" aria-hidden="true"></i>Copy link for an AI builder</button>
       <button class="btn" id="briefDownload"><i class="ph ph-download-simple" aria-hidden="true"></i>Download</button>
+      <button class="btn" id="docsZip" title="PRD, TRD, app flow, design brief, schema, plan and AGENTS.md in one zip, ready to drop into a repo"><i class="ph ph-file-zip" aria-hidden="true"></i>All docs (.zip)</button>
       <button class="btn" id="briefShare" title="One web page with the whole plan, for someone who will not sign in"><i class="ph ph-globe" aria-hidden="true"></i>Share as a web page</button>
       <button class="btn" id="briefPrint"><i class="ph ph-printer" aria-hidden="true"></i>Print or save as PDF</button>
       <button class="icon-btn" id="briefClose" aria-label="Close brief"><i class="ph ph-x" aria-hidden="true"></i></button>
     </div>
+    <div class="doc-tabs" id="docTabs" role="tablist" aria-label="The 6 docs"></div>
     <div id="briefBody"></div>
   </div>
 </div>
@@ -950,14 +962,16 @@
 const ENGINE_COPY = { gemini: "Google Gemini", nvidia: "NVIDIA Nemotron" };
 // One bee per aspect of the product. The engine labels every question with the bee that asks it.
 const BEES = {
-  PM: ["Queen Bee", "product and scope", "ph-crown-simple", "Who is this for, and what is out of scope?"],
-  DESIGN: ["Design Bee", "experience", "ph-palette", "What does the person see first?"],
-  FRONTEND: ["Frontend Bee", "screens and states", "ph-browser", "What shows while it loads, or when it is empty?"],
-  BACKEND: ["Backend Bee", "data and integrations", "ph-database", "Which services does it talk to, and what if one is slow?"],
-  TESTER: ["Test Bee", "edge cases", "ph-bug", "What happens when two people do this at once?"],
-  COMPLIANCE: ["Compliance Bee", "privacy and rules", "ph-shield-check", "What data do we keep, and are we allowed to?"],
+// Each bee has a name and a way of thinking, so people remember who asked what (Roger, 23 Oct 2026: bees with character).
+  PM: ["Queen Bee", "product and scope", "ph-crown-simple", "Who is this for, and what is out of scope?", "Rani", "Decisive. Keeps the first version small."],
+  DESIGN: ["Design Bee", "experience", "ph-palette", "What does the person see first?", "Kala", "Notices how a screen feels before how it works."],
+  FRONTEND: ["Frontend Bee", "screens and states", "ph-browser", "What shows while it loads, or when it is empty?", "Pixel", "Checks every state a screen can be in."],
+  BACKEND: ["Backend Bee", "data and integrations", "ph-database", "Which services does it talk to, and what if one is slow?", "Bolt", "Asks where the data lives and what breaks first."],
+  TESTER: ["Test Bee", "edge cases", "ph-bug", "What happens when two people do this at once?", "Nosy", "Tries to break everything, politely."],
+  COMPLIANCE: ["Compliance Bee", "privacy and rules", "ph-shield-check", "What data do we keep, and are we allowed to?", "Shield", "Guards people's data and the rules."],
 };
 const bee = (cat) => BEES[cat] || BEES.PM;
+const beeTitle = (cat) => `${bee(cat)[4]} the ${bee(cat)[0]}`;
 // Each bee has its own still portrait (Gemini art, one shared body, a prop per role); unknown roles fall back to the Queen.
 const beeIcon = (cat, sm) => `<span class="bee ${sm ? "sm" : ""}" aria-hidden="true"><img src="/bees/${BEES[cat] ? cat : "PM"}.png" alt="" width="30" height="30" decoding="async"></span>`;
 const MAX_ROUNDS = 3; // shortcut: caps automatic deep-dives per board to protect the free model quota
@@ -1436,7 +1450,7 @@ function renderPM() {
   const now = pmQueue()[0]?.category;
   $("hive").innerHTML = Object.keys(BEES).map((c) => {
     const n = open.filter((q) => q.category === c).length, asked = all.filter((q) => q.category === c).length;
-    const tip = `${bee(c)[0]}: ${bee(c)[1]}\n${n ? `${n} question${n > 1 ? "s" : ""} for you. Click to hear only from this bee.` : asked ? "All answered" : "Nothing to ask yet"}`;
+    const tip = `${beeTitle(c)}: ${bee(c)[1]}. ${bee(c)[5]}\n${n ? `${n} question${n > 1 ? "s" : ""} for you. Click to hear only from this bee.` : asked ? "All answered" : "Nothing to ask yet"}`;
     return `<button data-bee="${c}" aria-pressed="${PM.bee === c}" class="${n ? "" : "quiet"} ${c === now ? "asking" : ""}" aria-label="${esc(bee(c)[0])}, ${n} open" data-tip="${esc(tip)}" data-tip-pos="right">${beeIcon(c)}${n ? `<span class="badge">${n}</span>` : asked ? '<span class="done"><i class="ph ph-check" aria-hidden="true"></i></span>' : ""}</button>`;
   }).join("") + (S.sources?.length ? `<button data-scout aria-label="Scout Bee: ${S.sources.length} pages read" data-tip="Scout Bee: research\nRead ${S.sources.length} pages before the bees asked. Click to see them." data-tip-pos="right"><span class="bee" aria-hidden="true"><i class="ph ph-binoculars"></i></span></button>` : "");
   // Collapsed question: a single line that says who is waiting.
@@ -1444,14 +1458,14 @@ function renderPM() {
   $("dockPill").innerHTML = waiting ? `${beeIcon(waiting.category, true)}<span><b>${esc(bee(waiting.category)[0])}</b> has a question for you</span><i class="ph ph-caret-up" aria-hidden="true"></i>` : `${beeClip("idle")}<span>No questions waiting</span><i class="ph ph-caret-up" aria-hidden="true"></i>`;
 
   const thread = $("thread");
-  const hello = `<div class="msg-row">${beeIcon("PM")}<div class="msg-body"><div class="who">Queen Bee <span>product and scope</span></div><div class="bubble">${S.stage === "flows"
+  const hello = `<div class="msg-row">${beeIcon("PM")}<div class="msg-body"><div class="who">Rani the Queen Bee <span>product and scope</span></div><div class="bubble">${S.stage === "flows"
     ? "Hi, we are your product team. We read your idea and sketched the flows on the right. Before anyone draws a screen, each of us has a few questions."
     : "The screens are drawn from your decisions. Now we go through them one by one."}</div></div></div>`;
   // Scout Bee: the pages read on the web before anyone asked a question.
   const scout = S.sources?.length ? `<div class="msg-row"><span class="bee" aria-hidden="true"><i class="ph ph-binoculars"></i></span><div class="msg-body"><div class="who">Scout Bee <span>research</span></div><div class="bubble">Before we asked anything, I read ${S.sources.length} page${S.sources.length === 1 ? "" : "s"} about products like yours. Where a question comes from one, it says so.<details class="read"><summary>Show the ${S.sources.length} page${S.sources.length === 1 ? "" : "s"}</summary><ol class="sources">${S.sources.map((s) => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a></li>`).join("")}</ol></details></div></div></div>` : "";
   const cite = (q) => q.metadata?.cite?.url ? `<div class="cite"><img class="scout" src="/bees/SCOUT.png" alt="" width="20" height="20"> From the Scout Bee's reading: <a href="${esc(q.metadata.cite.url)}" target="_blank" rel="noopener noreferrer">${esc(q.metadata.cite.title)}</a></div>` : "";
   thread.innerHTML = hello + scout + done.map((q) => `
-    <div class="msg-row">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(bee(q.category)[0])}</div><div class="bubble">${esc(q.question_text)}</div></div></div>
+    <div class="msg-row">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(beeTitle(q.category))}</div><div class="bubble">${esc(q.question_text)}</div></div></div>
     <div class="mine"><div class="bubble">${esc(q.answer_text)}</div><div>${q.metadata?.default ? '<span class="by">Standard default</span>' : q.metadata?.answered_by ? `<span class="by">${esc(q.metadata.answered_by)}</span>` : ""}<button class="link" data-reopen="${esc(q.id)}">Change</button></div></div>
     ${q.metadata?.note ? `<div class="msg-row">${beeIcon(q.category)}<div class="msg-body"><div class="bubble">${esc(q.metadata.note)}</div></div></div>` : ""}`).join("");
   [...thread.children].slice(PM.seenThread ?? 0).forEach((m, i) => { m.classList.add("enter"); m.style.setProperty("--i", i); });
@@ -1501,7 +1515,7 @@ function renderPM() {
     const t = S.nodes[q.target_node_id];
     const details = open.filter((o) => o.metadata?.source === "BuildingBees").length; // routine gaps, not a bee's question
     ask.innerHTML = `
-      <div class="msg-row" style="margin-bottom:8px">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(bee(q.category)[0])} <span>about ${stepOf(q) ? `<span class="num on">${q.metadata.step}</span> <b class="about">${esc(stepOf(q))}</b>` : `<button class="link open" data-id="${esc(q.target_node_id)}">${esc(t ? (t.label || t.title) : q.target_node_id)}</button>`}</span></div></div></div>
+      <div class="msg-row" style="margin-bottom:8px">${beeIcon(q.category)}<div class="msg-body"><div class="who">${esc(beeTitle(q.category))} <span>about ${stepOf(q) ? `<span class="num on">${q.metadata.step}</span> <b class="about">${esc(stepOf(q))}</b>` : `<button class="link open" data-id="${esc(q.target_node_id)}">${esc(t ? (t.label || t.title) : q.target_node_id)}</button>`}</span></div></div></div>
       <div class="question">${esc(q.question_text)}</div>
       ${q.metadata?.why ? `<div class="why"><i class="ph ph-lightbulb" aria-hidden="true"></i> ${esc(q.metadata.why)}</div>` : ""}
       ${cite(q)}
@@ -1661,7 +1675,7 @@ document.addEventListener("click", (e) => {
 });
 function renderNoteList() {
   const list = notesOn(NOTE_AT.target, NOTE_AT.step, NOTE_AT.path), qs = questionsOn(NOTE_AT.target, NOTE_AT.step, NOTE_AT.path);
-  $("noteList").innerHTML = qs.map((q) => `<div class="note-item ask"><div class="who">${beeIcon(q.category, true)}<b>${esc(bee(q.category)[0])}</b><span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Needed before building" : "Good to know"}</span></div>
+  $("noteList").innerHTML = qs.map((q) => `<div class="note-item ask"><div class="who">${beeIcon(q.category, true)}<b>${esc(beeTitle(q.category))}</b><span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Needed before building" : "Good to know"}</span></div>
       <p class="q">${esc(q.question_text)}</p>${q.metadata?.why ? `<p class="why"><i class="ph ph-lightbulb" aria-hidden="true"></i> ${esc(q.metadata.why)}</p>` : ""}
       ${q.suggested_options?.length ? `<div class="options">${q.suggested_options.map((o, i) => `<button class="option" data-fill="${esc(q.id)}" data-fopt="${esc(o)}">${esc(o)}${i === 0 && q.metadata?.why ? '<span class="rec">Recommended</span>' : ""}</button>`).join("")}</div>` : ""}
       <div class="send-row"><input id="reply-${esc(q.id)}" placeholder="Reply to the bee" autocomplete="off" aria-label="Your reply"><button class="btn primary sm" data-reply="${esc(q.id)}">Reply</button>${q.suggested_options?.length ? `<button class="link" data-reply-decide="${esc(q.id)}"><i class="ph ph-magic-wand" aria-hidden="true"></i> Decide for me</button>` : ""}</div>${rateRow(q)}</div>`).join("") + list.map((c) => `<div class="note-item"><p>${esc(c.text)}</p><span class="muted">${esc(c.by || "You")} · ${c.status === "open" ? "waiting" : "applied"}</span>${c.status === "open" ? `<button class="link" data-note-del="${esc(c.id)}">Take back</button>` : ""}</div>`).join("");
@@ -1701,6 +1715,24 @@ async function updateBoard() {
   await load();
   if (!PM.error) toast(roundLeft() ? `Round ${S.round - 1} done. Round ${S.round}: ${roundLeft()} question${roundLeft() > 1 ? "s" : ""}.` : `Round ${S.round - 1} done. Nothing blocks the build now: draw the screens when you are ready.`, "done");
   reveal(document.querySelector("#flows .changed"));
+  setTimeout(beeTrail, 700);  // after the board has scrolled to the first change
+}
+// The bee trail (Gemini brainstorm, 23 Oct 2026): after an update the Queen Bee flies over what changed, leaving a dotted
+// line, so people see where the board moved instead of hunting for it. Skipped under reduced motion.
+function beeTrail() {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const pts = [...document.querySelectorAll("#flows .changed")].slice(0, 6).map((el) => el.getBoundingClientRect())
+    .filter((r) => r.bottom > 0 && r.top < innerHeight && r.width).map((r) => [r.left + r.width / 2, r.top + 6]);
+  if (!pts.length) return;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "bee-trail"); svg.setAttribute("aria-hidden", "true");
+  svg.innerHTML = `<polyline points="${pts.map((p) => p.join(",")).join(" ")}" />`;
+  const img = Object.assign(document.createElement("img"), { src: "/bees/PM.png", alt: "", className: "bee-flyer" });
+  document.body.append(svg, img);
+  const hop = 550, frames = pts.map(([x, y]) => ({ transform: `translate(${x - 18}px, ${y - 36}px)` }));
+  img.animate(frames.length > 1 ? frames : [frames[0], frames[0]], { duration: hop * Math.max(1, pts.length - 1), easing: "ease-in-out", fill: "forwards" })
+    .finished.then(() => { svg.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 900, delay: 600, fill: "forwards" }).finished.then(() => svg.remove());
+                          img.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, delay: 600, fill: "forwards" }).finished.then(() => img.remove()); });
 }
 // Solo founders answer in sets: every open question about one flow or screen (3 to 7, topped up from what
 // comes next), then ONE call applies them all and the board redraws once. Teams stay one question at a time,
@@ -1727,7 +1759,7 @@ function renderSet(ask, cite) {
       <span class="muted">Round ${S.round} has ${roundLeft()} question${roundLeft() === 1 ? "" : "s"} left${later ? ` (${later} more wait for round ${S.round + 1})` : ""}. Nothing on the board changes until you press Update the board.</span></div>
     ${set.map((q, n) => { const d = PM.draft[q.id] || { opts: [], text: "" }; return `
       <div class="set-q ${draftText(d) ? "done" : ""}">
-        <div class="who">${beeIcon(q.category, true)}<b>${esc(bee(q.category)[0])}</b>${stepOf(q) ? ` <span class="muted">about step ${q.metadata.step}, ${esc(stepOf(q))}</span>` : ""}
+        <div class="who">${beeIcon(q.category, true)}<b>${esc(beeTitle(q.category))}</b>${stepOf(q) ? ` <span class="muted">about step ${q.metadata.step}, ${esc(stepOf(q))}</span>` : ""}
           <span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Needed before building" : "Good to know"}</span></div>
         <div class="question"><span class="qn">${n + 1}.</span> ${esc(q.question_text)}</div>
         ${q.metadata?.why ? `<div class="why"><i class="ph ph-lightbulb" aria-hidden="true"></i> ${esc(q.metadata.why)}</div>` : ""}
@@ -2016,16 +2048,36 @@ function mdToHtml(md) {
   close();
   return html;
 }
-let briefText = "";
+let briefText = "", briefFile = "brief.md", DOCS = [], docTab = "brief";
+// The Brief plus the 6 docs a team needs before an agent writes code (Roger, 23 Oct 2026), each with how ready it is.
+function showDoc(name) {
+  docTab = name;
+  const d = DOCS.find((x) => x.name === name);
+  if (d) { briefText = d.markdown; briefFile = d.file; }
+  $("docTabs").innerHTML = [`<button role="tab" aria-selected="${name === "brief"}" data-doc="brief">Brief</button>`].concat(DOCS.filter((x) => x.name !== "brief").map((x) =>
+    `<button role="tab" aria-selected="${name === x.name}" data-doc="${x.name}" title="${esc(x.title)}">${esc(x.file.replace(".md", ""))}<span class="pct ${x.ready === 100 ? "done" : ""}">${x.ready}%</span></button>`)).join("");
+  $("briefBody").innerHTML = mdToHtml(briefText);
+}
 $("briefBtn").onclick = async () => {
   try {
     const res = await fetch("/api/brief", { headers: { "X-Board": BOARD } });
     if (!res.ok) throw new Error("Could not build the brief.");
-    briefText = await res.text();
-    $("briefBody").innerHTML = mdToHtml(briefText);
+    const brief = await res.text();
+    DOCS = (await api("/api/docs").catch(() => ({ docs: [] }))).docs;
+    if (docTab === "brief") { briefText = brief; briefFile = "brief.md"; }
+    DOCS.unshift({ name: "brief", file: "brief.md", title: "Product brief", markdown: brief, ready: 0 }); DOCS = DOCS.filter((x, i) => i === 0 || x.name !== "brief");
+    showDoc(docTab);
     $("brief").hidden = false; $("briefClose").focus();
   } catch (err) { toast(err.message); }
 };
+$("docTabs").onclick = (e) => { const b = e.target.closest("[data-doc]"); if (b) showDoc(b.dataset.doc); };
+$("briefDocs").onclick = async () => {
+  const b = $("briefDocs"); b.disabled = true; b.lastChild.textContent = "Writing the docs...";
+  try { await api(`/api/docs?${eq()}`, { method: "POST" }); await load(); docTab = "trd"; $("briefBtn").click(); toast("TRD, design brief and schema written. Any team choices are now questions from the bees."); }
+  catch (err) { toast(err.message); }
+  finally { b.disabled = false; b.lastChild.textContent = "Write the tech docs"; }
+};
+$("docsZip").onclick = () => { const a = document.createElement("a"); a.href = `/api/docs.zip?board=${encodeURIComponent(BOARD)}`; a.download = "buildingbees-docs.zip"; a.click(); };
 $("briefClose").onclick = () => { $("brief").hidden = true; };
 // The whole plan as one standalone page (an idea from Archify): anyone with the link can read it, no sign-in.
 $("briefShare").onclick = () => window.open(`/api/share?board=${encodeURIComponent(BOARD)}`, "_blank", "noopener");
@@ -2189,7 +2241,7 @@ $("briefAgent").onclick = async () => {
 $("briefDownload").onclick = () => {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([briefText], { type: "text/markdown" }));
-  a.download = (($("product").textContent || "product").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") || "product") + "-brief.md";
+  a.download = briefFile === "brief.md" ? ((($("product").textContent || "product").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") || "product") + "-brief.md") : briefFile;
   a.click(); URL.revokeObjectURL(a.href);
 };
 $("briefPrint").onclick = () => window.print();
@@ -2307,7 +2359,7 @@ $("engineBtn").onclick = () => {
   menu(false); toast(`Switched to ${S.engines[S.engine]?.label || S.engine}. The next update and the next drawing use it; the board stays as it is.`);  // Sravani, 17 Oct: "no changes happening"
 };
 
-$("crew").innerHTML = Object.entries(BEES).map(([c, [name, , , asks]]) => `<li>${beeIcon(c)}<span><b>${name}</b><span>${asks}</span></span></li>`).join("")
+$("crew").innerHTML = Object.entries(BEES).map(([c, [role, , , asks, name, voice]]) => `<li>${beeIcon(c)}<span><b>${name} the ${role}</b><span>${voice} ${asks}</span></span></li>`).join("")
   + '<li id="scoutCrew" hidden><span class="bee" aria-hidden="true"><i class="ph ph-binoculars"></i></span><span><b>Scout Bee</b><span>Reads the web first, so the others ask about real rules and real failures.</span></span></li>';
 $("prd").value = store.get("bb_spec") || "";
 load().catch((err) => { $("start").hidden = false; say(err.message, true); });

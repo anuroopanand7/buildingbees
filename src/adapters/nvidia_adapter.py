@@ -16,7 +16,7 @@ import httpx
 
 from src.adapters.gemini_adapter import EngineNotConfigured
 from src.adapters.spec_prompts import (
-    FLOWS_PROMPT, FlowsExtract, PLAN_PROMPT, PlanExtract, INGEST_PROMPT, INTERROGATE_PROMPT, QuestionList, Reaction, SpecExtract, XQuestion,
+    DOCS_PROMPT, DocsExtract, FLOWS_PROMPT, FlowsExtract, PLAN_PROMPT, PlanExtract, INGEST_PROMPT, INTERROGATE_PROMPT, QuestionList, Reaction, SpecExtract, XQuestion,
 )
 
 DEFAULT_BASE_URL = "https://api.tokenfactory.nebius.com/v1"  # the hackathon requires Nebius Token Factory
@@ -174,6 +174,10 @@ class NvidiaNemotronAdapter:
     def write_plan(self, board_json: str) -> PlanExtract:
         """Writes user stories with acceptance criteria, a feature list, a build order and a glossary from the board."""
         return self._generate(PLAN_PROMPT + board_json[:60000], PlanExtract, model=self.heavy_model)
+
+    def write_docs(self, board_text: str) -> DocsExtract:
+        """Writes the TRD, the design brief and the backend schema from the board, on the heavy model."""
+        return self._generate(DOCS_PROMPT + board_text[:60000], DocsExtract, model=self.heavy_model)
 
     def interrogate(self, node_id: str, context_json: str, asked: List[str]) -> List[XQuestion]:
         """Looks for further product questions on one screen, button or API."""
