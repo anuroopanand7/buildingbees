@@ -2,7 +2,7 @@
 
 import datetime
 import re
-from typing import Iterable
+from typing import Optional, List, Iterable
 
 from src.adapters.spec_prompts import FlowsExtract, SpecExtract, XQuestion
 from src.core.graph import BuildingBeesEngine
@@ -166,14 +166,28 @@ def strip_guesses(g: BuildingBeesEngine, said: str) -> list:
     return list(dict.fromkeys(blanked))
 
 
-def clean_branches(branches, n_steps: int) -> list:
-    """Branches that split off a step that exists; anything pointing elsewhere is dropped, never guessed."""
+# Steps that can fail for reasons outside the person's control: money, a slot someone else can take, a file, a check.
+RISKY_STEP = re.compile(r"\b(pay|checkout|book|reserv|upload|order)\w*", re.I)
+
+
+def clean_branches(branches, n_steps: int, steps: Optional[List[str]] = None) -> list:
+    """Branches that split off a step that exists; anything pointing elsewhere is dropped, never guessed.
+    With the steps given, every risky step without a split gets an empty "No" path (the failure exit): models leave
+    these out even when told not to (prompt tuning, 21 Oct: 5 of 6 ideas), so the rule is enforced in code and the
+    Test Bee asks what happens there."""
     out = []
     for b in branches:
         if 1 <= b.at_step <= n_steps and b.decision:
             d = b.model_dump()
             d["rejoin_step"] = d["rejoin_step"] if 0 < d["rejoin_step"] <= n_steps else 0
             out.append(d)
+    # One exit per flow at most, on the first risky step title, and only when the flow has no split of its own: more
+    # than that doubled the questions in the eval (23 Oct: 15.2 an idea, 34 near-duplicates).
+    risky = [i for i, step in enumerate(steps or [], 1) if RISKY_STEP.search(step.split(":")[0])]
+    if risky and not out:
+        title = steps[risky[0] - 1].split(":")[0].strip()
+        out.append({"at_step": risky[0], "decision": f"{title} went through?", "main_label": "Yes", "label": "No",
+                    "steps": [], "rejoin_step": 0, "auto": True})
     return out
 
 
@@ -204,7 +218,7 @@ def build_flows_graph(x: FlowsExtract, source: str = "ai") -> BuildingBeesEngine
                             flow_ids=[f.id for f in x.flows if f.user_id == u.id]))
     for f in x.flows:
         g.add_node(FlowNode(id=f.id, title=f.title, goal=f.goal,
-                            metadata={"steps": f.steps, "branches": clean_branches(f.branches, len(f.steps))}))
+                            metadata={"steps": f.steps, "branches": clean_branches(f.branches, len(f.steps), f.steps)}))
         if f.user_id in g.nodes:
             g.add_edge(f.user_id, f.id)
     g.features = []

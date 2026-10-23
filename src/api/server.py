@@ -389,7 +389,7 @@ def _apply_reaction(g: BuildingBeesEngine, r) -> List[str]:
         if f is None and fu.steps and fu.title and not drawn:
             # A flow the founder has just asked for. Only while flows are still being agreed.
             f = g.add_node(FlowNode(id=fu.flow_id, title=fu.title, goal=fu.goal,
-                                   metadata={"steps": fu.steps, "branches": clean_branches(fu.branches, len(fu.steps))}))
+                                   metadata={"steps": fu.steps, "branches": clean_branches(fu.branches, len(fu.steps), fu.steps)}))
             owner = fu.user_id if fu.user_id in users else (users[0] if users else None)
             if owner:
                 g.add_edge(owner, f.id)
@@ -402,7 +402,7 @@ def _apply_reaction(g: BuildingBeesEngine, r) -> List[str]:
             f.metadata["was"] = before  # so the board can show what this answer changed
             f.metadata["steps"] = fu.steps
             f.metadata["was_branches"] = f.metadata.get("branches", [])
-            f.metadata["branches"] = clean_branches(fu.branches, len(fu.steps)) if fu.branches else \
+            f.metadata["branches"] = clean_branches(fu.branches, len(fu.steps), fu.steps) if fu.branches else \
                 [b for b in f.metadata.get("branches", []) if b["at_step"] <= len(fu.steps)]
             for q in g.get_questions_for_node(f.id):  # keep each open question on its step if that step survived
                 k = int(q.metadata.get("step") or 0)

@@ -181,3 +181,20 @@ def test_six_docs_from_the_board_and_the_docs_call(monkeypatch):
     assert "buyer reads own" in docs["schema"]["markdown"] and "NOT DECIDED" in docs["agents"]["markdown"]
     names = zipfile.ZipFile(io.BytesIO(client.get("/api/docs.zip", headers=h).content)).namelist()
     assert "AGENTS.md" in names and "docs/SCHEMA.md" in names
+
+
+def test_risky_steps_always_get_a_failure_exit_and_a_test_bee_question():
+    """Talent research fix (23 Oct): a pay, book or upload step with no split gets an empty "No" path, which the Test
+    Bee asks about; steps that cannot fail (viewing a list) are left alone, and a model's own split is kept."""
+    from src.adapters.spec_prompts import XBranch, XFlowPlan
+    from src.core.ingest import build_flows_graph, clean_branches
+    steps = ["Browse: the buyer sees the soaps", "Pay: the buyer pays by UPI", "Upload: the seller adds a photo"]
+    kept = clean_branches([XBranch(at_step=3, decision="Photo accepted?", main_label="Yes", label="No")], 3, steps)
+    assert [b["at_step"] for b in kept] == [3]  # the model drew a split: nothing added
+    out = clean_branches([], 3, steps)
+    assert len(out) == 1 and out[0]["decision"] == "Pay went through?" and out[0]["steps"] == []  # one exit, first risky step
+    x = FLOWS.model_copy(deep=True)
+    x.flows = [XFlowPlan(id="F_BUY", title="Buy", goal="Buy soap", user_id=x.users[0].id, steps=steps)]
+    g = build_flows_graph(x)
+    asked = [q.question_text for q in g.nodes.values() if getattr(q, "category", None) and q.category.value == "TESTER"]
+    assert any("Pay went through" in t for t in asked) and not any("Browse" in t for t in asked)
