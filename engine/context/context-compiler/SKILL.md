@@ -1,6 +1,11 @@
 ---
 name: context-compiler
 description: Use when writing or changing any prompt that BuildingBees sends to a model, or any MCP work package it hands to an agent. Builds the prompt in a fixed order from the board, so it is small, cache friendly and cannot contradict a decision.
+owner: engine
+version: 1
+source: ours (Google ADK context post, Argon reviews of 23 Oct 2026)
+license: ours
+max_tokens: 600
 ---
 
 # Context compiler

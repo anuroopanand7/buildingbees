@@ -1,6 +1,11 @@
 ---
 name: knowledge-base
 description: Use when deciding what BuildingBees should remember beyond one board, or when a new board could start from what a team or the product already knows. Two kinds of knowledge, both retrieved on demand and never pinned into every prompt.
+owner: engine
+version: 1
+source: ours
+license: ours
+max_tokens: 400
 ---
 
 # Knowledge base
