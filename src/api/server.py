@@ -45,6 +45,7 @@ from src.core.schema import (
 from src.adapters.gemini_adapter import GoogleGeminiAdapter
 from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.core.docs import build_docs
+from src.adapters.spec_prompts import TALENTS
 from src.core.agent_view import decision_log, item as plan_item, ready_wave
 from src.adapters.agent_adapter import AgentAdapter, NeedAgent, SCHEMAS as AGENT_SCHEMAS
 from src.adapters.nvidia_adapter import pdf_to_text
@@ -1459,6 +1460,7 @@ def get_status() -> Dict[str, Any]:
     return {
         "product_name": getattr(graph, "product_name", ""),
         "engines": {k: {"label": e.label, "enabled": e.enabled, "model": e.model} for k, e in engines.items()},
+        "talents": {k: [[t, sk] for t, sk in v[2]] for k, v in TALENTS.items()},  # the same list the model is told
         "research": tavily.enabled(),
         "firebase": FIREBASE,  # public web config, safe to send to the browser
         "total_nodes": len(graph.nodes),

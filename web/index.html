@@ -1006,14 +1006,7 @@ const BEES = {
 const bee = (cat) => BEES[cat] || BEES.PM;
 // Each bee has talents, and a talent is a set of skills (Roger, 23 Oct 2026: "a talent is a collection of skills, like
 // Claude skills"). Shown on the start screen and in the bee rail, so people see what each bee is good at.
-const TALENTS = {
-  PM: [["Scope shaping", ["core user", "must vs later", "out of scope"]], ["Business rules", ["money flows", "pricing", "success metric"]], ["Team alignment", ["settling disagreements", "sign-off", "decision log"]]],
-  DESIGN: [["Experience flow", ["first impression", "navigation", "empty states"]], ["Visual language", ["palette", "typography", "components"]], ["Voice", ["wording", "tone", "error messages"]]],
-  FRONTEND: [["Screen states", ["loading", "empty", "error", "success"]], ["Interaction", ["forms and validation", "gestures", "offline"]], ["Accessibility", ["contrast", "screen readers", "keyboard"]]],
-  BACKEND: [["Data modelling", ["entities", "relations", "access rules"]], ["Integrations", ["payments", "messaging", "third-party APIs"]], ["Reliability", ["retries and time-outs", "duplicate requests", "scale"]]],
-  TESTER: [["Edge cases", ["double taps", "two people at once", "odd input"]], ["Failure paths", ["payment fails", "network drops", "half-saved data"]], ["Acceptance", ["given-when-then checks", "test data"]]],
-  COMPLIANCE: [["Privacy", ["personal data kept", "how long", "consent"]], ["Security", ["sign-in", "roles", "who sees what"]], ["Local rules", ["data protection law", "tax and invoices", "age limits"]]],
-};
+let TALENTS = {};  // filled from /api/status: the same talents the model routes questions by
 const talentsText = (cat) => (TALENTS[cat] || []).map(([t, skills]) => `${t}: ${skills.join(", ")}`).join("\n");
 const talentsHtml = (cat) => `<span class="talents">${(TALENTS[cat] || []).map(([t, skills]) => `<span class="talent" title="${esc(skills.join(", "))}"><b>${esc(t)}</b> ${esc(skills.join(" · "))}</span>`).join("")}</span>`;
 const beeTitle = (cat) => `${bee(cat)[4]} the ${bee(cat)[0]}`;
@@ -1068,6 +1061,7 @@ function say(text, err = false) { $("msg").textContent = text; $("msg").classNam
 let restoring = false;
 async function load() {
   let [g, screens, status] = await Promise.all([api("/api/graph"), api("/api/screens"), api("/api/status")]);
+  if (status.talents && !Object.keys(TALENTS).length) { TALENTS = status.talents; renderCrew(); }
   const cached = LINKED ? "" : store.get("bb_graph"); // a linked board belongs to someone else: never overwrite it from this browser's copy
   if (!g.total_nodes && cached && !restoring) {
     // The server slept and lost this board; put back the copy this browser kept.
@@ -2404,8 +2398,9 @@ $("engineBtn").onclick = () => {
   menu(false); toast(`Switched to ${S.engines[S.engine]?.label || S.engine}. The next update and the next drawing use it; the board stays as it is.`);  // Sravani, 17 Oct: "no changes happening"
 };
 
-$("crew").innerHTML = Object.entries(BEES).map(([c, [role, , , asks, name, voice]]) => `<li>${beeIcon(c)}<span><b>${name} the ${role}</b><span>${voice} ${asks}</span>${talentsHtml(c)}</span></li>`).join("")
+const renderCrew = () => $("crew").innerHTML = Object.entries(BEES).map(([c, [role, , , asks, name, voice]]) => `<li>${beeIcon(c)}<span><b>${name} the ${role}</b><span>${voice} ${asks}</span>${talentsHtml(c)}</span></li>`).join("")
   + '<li id="scoutCrew" hidden><span class="bee" aria-hidden="true"><i class="ph ph-binoculars"></i></span><span><b>Scout Bee</b><span>Reads the web first, so the others ask about real rules and real failures.</span></span></li>';
+renderCrew();
 $("prd").value = store.get("bb_spec") || "";
 load().catch((err) => { $("start").hidden = false; say(err.message, true); });
 </script>

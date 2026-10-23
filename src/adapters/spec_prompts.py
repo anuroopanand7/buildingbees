@@ -59,6 +59,39 @@ class XAPI(BaseModel):
     response_fields: List[str] = []  # what comes back
 
 
+# Each bee's talents, and each talent's skills (Roger, 23 Oct 2026: "a bee has talents; a talent is a collection of
+# skills"). One source: the HIVE block below routes every question to the bee whose talent covers it, and
+# /api/status hands the same list to the web app, so what people read is what the model is told.
+TALENTS = {
+    "PM": ("North", "who the user is, the goal, what is in and out of scope, how success is measured", [
+        ("Scope shaping", ["core user", "must vs later", "out of scope"]),
+        ("Business rules", ["money flows", "pricing", "success metric"]),
+        ("Team alignment", ["settling disagreements", "sign-off", "decision log"])]),
+    "DESIGN": ("Kala", "what the experience should feel like, what the user sees first, wording, accessibility", [
+        ("Experience flow", ["first impression", "navigation", "empty states"]),
+        ("Visual language", ["palette", "typography", "components"]),
+        ("Voice", ["wording", "tone", "error messages"])]),
+    "FRONTEND": ("Pixel", "screen states, validation, what is kept when something fails, device and offline behaviour", [
+        ("Screen states", ["loading", "empty", "error", "success"]),
+        ("Interaction", ["forms and validation", "gestures", "offline"]),
+        ("Accessibility", ["contrast", "screen readers", "keyboard"])]),
+    "BACKEND": ("Bolt", "data, integrations, vendors, timeouts, retries, limits, cost", [
+        ("Data modelling", ["entities", "relations", "access rules"]),
+        ("Integrations", ["payments", "messaging", "third-party APIs"]),
+        ("Reliability", ["retries and time-outs", "duplicate requests", "scale"])]),
+    "TESTER": ("Poke", "edge cases, abuse, what happens when it goes wrong, how we know it works", [
+        ("Edge cases", ["double taps", "two people at once", "odd input"]),
+        ("Failure paths", ["payment fails", "network drops", "half-saved data"]),
+        ("Acceptance", ["given-when-then checks", "test data"])]),
+    "COMPLIANCE": ("Shield", "privacy, consent, medical, legal or money rules, who is liable", [
+        ("Privacy", ["personal data kept", "how long", "consent"]),
+        ("Security", ["sign-in", "roles", "who sees what"]),
+        ("Local rules", ["data protection law", "tax and invoices", "age limits"])]),
+}
+HIVE = "".join(f"- {cat} ({name}): {owns}. Talents: " + "; ".join(f"{t} ({', '.join(sk)})" for t, sk in talents) + "\n"
+               for cat, (name, owns, talents) in TALENTS.items())
+
+
 class XEntity(BaseModel):
     name: str
     fields: List[str]
@@ -352,13 +385,7 @@ Rules:
 - Do not ask the same thing twice in different words.
 
 THE HIVE. Every question is asked by one bee. Set "category" to exactly one of:
-- PM: who the user is, the goal, what is in and out of scope, how success is measured
-- DESIGN: what the experience should feel like, what the user sees first, wording, accessibility
-- FRONTEND: screen states, validation, what is kept when something fails, device and offline behaviour
-- BACKEND: data, integrations, vendors, timeouts, retries, limits, cost
-- TESTER: edge cases, abuse, what happens when it goes wrong, how we know it works
-- COMPLIANCE: privacy, consent, medical, legal or money rules, who is liable
-ONLY ASK WHAT ONLY THIS TEAM CAN DECIDE. A product team answers these questions (a product manager,
+""" + HIVE + """ONLY ASK WHAT ONLY THIS TEAM CAN DECIDE. A product team answers these questions (a product manager,
 a designer, frontend and backend engineers, a tester), and every question costs them time.
 - Never ask about anything with an industry-standard answer: timeouts and retries, double taps and duplicate
   submits, loading spinners and generic error messages, sign-in and password basics, identity checks,
@@ -426,13 +453,7 @@ FEATURES. List the product's features (3 to 10), the way a PRD's feature list st
    without the answer. Assumption is not approval: when the input is silent, ask, do not decide.
 
 THE HIVE. Every question is asked by one bee. Set "category" to exactly one of:
-- PM: who the user is, the goal, what is in and out of scope, how success is measured
-- DESIGN: what the experience should feel like, what the user sees first, wording, accessibility
-- FRONTEND: screen states, validation, what is kept when something fails, device and offline behaviour
-- BACKEND: data, integrations, vendors, timeouts, retries, limits, cost
-- TESTER: edge cases, abuse, what happens when it goes wrong, how we know it works
-- COMPLIANCE: privacy, consent, medical, legal or money rules, who is liable
-ONLY ASK WHAT ONLY THIS TEAM CAN DECIDE. A product team answers these questions (a product manager,
+""" + HIVE + """ONLY ASK WHAT ONLY THIS TEAM CAN DECIDE. A product team answers these questions (a product manager,
 a designer, frontend and backend engineers, a tester), and every question costs them time.
 - Never ask about anything with an industry-standard answer: timeouts and retries, double taps and duplicate
   submits, loading spinners and generic error messages, sign-in and password basics, identity checks,
@@ -467,13 +488,7 @@ Do not repeat the already-asked questions. Target every question at
 node id "{node_id}". Mark blocking only if code cannot be written safely without the answer.
 
 THE HIVE. Every question is asked by one bee. Set "category" to exactly one of:
-- PM: who the user is, the goal, what is in and out of scope, how success is measured
-- DESIGN: what the experience should feel like, what the user sees first, wording, accessibility
-- FRONTEND: screen states, validation, what is kept when something fails, device and offline behaviour
-- BACKEND: data, integrations, vendors, timeouts, retries, limits, cost
-- TESTER: edge cases, abuse, what happens when it goes wrong, how we know it works
-- COMPLIANCE: privacy, consent, medical, legal or money rules, who is liable
-ONLY ASK WHAT ONLY THIS TEAM CAN DECIDE. A product team answers these questions (a product manager,
+""" + HIVE + """ONLY ASK WHAT ONLY THIS TEAM CAN DECIDE. A product team answers these questions (a product manager,
 a designer, frontend and backend engineers, a tester), and every question costs them time.
 - Never ask about anything with an industry-standard answer: timeouts and retries, double taps and duplicate
   submits, loading spinners and generic error messages, sign-in and password basics, identity checks,
