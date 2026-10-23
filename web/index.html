@@ -993,11 +993,11 @@ const ENGINE_COPY = { gemini: "Google Gemini", nvidia: "NVIDIA Nemotron" };
 // One bee per aspect of the product. The engine labels every question with the bee that asks it.
 const BEES = {
 // Each bee has a name and a way of thinking, so people remember who asked what (Roger, 23 Oct 2026: bees with character).
-  PM: ["Queen Bee", "product and scope", "ph-crown-simple", "Who is this for, and what is out of scope?", "Rani", "Decisive. Keeps the first version small."],
+  PM: ["Queen Bee", "product and scope", "ph-crown-simple", "Who is this for, and what is out of scope?", "North", "Holds the true north. Keeps the first version small."],
   DESIGN: ["Design Bee", "experience", "ph-palette", "What does the person see first?", "Kala", "Notices how a screen feels before how it works."],
   FRONTEND: ["Frontend Bee", "screens and states", "ph-browser", "What shows while it loads, or when it is empty?", "Pixel", "Checks every state a screen can be in."],
   BACKEND: ["Backend Bee", "data and integrations", "ph-database", "Which services does it talk to, and what if one is slow?", "Bolt", "Asks where the data lives and what breaks first."],
-  TESTER: ["Test Bee", "edge cases", "ph-bug", "What happens when two people do this at once?", "Nosy", "Tries to break everything, politely."],
+  TESTER: ["Test Bee", "edge cases", "ph-bug", "What happens when two people do this at once?", "Poke", "Pokes at every flow until something gives, politely."],
   COMPLIANCE: ["Compliance Bee", "privacy and rules", "ph-shield-check", "What data do we keep, and are we allowed to?", "Shield", "Guards people's data and the rules."],
 };
 const bee = (cat) => BEES[cat] || BEES.PM;
@@ -1488,7 +1488,7 @@ function renderPM() {
   $("dockPill").innerHTML = waiting ? `${beeIcon(waiting.category, true)}<span><b>${esc(bee(waiting.category)[0])}</b> has a question for you</span><i class="ph ph-caret-up" aria-hidden="true"></i>` : `${beeClip("idle")}<span>No questions waiting</span><i class="ph ph-caret-up" aria-hidden="true"></i>`;
 
   const thread = $("thread");
-  const hello = `<div class="msg-row">${beeIcon("PM")}<div class="msg-body"><div class="who">Rani the Queen Bee <span>product and scope</span></div><div class="bubble">${S.stage === "flows"
+  const hello = `<div class="msg-row">${beeIcon("PM")}<div class="msg-body"><div class="who">North the Queen Bee <span>product and scope</span></div><div class="bubble">${S.stage === "flows"
     ? "Hi, we are your product team. We read your idea and sketched the flows on the right. Before anyone draws a screen, each of us has a few questions."
     : "The screens are drawn from your decisions. Now we go through them one by one."}</div></div></div>`;
   // Scout Bee: the pages read on the web before anyone asked a question.
