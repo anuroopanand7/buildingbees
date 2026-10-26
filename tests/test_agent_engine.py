@@ -175,7 +175,7 @@ def test_six_docs_from_the_board_and_the_docs_call(monkeypatch):
     g = client.post("/api/docs?engine=gemini", headers=h).json()
     assert any(n.get("question_text") == "Which brand colours should the shop use?" for n in g["nodes"])  # asked, not guessed
     docs = {d["name"]: d for d in client.get("/api/docs", headers=h).json()["docs"]}
-    assert set(docs) == {"prd", "trd", "flow", "design", "schema", "plan", "agents"}
+    assert set(docs) == {"prd", "trd", "flow", "design", "schema", "plan", "tests", "agents"}
     assert "20 orders" in docs["prd"]["markdown"] and "#FFC800" in docs["design"]["markdown"]
     assert "PostgreSQL (recommended)" in docs["trd"]["markdown"]  # a pick nobody made is labelled, never passed off as decided
     assert "buyer reads own" in docs["schema"]["markdown"] and "NOT DECIDED" in docs["agents"]["markdown"]
@@ -301,3 +301,19 @@ def test_mock_api_answers_with_placeholders(monkeypatch):
     assert client.post("/mock/mock-test/orders/abc").status_code == 405
     assert client.get("/mock/mock-test/nothing/here").status_code == 404
     assert mock.sample_json(["email: string", "phone"]) == {"email": "name@example.com", "phone": "+91 90000 00000"}
+
+
+def test_openapi_test_plan_and_saved_mock_data(monkeypatch):
+    """Raju's second list: OpenAPI from the board, a test plan from the flows, and hand-written mock data."""
+    h, g = _drawn_board(monkeypatch, "contract-test")
+    api = next(n for n in server.boards["contract-test"].nodes.values() if isinstance(n, server.APINode))
+    api.path, api.method = "/orders/{order_id}", "GET"
+    spec = client.get("/api/openapi.json", headers=h).json()
+    op = spec["paths"]["/orders/{order_id}"]["get"]
+    assert spec["openapi"].startswith("3.0") and op["parameters"][0]["name"] == "order_id"
+    docs = {d["name"]: d for d in client.get("/api/docs", headers=h).json()["docs"]}
+    assert docs["tests"]["markdown"].startswith("# Test plan") and "Happy path" in docs["tests"]["markdown"]
+    assert client.post(f"/api/nodes/{api.id}/mock", json={"data": {"name": "A very long dish name", "price": 0}}, headers=h).json()["saved"]
+    assert client.get("/mock/contract-test/orders/9").json() == {"name": "A very long dish name", "price": 0}
+    client.post(f"/api/nodes/{api.id}/mock", json={"data": None}, headers=h)
+    assert client.get("/mock/contract-test/orders/9").json() != {"name": "A very long dish name", "price": 0}

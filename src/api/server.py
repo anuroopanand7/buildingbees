@@ -46,6 +46,7 @@ from src.adapters.gemini_adapter import GoogleGeminiAdapter
 from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.core.docs import build_docs
 from src.core import mock
+from src.core.contract import openapi, test_plan
 from src.core.skills import for_call
 from src.adapters.spec_prompts import TALENTS
 from src.core.agent_view import build_prompt, decision_log, item as plan_item, ready_wave
@@ -352,6 +353,7 @@ def _state(graph: BuildingBeesEngine) -> Dict[str, Any]:
                    for i in getattr(graph, "invites", {}).values() if not i.get("revoked")],
         "plan": getattr(graph, "plan", None),
         "docs": getattr(graph, "docs", None),
+        "mock_data": getattr(graph, "mock_data", {}) or {},
         "plan_decisions": getattr(graph, "plan_decisions", 0),
         "last_call": getattr(graph, "last_call", None),  # engine pill: which model answered, how fast
         # Stage one agrees the flows; screens are only drawn after that.
@@ -889,6 +891,7 @@ def _rebuild(d: Dict[str, Any]) -> BuildingBeesEngine:
     g.invites = dict(d.get("invites") or {})
     g.plan, g.plan_decisions = d.get("plan"), int(d.get("plan_decisions") or 0)
     g.docs = d.get("docs")
+    g.mock_data = d.get("mock_data") or {}
     g.needs_redraw = bool(d.get("needs_redraw"))
     for n in d["nodes"][:2000]:
         cls = LAYER_CLASSES.get(n.get("layer"))
@@ -1369,8 +1372,36 @@ def get_docs_zip(request: Request):
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for d in get_docs(request)["docs"]:
             z.writestr(f"docs/{d['file']}" if d["file"] != "AGENTS.md" else "AGENTS.md", d["markdown"])
+        z.writestr("docs/openapi.json", json.dumps(openapi(_board()), indent=2))
     return Response(buf.getvalue(), media_type="application/zip",
                     headers={"Content-Disposition": 'attachment; filename="buildingbees-docs.zip"'})
+
+
+@app.get("/api/openapi.json")
+def get_openapi() -> JSONResponse:
+    """The board's APIs as OpenAPI 3.0, for Postman, Swagger or type generators (src/core/contract.py)."""
+    return JSONResponse(openapi(_board()), headers={"Content-Disposition": 'attachment; filename="openapi.json"'})
+
+
+class MockData(BaseModel):
+    data: Any
+
+
+@app.post("/api/nodes/{node_id}/mock")
+def save_mock(node_id: str, payload: MockData) -> Dict[str, Any]:
+    """Saves hand-written example JSON for one API, which its live mock then returns (Raju: test long names, zero
+    prices and other edge cases before the backend exists). Null resets it to the shape from the field names."""
+    g = _board()
+    if not isinstance(g.get_node(node_id), APINode):
+        raise HTTPException(status_code=404, detail="Mock data belongs to an API")
+    if len(json.dumps(payload.data, default=str)) > 20000:
+        raise HTTPException(status_code=400, detail="Keep mock data under 20 KB")
+    g.mock_data = getattr(g, "mock_data", {}) or {}
+    if payload.data is None:
+        g.mock_data.pop(node_id, None)
+    else:
+        g.mock_data[node_id] = payload.data
+    return {"saved": payload.data is not None}
 
 
 @app.get("/api/plan-check")
@@ -1465,7 +1496,8 @@ def mock_api(board_id: str, api_path: str, request: Request) -> JSONResponse:
     if node is None:
         status, why = (405, f"This path answers {', '.join(sorted(set(allowed)))}") if allowed else (404, "No API on this board has that path")
         return JSONResponse(status_code=status, content={"detail": why}, headers=cors)
-    return JSONResponse(content=mock.sample_json(node.outputs_schema.get("fields", [])),
+    saved = (getattr(_board(), "mock_data", {}) or {}).get(node.id)
+    return JSONResponse(content=saved if saved is not None else mock.sample_json(node.outputs_schema.get("fields", [])),
                         headers={**cors, "X-Mock": "example data shaped from field names"})
 
 

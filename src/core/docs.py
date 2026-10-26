@@ -11,6 +11,7 @@ from typing import Any, Dict, List
 
 from src.core.agent_view import ready_wave
 from src.core.brief import build_brief
+from src.core.contract import test_plan
 from src.core.graph import BuildingBeesEngine
 from src.core.schema import QuestionNode, QuestionStatus
 
@@ -122,6 +123,8 @@ def build_docs(g: BuildingBeesEngine, board_link: str = "") -> List[Dict[str, An
             ready = 0
         out.append({"name": key, "file": file, "title": title, "ready": ready,
                     "markdown": f"# {title}: {name}\n\n{body or '(nothing on the board for this yet)'}\n"})
+    out.append({"name": "tests", "file": "TESTS.md", "title": "Test plan", "ready": _ready(g, {"TESTER"}),
+                "markdown": test_plan(g)})
     out.append({"name": "agents", "file": "AGENTS.md", "title": "Build prompt for coding agents", "ready": out[-1]["ready"],
                 "markdown": agents_md(g, board_link)})
     return out

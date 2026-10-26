@@ -392,6 +392,11 @@
   .kv { display: grid; grid-template-columns: 104px 1fr; gap: 6px 12px; font-size: 13px; margin: 14px 0 18px; }
   .kv dt { color: var(--muted); }
   .kv dd { margin: 0; overflow-wrap: anywhere; }
+  .purpose { font-size: 12px; color: var(--muted); margin: 2px 0 4px; line-height: 1.4; }
+  body.no-notes .purpose { display: none; }
+  #notesBtn { width: auto; padding: 0 10px; gap: 6px; display: inline-flex; align-items: center; font-size: 12px; }
+  #notesBtn[aria-pressed="true"] { background: var(--fill); }
+  .contract textarea.json { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; resize: vertical; }
   .contract pre.json { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; overflow: auto; margin: 4px 0 10px; }
   .contract .meta { margin-top: 8px; }
   .copy-prompt { font-size: 12px; }
@@ -976,6 +981,7 @@
     <button id="zoomPct" aria-label="Reset zoom to 100%" data-tip="Reset to 100%" data-tip-pos="top">100%</button>
     <button id="zoomIn" aria-label="Zoom in" data-tip="Zoom in" data-tip-pos="top"><i class="ph ph-plus" aria-hidden="true"></i></button>
     <button id="zoomFit" aria-label="Recenter: fit the whole board" data-tip="Recenter: fit the whole board" data-tip-pos="top"><i class="ph ph-arrows-in-simple" aria-hidden="true"></i></button>
+    <button id="notesBtn" aria-pressed="true" data-tip="Button notes: what each button is for (N)" data-tip-pos="top"><i class="ph ph-lightbulb" aria-hidden="true"></i> Notes</button>
     <button id="chaosBtn" aria-pressed="false" data-tip="What can go wrong: show only the failure and undecided paths" data-tip-pos="top"><i class="ph ph-warning" aria-hidden="true"></i> What can go wrong</button>
   </div>
   <button class="island btn sm recenter" id="recenter" hidden><i class="ph ph-crosshair" aria-hidden="true"></i>Back to the board</button>
@@ -1033,6 +1039,7 @@
       <button class="btn" id="briefAgent" title="A link an AI coding agent (Claude Code, Cursor, Jules) can read to build from this plan"><i class="ph ph-robot" aria-hidden="true"></i>Copy link for an AI builder</button>
       <button class="btn" id="briefDownload"><i class="ph ph-download-simple" aria-hidden="true"></i>Download</button>
       <button class="btn" id="docsZip" title="PRD, TRD, app flow, design brief, schema, plan and AGENTS.md in one zip, ready to drop into a repo"><i class="ph ph-file-zip" aria-hidden="true"></i>All docs (.zip)</button>
+      <button class="btn" id="openapiBtn" title="The board's APIs as OpenAPI 3.0 for Postman, Swagger or type generators"><i class="ph ph-brackets-curly" aria-hidden="true"></i>OpenAPI</button>
       <button class="btn" id="briefShare" title="One web page with the whole plan, for someone who will not sign in"><i class="ph ph-globe" aria-hidden="true"></i>Share as a web page</button>
       <button class="btn" id="briefPrint"><i class="ph ph-printer" aria-hidden="true"></i>Print or save as PDF</button>
       <button class="icon-btn" id="briefClose" aria-label="Close brief"><i class="ph ph-x" aria-hidden="true"></i></button>
@@ -1129,7 +1136,7 @@ async function load() {
   }
   if (!LINKED) store.set("bb_graph", g.total_nodes ? JSON.stringify({ product_name: g.product_name, spec_text: g.spec_text, entities: g.entities, sources: g.sources, needs_redraw: g.needs_redraw, comments: g.comments, signoffs: g.signoffs, nodes: g.nodes, edges: g.edges }) : "");
   S.stage = g.stage; S.needsRedraw = g.needs_redraw; S.comments = g.comments || []; S.round = g.round || 1; S.rounds = g.rounds || []; S.roundQ = new Set(g.round_questions || []);
-  S.ids = g.short_ids || {}; S.features = g.features || []; S.owner = g.owner || ""; S.roster = g.roster || []; S.conflicts = g.conflicts || []; S.sources = g.sources || []; S.mode = g.mode || "solo"; S.spec = g.spec_text || ""; S.lastCall = g.last_call; S.docs = g.docs || null;
+  S.ids = g.short_ids || {}; S.features = g.features || []; S.owner = g.owner || ""; S.roster = g.roster || []; S.conflicts = g.conflicts || []; S.sources = g.sources || []; S.mode = g.mode || "solo"; S.spec = g.spec_text || ""; S.lastCall = g.last_call; S.docs = g.docs || null; S.mock = g.mock_data || {};
   S.nodes = {}; S.fwd = {}; S.rev = {}; S.screens = {};
   g.nodes.forEach((n) => (S.nodes[n.id] = n));
   g.edges.forEach((e) => {
@@ -1258,8 +1265,10 @@ function screenCard(id) {
       const apis = (S.fwd[c.id] || []).map((a) => S.nodes[a]).filter((a) => a && a.layer === "API");
       const cnt = openBlocking(c.id) + apis.reduce((t, a) => t + openBlocking(a.id), 0);
       const failTo = S.nodes[c.target_screen_on_failure]?.layer === "SCREEN" && c.target_screen_on_failure !== id;
+      const purpose = (n.metadata?.elements || []).find((e) => e.kind === "button" && e.detail && (e.label || "").trim().toLowerCase() === (c.label || "").trim().toLowerCase())?.detail;
       return `<li class="cta ${failTo ? "has-fail" : apis.length ? "no-fail" : ""} ${PM.focus === c.id || S.selected === c.id ? "focus" : ""} ${hit(c.id) || apis.map((a) => hit(a.id)).find(Boolean) || ""}" data-id="${esc(c.id)}" tabindex="0">
         <div class="cta-top"><span class="cta-label">${idChip(c.id)}${esc(c.label || c.title)}${apis.length ? "" : ' <span class="muted">goes to the next screen</span>'}${failTo ? `<span class="fail-to">if it fails: ${esc(S.ids?.[c.target_screen_on_failure] || S.nodes[c.target_screen_on_failure].title)}</span>` : ""}</span>${cnt ? `<span class="count" title="Open blocking questions">${cnt}</span>` : ""}</div>
+        ${purpose ? `<div class="purpose">${esc(purpose)}</div>` : ""}
         ${apis.length ? `<div class="apis">${apis.map((a) => `<button class="api mono ${PM.focus === a.id || S.selected === a.id ? "focus" : ""}" data-id="${esc(a.id)}" title="${esc(a.method)} ${esc(a.path)}">${idChip(a.id)}${S.mode === "team" ? `${esc(a.method)} ${esc(a.path)}` : esc(apiWords(a))}</button>`).join("")}</div>` : ""}
       </li>`;
     }).join("")}</ul>` : '<div class="no-ctas">No buttons defined</div>'}
@@ -1733,7 +1742,9 @@ function apiContract(n) {
     <div class="meta">Live mock (example data, for building the frontend before the backend exists)</div>
     <div class="send-row"><input class="mono" readonly value="${esc(mockUrl)}" aria-label="Mock API address"><button class="btn sm" data-copy-text="${esc(mockUrl)}">Copy</button></div>
     <div class="meta">Example request (shape from the fields, values are placeholders)</div><pre class="json">${esc(sampleJson(n.inputs_schema?.fields))}</pre>
-    <div class="meta">Example response</div><pre class="json">${esc(sampleJson(n.outputs_schema?.fields))}</pre>
+    <div class="meta">Example response${S.mock?.[n.id] !== undefined ? " (yours, saved)" : ""}; edit it to test edge cases with the live mock</div>
+    <textarea id="mockEdit" class="json mono" rows="7" spellcheck="false" aria-label="Example response JSON">${esc(S.mock?.[n.id] !== undefined ? JSON.stringify(S.mock[n.id], null, 2) : sampleJson(n.outputs_schema?.fields))}</textarea>
+    <div class="send-row"><button class="btn sm" data-mock-save="${esc(n.id)}">Save mock</button>${S.mock?.[n.id] !== undefined ? `<button class="link" data-mock-reset="${esc(n.id)}">Reset</button>` : ""}</div>
     ${errs.length ? `<div class="meta">When it fails</div><ul class="reasons">${errs.map(([c, v]) => `<li><b>${esc(c)}</b> ${esc(Object.values(v || {}).join(", "))}</li>`).join("")}</ul>` : ""}
     <details class="suggest"><summary>Suggest a field change</summary>
       <label>Which side <select id="sfSide"><option value="response">What it returns</option><option value="request">What it sends</option></select></label>
@@ -1845,6 +1856,29 @@ function downloadSvg(id) {
   a.download = `${S.ids?.[id] || "screen"}-${(n.title || "screen").toLowerCase().replace(/[^a-z0-9]+/g, "-")}.svg`;
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
+// A file from the API with the board's headers (fetch, then save), for downloads such as openapi.json.
+async function downloadFrom(path, name) {
+  const res = await fetch(path, { headers: { "X-Board": BOARD, "X-Role": ROLE || "", "X-Invite": invite() } });
+  if (!res.ok) throw new Error("Could not download " + name);
+  const a = document.createElement("a"); a.href = URL.createObjectURL(await res.blob()); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+// Keyboard shortcuts (Raju): P plays the first flow with screens, C toggles What can go wrong, N toggles button notes,
+// 1 2 3 switch Idea, Flows, Screens. Never while typing, and never with a dialog open.
+document.addEventListener("keydown", (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest?.("input, textarea, select, [contenteditable]")) return;
+  if ([...document.querySelectorAll('[role="dialog"]')].some((d) => !d.hidden)) return;
+  const k = e.key.toLowerCase();
+  const click = (sel) => { const b = document.querySelector(sel); if (b && !b.hidden) { e.preventDefault(); b.click(); } };
+  if (k === "p") click("#flows [data-play]");
+  else if (k === "c") click("#chaosBtn");
+  else if (k === "n") click("#notesBtn");
+  else if (k === "1") click('[data-step="idea"]');
+  else if (k === "2") click('[data-step="flows"]');
+  else if (k === "3") click('[data-step="screens"]');
+});
+try { if (localStorage.getItem("bb_notes_off")) { document.body.classList.add("no-notes"); $("notesBtn").setAttribute("aria-pressed", "false"); } } catch (e) {}
+
 // The build prompt is plain text, so it skips api()'s JSON parsing; same board, role and sign-in headers.
 async function copyPrompt(short) {
   const headers = { "X-Board": BOARD, "X-Role": ROLE || "", "X-Invite": invite() };
@@ -2114,6 +2148,19 @@ document.addEventListener("click", (e) => {
     if (!confirm("Go back to this point? The board as it is now is kept, so you can come back to it.")) return;
     return api("/api/history/restore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ at: t.dataset.restore }) })
       .then(() => { $("history").hidden = true; SEEN.clear(); return load(); }).then(() => toast("The board is back at that point.")).catch(fail);
+  }
+  if (t.id === "notesBtn") {  // Raju: notes help reviews and newcomers; developers can hide them for a cleaner board
+    const off = document.body.classList.toggle("no-notes"); t.setAttribute("aria-pressed", !off);
+    try { localStorage.setItem("bb_notes_off", off ? "1" : ""); } catch (e) {}
+    return requestAnimationFrame(drawWires);
+  }
+  if (t.id === "openapiBtn") return downloadFrom("/api/openapi.json", "openapi.json").catch(fail);
+  if (t.dataset.mockSave || t.dataset.mockReset) {
+    const id = t.dataset.mockSave || t.dataset.mockReset;
+    let data = null;
+    if (t.dataset.mockSave) { try { data = JSON.parse($("mockEdit").value); } catch (e) { return toast("That is not valid JSON yet."); } }
+    return api(`/api/nodes/${encodeURIComponent(id)}/mock`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data }) })
+      .then(load).then(() => toast(data === null ? "Mock reset to the example from the field names." : "Saved. The live mock now returns this.")).catch(fail);
   }
   if (t.id === "chaosBtn") {  // Poke's view: dim the happy path so every failure and undecided path stands out
     const on = document.body.classList.toggle("chaos"); t.setAttribute("aria-pressed", on);
