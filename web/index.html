@@ -241,7 +241,7 @@
   .step.next .num { background: var(--text); color: var(--on-ink); font-size: 13px; }
   /* Motion: one entrance, one curve, one stagger. New nodes rise in as they are drawn; wires follow. */
   :root { --ease-out: cubic-bezier(.16, 1, .3, 1); }
-  .enter { animation: rise .45s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 60ms); }
+  .enter { animation: rise .45s var(--ease-out) both; animation-delay: min(calc(var(--i, 0) * 60ms), 500ms); }  /* capped: a big round never trails */
   @keyframes rise { from { opacity: 0; transform: translateY(10px) scale(.985); } }
   .wires.draw path { animation-delay: calc(var(--d, 0) * 1ms); }
   .sketching::after { content: ""; position: absolute; inset: -7px; border: 2px dashed var(--accent); border-radius: 17px; pointer-events: none; animation: sketch 1.1s ease-in-out infinite; }
@@ -404,10 +404,21 @@
   .suggest summary { cursor: pointer; font-weight: 600; }
   .suggest label { display: grid; gap: 4px; margin: 8px 0; color: var(--muted); }
   .suggest input, .suggest select { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); }
-  .play-sheet { max-width: 620px; transition: max-width .25s ease; }
-  #player.desk .play-sheet { max-width: min(1100px, 94vw); }
+  .play-sheet { width: min(620px, 100%); transition: width .25s var(--ease-out); }
+  #player.desk .play-sheet { width: min(1100px, 94vw); }
+  #playBody > * { animation: rise .25s var(--ease-out) both; }  /* each screen of the walkthrough rises in */
+  #playBody > .play-ctas { animation-delay: 60ms; }
+  /* Dialogs fade in and their sheet rises, instead of snapping (UI audit, 27 Oct 2026). */
+  [role="dialog"]:not([hidden]) { animation: fade-in .2s ease-out both; }
+  [role="dialog"]:not([hidden]) .brief-sheet { animation: sheet-in .28s var(--ease-out) both; }
+  @keyframes fade-in { from { opacity: 0; } }
+  @keyframes sheet-in { from { opacity: 0; transform: translateY(14px) scale(.98); } }
+  /* What can go wrong and Notes ease in and out instead of jumping. */
+  .step, .scr > *, .cta, .purpose { transition: opacity .25s ease, outline-color .25s ease; }
+  .erd { animation: fade-in .3s ease-out both; }
+  @media (prefers-reduced-motion: reduce) { [role="dialog"], [role="dialog"] .brief-sheet, #playBody > *, .erd { animation: none !important; } }
   #player.desk .phone, #player.desk .play-ctas { max-width: 960px; }
-  .scr.desk { width: 440px; }
+  .scr.desk { width: 440px; max-width: calc(100vw - 96px); }
   .desk-tag { margin-left: 6px; font-size: 11px; vertical-align: middle; }
   .play-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; flex: 1; }
   .tag.bad { background: var(--bad-soft); color: var(--bad); }
@@ -417,9 +428,9 @@
   .erd-wrap { overflow: auto; margin: 0 0 18px; padding-bottom: 6px; }
   .erd .erd-box { fill: var(--panel); stroke: var(--line-strong); }
   .erd .erd-head { fill: var(--fill); stroke: var(--line-strong); }
-  .erd .erd-title { font: 600 13px Inter, system-ui, sans-serif; fill: var(--text); }
-  .erd .erd-col { font: 12px ui-monospace, monospace; fill: var(--text); }
-  .erd .erd-type { font: 11px ui-monospace, monospace; fill: var(--muted); }
+  .erd .erd-title { font: 600 13px Geist, system-ui, sans-serif; fill: var(--text); }
+  .erd .erd-col { font: 12px "Geist Mono", ui-monospace, monospace; fill: var(--text); }
+  .erd .erd-type { font: 11px "Geist Mono", ui-monospace, monospace; fill: var(--muted); }
   .erd .erd-link { fill: none; stroke: var(--wire, var(--muted)); stroke-width: 1.5; stroke-linejoin: round; opacity: .8; }
   .erd .erd-end { fill: var(--wire, var(--muted)); }
   .history-list { list-style: none; padding: 0; margin: 0; }
@@ -994,8 +1005,8 @@
 
 <div id="player" hidden role="dialog" aria-modal="true" aria-label="Play the flow">
   <div class="brief-sheet play-sheet">
-    <div class="brief-bar"><button class="btn sm" id="playBack"><i class="ph ph-arrow-left" aria-hidden="true"></i>Back</button>
-      <span id="playHead" class="play-head"></span>
+    <div class="brief-bar"><button class="btn sm" id="playBack" aria-label="Previous screen"><i class="ph ph-arrow-left" aria-hidden="true"></i>Back</button>
+      <span id="playHead" class="play-head" aria-live="polite"></span>
       <button class="icon-btn" id="playClose" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button>
     </div>
     <div id="playBody"></div>
@@ -1862,6 +1873,19 @@ function downloadSvg(id) {
   a.download = `${S.ids?.[id] || "screen"}-${(n.title || "screen").toLowerCase().replace(/[^a-z0-9]+/g, "-")}.svg`;
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
+// Every dialog: Escape closes it (via its own close button) and Tab stays inside it (UI audit, 27 Oct 2026).
+// #player, #brief and #boards already handle Escape themselves.
+document.addEventListener("keydown", (e) => {
+  const d = [...document.querySelectorAll('[role="dialog"]')].filter((x) => !x.hidden).pop();
+  if (!d) return;
+  if (e.key === "Escape" && !["player", "brief", "boards"].includes(d.id)) return d.querySelector('.icon-btn[id$="Close"], [id$="Close"]')?.click();
+  if (e.key !== "Tab") return;
+  const f = [...d.querySelectorAll('button:not(:disabled), input, textarea, select, a[href], [tabindex="0"]')].filter((x) => x.offsetParent);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
 // A file from the API with the board's headers (fetch, then save), for downloads such as openapi.json.
 async function downloadFrom(path, name) {
   const res = await fetch(path, { headers: { "X-Board": BOARD, "X-Role": ROLE || "", "X-Invite": invite() } });
@@ -2169,7 +2193,7 @@ document.addEventListener("click", (e) => {
       .then(load).then(() => toast(data === null ? "Mock reset to the example from the field names." : "Saved. The live mock now returns this.")).catch(fail);
   }
   if (t.id === "chaosBtn") {  // Poke's view: dim the happy path so every failure and undecided path stands out
-    const on = document.body.classList.toggle("chaos"); t.setAttribute("aria-pressed", on);
+    const on = document.body.classList.toggle("chaos"); t.setAttribute("aria-pressed", on); setTimeout(drawWires, 260);
     if (on && !document.querySelector("#flows .steps.branch, #flows .cta.has-fail, #flows .cta.no-fail")) toast("No failure paths drawn yet. Open the Flows view, or answer Poke's questions to add them.");
     return requestAnimationFrame(drawWires);
   }
@@ -2395,7 +2419,7 @@ function showDoc(name) {
   $("docTabs").innerHTML = [`<button role="tab" aria-selected="${name === "brief"}" data-doc="brief">Brief</button>`].concat(DOCS.filter((x) => x.name !== "brief").map((x) =>
     `<button role="tab" aria-selected="${name === x.name}" data-doc="${x.name}" title="${esc(x.title)}">${esc(x.file.replace(".md", ""))}<span class="pct ${x.ready === 100 ? "done" : ""}">${x.ready}%</span></button>`)).join("");
   // The schema tab opens with a diagram of the tables (Raju's idea), drawn from the same tables as the text.
-  const erd = name === "schema" && S.docs?.tables?.length ? `<div class="erd-wrap" aria-label="Database diagram">${erdSvg(S.docs.tables, esc)}</div>` : "";
+  const erd = name === "schema" && S.docs?.tables?.length ? `<div class="erd-wrap" tabindex="0" role="group" aria-label="Database diagram">${erdSvg(S.docs.tables, esc)}</div>` : "";
   $("briefBody").innerHTML = erd + mdToHtml(briefText);
 }
 $("briefBtn").onclick = async () => {

@@ -2,7 +2,7 @@
 name: failure-exits
 description: Use when a flow has a step where money moves, a slot is taken, a file is uploaded or an order is placed. Every such step needs a "what if it fails" path, and the Test Bee asks what happens there instead of guessing.
 owner_bee: poke
-talent: failure_paths
+talent: failure_exits
 version: 1
 source: ours (talent-skills research, 23 Oct 2026; idea "3-exit node")
 license: ours

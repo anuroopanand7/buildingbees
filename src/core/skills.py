@@ -25,7 +25,7 @@ def skill_body(relative_path: str) -> str:
 @lru_cache(maxsize=1)
 def _india_pack() -> str:
     return "\n\nLOCAL RULES (Shield Bee: this product is for India; ask about each, never assume):\n" + \
-        skill_body("shield/local-rules/india-dpdp-gst/SKILL.md")
+        skill_body("shield/country-rules/india-dpdp-gst/SKILL.md")
 
 
 def local_rules(text: str) -> str:

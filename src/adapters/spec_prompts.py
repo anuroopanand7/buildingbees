@@ -64,30 +64,32 @@ class XAPI(BaseModel):
 # skills"). One source: the HIVE block below routes every question to the bee whose talent covers it, and
 # /api/status hands the same list to the web app, so what people read is what the model is told.
 TALENTS = {
-    "PM": ("North", "who the user is, the goal, what is in and out of scope, how success is measured", [
+    # One owner per topic (talents review, 27 Oct 2026): pricing is North's, the payment vendor Bolt's, GST Shield's;
+    # Poke owns what happens when a step fails, Kala only its words, Pixel only what stays on screen.
+    "PM": ("North", "who the user is, the goal, what is in and out of scope, pricing, how success is measured", [
         ("Scope shaping", ["core user", "must vs later", "out of scope"]),
-        ("Business rules", ["money flows", "pricing", "success metric"]),
+        ("Money and pricing", ["what it costs the user", "who pays whom", "success number"]),
         ("Team alignment", ["settling disagreements", "sign-off", "decision log"])]),
-    "DESIGN": ("Kala", "what the experience should feel like, what the user sees first, wording, accessibility", [
-        ("Experience flow", ["first impression", "navigation", "empty states"]),
+    "DESIGN": ("Kala", "what the experience should feel like, what the user sees first, wording and tone", [
+        ("Experience flow", ["first impression", "navigation", "what a new user sees"]),
         ("Visual language", ["palette", "typography", "components"]),
-        ("Voice", ["wording", "tone", "error messages"])]),
-    "FRONTEND": ("Pixel", "screen states, validation, what is kept when something fails, device and offline behaviour", [
+        ("Voice", ["wording", "tone", "words on error screens"])]),
+    "FRONTEND": ("Pixel", "screen states, desktop or mobile layout, validation, what is kept when something fails, accessibility", [
         ("Screen states", ["loading", "empty", "error", "success"]),
-        ("Interaction", ["forms and validation", "gestures", "offline"]),
-        ("Accessibility", ["contrast", "screen readers", "keyboard"])]),
-    "BACKEND": ("Bolt", "data, integrations, vendors, timeouts, retries, limits, cost", [
-        ("Data modelling", ["entities", "relations", "access rules"]),
-        ("Integrations", ["payments", "messaging", "third-party APIs"]),
-        ("Reliability", ["retries and time-outs", "duplicate requests", "scale"])]),
-    "TESTER": ("Poke", "edge cases, abuse, what happens when it goes wrong, how we know it works", [
+        ("Devices", ["desktop or mobile", "offline", "slow network"]),
+        ("Forms and access", ["validation", "keyboard and screen readers", "contrast"])]),
+    "BACKEND": ("Bolt", "data, our own API, vendors, timeouts, retries, limits, cost", [
+        ("Data modelling", ["entities", "relations", "what is stored"]),
+        ("API and mock data", ["endpoints", "what each call sends and returns", "sample data"]),
+        ("Integrations", ["payment vendor", "messaging and notifications", "retries and time-outs"])]),
+    "TESTER": ("Poke", "edge cases, abuse, what the user can do when a step fails, how we know it works", [
         ("Edge cases", ["double taps", "two people at once", "odd input"]),
-        ("Failure paths", ["payment fails", "network drops", "half-saved data"]),
-        ("Acceptance", ["given-when-then checks", "test data"])]),
-    "COMPLIANCE": ("Shield", "privacy, consent, medical, legal or money rules, who is liable", [
+        ("Failure exits", ["payment fails", "upload fails", "slot already taken", "connection drops"]),
+        ("How we check it", ["pass or fail checks", "sample users"])]),
+    "COMPLIANCE": ("Shield", "privacy, consent, medical, legal or money rules, who is liable, who may see what", [
         ("Privacy", ["personal data kept", "how long", "consent"]),
-        ("Security", ["sign-in", "roles", "who sees what"]),
-        ("Local rules", ["data protection law", "tax and invoices", "age limits"])]),
+        ("Roles and sign-in", ["who sees what", "team roles", "login"]),
+        ("Country rules", ["data protection law", "GST and invoices", "age limits"])]),
 }
 HIVE = "".join(f"- {cat} ({name}): {owns}. Talents: " + "; ".join(f"{t} ({', '.join(sk)})" for t, sk in talents) + "\n"
                for cat, (name, owns, talents) in TALENTS.items())

@@ -42,11 +42,11 @@ Round 1: add_constraint: The prompt requires explicit branching logic but does n
   score 42/48 vs 41/48: KEPT. Spend so far $0.028.
 
 Round 2: add_constraint: The prompt requires explicit branching logic but does not enforce asking clarifying questions when splits are ambiguous, leading to assumed failure paths instea
-  edit: 'If the input does not specify behavior on either path of a potential split, you MUST ask a clarifying question about user intent or system behavior before drawing any branch—never assume failure or su'
+  edit: 'If the input does not specify behavior on either path of a potential split, you MUST ask a clarifying question about user intent or system behavior before drawing any branch, never assume failure or su'
   score 42/48 vs 42/48: reverted. Spend so far $0.042.
 
 Round 3: add_constraint: The prompt correctly instructs to draw splits but does not require asking clarifying questions when both paths of a split are unspecified, leading to assumed fa
-  edit: "If neither path of a split is specified by the input, do not draw any steps for either path—instead, generate a PM question on that flow asking what should happen on each path, using 'step' set to at_"
+  edit: "If neither path of a split is specified by the input, do not draw any steps for either path, instead, generate a PM question on that flow asking what should happen on each path, using 'step' set to at_"
   score 41/48 vs 42/48: reverted. Spend so far $0.058.
 
 Round 4: add_constraint: The prompt incorrectly requires drawing failure splits even when the input does not mention possible failures, leading to speculative branches that violate the 
@@ -94,7 +94,7 @@ Baseline: 43/48 checks passed. Failures:
 
 Round 1: edit would delete existing guidance (33 words), skipped.
 
-Round 2: add_constraint: The prompt correctly instructs drawing splits but lacks explicit emphasis on ensuring all possible outcomes—especially failures—are either handled via known pat
+Round 2: add_constraint: The prompt correctly instructs drawing splits but lacks explicit emphasis on ensuring all possible outcomes, especially failures, are either handled via known pat
   edit: 'At most 3 branches per flow; leave branches empty when the flow has no real split. If a split exists due to risk (payment failure, slot taken, upload rejected), always draw the branch and either: (a) '
   score 42/48 vs 43/48: reverted. Spend so far $0.029.
 

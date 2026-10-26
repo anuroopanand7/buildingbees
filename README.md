@@ -4,7 +4,8 @@
 
 Tools that turn one prompt into screens or diagrams have to guess everything the prompt leaves out. BuildingBees works the way a product team does: it maps the user flows first, then six bees ask what the idea leaves out (a solo founder answers a set of 3 to 7 at a time; a team answers one at a time, each person for their own role). Anyone can comment on any card, and the board changes only when you press Update the board: work moves in review rounds (on a team board, the owner processes each round). Every flow, screen, button, API and feature has a short id (FL1, S2, B3, A1, F1) shared by the board, the Brief and the export. New features can be added to the same board later. Screens are drawn only after the flows are agreed.
 
-Live demo: https://buildingbees-853213660594.asia-south1.run.app
+Live demo on Google Gemini: https://buildingbees-853213660594.asia-south1.run.app
+Live demo on NVIDIA Nemotron (newest build): https://buildingbees-nemotron-853213660594.asia-south1.run.app
 
 **Who it is for:** product teams in B2B software, first of all software agencies scoping fixed-price client work. A team shares one board: the client, the product manager, the designer, the engineers and the tester each answer only the questions that belong to them, and the client signs off the scope before anyone builds.
 
@@ -34,6 +35,27 @@ Then answer a round (or press Decide the rest for me), tap any step card to comm
 **Guardrails and data.** Every model reply is validated against a Pydantic schema before it touches the board. `strip_guesses` removes vendors, timeouts and limits nobody stated, so they become questions. Web research (Tavily, the Scout Bee) is shown as a source, never counted as a decision. The only data is what the person types; boards live in Firestore.
 
 **Technical problems we solved.** Each Gemini model has its own quota, so a fail-over chain across Agent Platform and the API key keeps the bees answering; rounds batch every answer and note into one call, so the board redraws once per round instead of after every answer; short ids (F1, FL1, S1, B1, A1) stay stable through redraws, so a coding agent can follow them.
+
+## From plan to code: what a developer gets
+
+Everything below is built from the board, with no extra model call, so it never says more than the team decided.
+
+| Feature | Where | What it does |
+|---|---|---|
+| Play the flow | "Play the flow" on any flow with screens (key P) | Click through the screens like a working app, following each button's success screen, with its failure screen one tap away |
+| What can go wrong | Zoom bar (key C) | Dims the happy path; failure screens and buttons that have one are outlined red, buttons that call an API with no failure screen are dashed |
+| Build prompt | "Build prompt" on every screen | A paste-ready prompt for Cursor or Claude Code: the screen, its buttons, the APIs they call, the decisions, and open questions marked "do not guess" |
+| API contract and live mock | Click any API | Method, path, example request and response, failure codes; a live mock at `/mock/<board>/<path>` returns the example (edit and save it to test edge cases) |
+| OpenAPI 3.0 | Brief, "OpenAPI" | `openapi.json` for Postman, Swagger or type generators (also in the docs zip) |
+| Test plan | Brief, TESTS tab | A happy path per flow, a scenario per failure screen, and the gaps still to decide |
+| Database diagram | Brief, SCHEMA tab | The tables and how they link, drawn from the schema |
+| Suggest a field change | API panel | Becomes a Backend question; the API changes only when the owner or backend lead approves it |
+| Go back to an earlier point | Menu | A copy is kept before every round and before screens are drawn (last 5); going back is itself undoable |
+| Desktop screens | Board and Play the flow | Staff and admin screens are tagged desktop and drawn wide |
+| Share with team | Top bar on a solo board | Turns a solo board into a team board; the founder keeps running it, each teammate answers only their bee's questions |
+| SVG export | Screen details | A plain SVG of the wireframe that Figma opens |
+
+Each bee has talents, and a talent is a set of skills (`talents/<bee>/<talent>/<skill>/SKILL.md`). A skill is wired into the prompts only if it moves a measured number (`scripts/eval_skills.py`); today that is Shield's India pack (DPDP consent and GST), added automatically when the idea looks Indian.
 
 ## How it works
 

@@ -8,7 +8,7 @@ which bee asks which question, and this folder holds the skills behind it. Rules
 ```
 talents/
   <bee>/                 north, kala, pixel, bolt, poke, shield, scout
-    <talent>/            the talent's name in TALENTS, as a folder (failure-paths)
+    <talent>/            the talent's name in TALENTS, as a folder (failure-exits)
       <skill>/SKILL.md   or SKILL.md directly when the talent has one skill
 ```
 
@@ -19,7 +19,7 @@ Every `SKILL.md` starts with a header the prompt code can read:
 name: failure-exits
 description: when to use it, in one sentence
 owner_bee: poke
-talent: failure_paths
+talent: failure_exits
 version: 1
 source: where it came from (repo, or "ours")
 license: MIT, Apache-2.0 or ours
@@ -37,8 +37,8 @@ Rules (from the 23 Oct 2026 research with Argon):
 
 | Bee | Talent | Skill | Status |
 |---|---|---|---|
-| Poke | failure paths | [failure-exits](poke/failure-paths/SKILL.md) | In use (enforced in code) |
-| Shield | local rules | [india-dpdp-gst](shield/local-rules/india-dpdp-gst/SKILL.md) | **In use**: `src/core/skills.py` adds it to every prompt of a board that looks Indian. A/B on Nemotron, Pune tuition idea: the Compliance Bee goes from asking only about data retention to also asking if under-18s use the app and if the centre is GST registered |
+| Poke | failure exits | [failure-exits](poke/failure-exits/SKILL.md) | In use (enforced in code) |
+| Shield | country rules | [india-dpdp-gst](shield/country-rules/india-dpdp-gst/SKILL.md) | **In use**: `src/core/skills.py` adds it to every prompt of a board that looks Indian. A/B on Nemotron, Pune tuition idea: the Compliance Bee goes from asking only about data retention to also asking if under-18s use the app and if the centre is GST registered |
 | North | scope shaping | [no-tech-in-requirements](north/scope-shaping/no-tech-in-requirements/SKILL.md) | Tested, not wired: technology mentions across 6 ideas 0 without it, 0 with it. The prompts already keep tech out |
 | Pixel | screen states | [four-states](pixel/screen-states/four-states/SKILL.md) | Tested, not wired: screens that show a list or picture with their own loading, empty and error words: 92% without it, 94% with it. The prompts already write them |
 | Bolt | data modelling | [who-can-do-what](bolt/data-modelling/who-can-do-what/SKILL.md) | Tested, not wired: schema tables with a clear who-reads, who-changes line: 8 of 10 without it, 6 of 10 with it (one run, noisy; no gain) |

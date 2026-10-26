@@ -2,7 +2,7 @@
 name: india-dpdp-gst
 description: Use when the product is used in India or touches rupees, UPI, GST, Aadhaar or Indian users.
 owner_bee: shield
-talent: local_rules
+talent: country_rules
 version: 1
 source: ours (drafted by DeepSeek via OpenCode, rewritten and checked by Claude, 23 Oct 2026)
 license: ours
