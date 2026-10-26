@@ -395,6 +395,27 @@
   .contract pre.json { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; overflow: auto; margin: 4px 0 10px; }
   .contract .meta { margin-top: 8px; }
   .copy-prompt { font-size: 12px; }
+  .suggest { margin-top: 12px; font-size: 13px; }
+  .suggest summary { cursor: pointer; font-weight: 600; }
+  .suggest label { display: grid; gap: 4px; margin: 8px 0; color: var(--muted); }
+  .suggest input, .suggest select { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); }
+  .play-sheet { max-width: 560px; }
+  .play-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; flex: 1; }
+  .tag.bad { background: var(--bad-soft); color: var(--bad); }
+  .phone { max-width: 390px; margin: 16px auto; border: 1.5px solid var(--line-strong); border-radius: 22px; padding: 14px; }
+  .play-ctas { display: grid; gap: 12px; max-width: 390px; margin: 0 auto 8px; }
+  .play-ctas .btn { width: 100%; min-height: 44px; justify-content: center; }
+  .erd-wrap { overflow: auto; margin: 0 0 18px; padding-bottom: 6px; }
+  .erd .erd-box { fill: var(--panel); stroke: var(--line-strong); }
+  .erd .erd-head { fill: var(--fill); stroke: var(--line-strong); }
+  .erd .erd-title { font: 600 13px Inter, system-ui, sans-serif; fill: var(--text); }
+  .erd .erd-col { font: 12px ui-monospace, monospace; fill: var(--text); }
+  .erd .erd-type { font: 11px ui-monospace, monospace; fill: var(--muted); }
+  .erd .erd-link { fill: none; stroke: var(--wire, var(--muted)); stroke-width: 1.5; }
+  .erd .erd-end { fill: var(--wire, var(--muted)); }
+  .history-list { list-style: none; padding: 0; margin: 0; }
+  .history-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .tier { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 14px 0 4px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.12); font-size: 13px; }
   #chaosBtn { width: auto; padding: 0 10px; gap: 6px; display: inline-flex; align-items: center; font-size: 12px; }
   #chaosBtn[aria-pressed="true"] { background: var(--warn-soft); color: var(--text); }
   body.chaos .flow-row, body.chaos .steps:not(.branch) > .step:not(.decision) { opacity: .3; }
@@ -410,7 +431,7 @@
   .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; border: none; background: var(--fill); font-size: 16px; }
 
   /* The Brief: the board as a document. Prints cleanly, so "Save as PDF" works from the browser. */
-  #brief, #boards, #fb, #flowEdit, #featureAdd, #noteAdd, #invite { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--text) 35%, transparent); display: grid; place-items: center; padding: 24px; }
+  #brief, #boards, #history, #player, #fb, #flowEdit, #featureAdd, #noteAdd, #invite { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--text) 35%, transparent); display: grid; place-items: center; padding: 24px; }
   .brief-sheet { background: var(--panel); border-radius: 18px; box-shadow: var(--shadow); width: min(820px, 100%); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; }
   .brief-sheet > :not(.brief-bar) { min-height: 0; }  /* lets the body shrink and scroll inside the capped sheet */
   .brief-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
@@ -807,6 +828,7 @@
   <button id="boardsBtn" hidden><i class="ph ph-squares-four" aria-hidden="true"></i>My boards</button>
   <button id="engineBtn" hidden></button>
   <button id="featureBtn" hidden><i class="ph ph-plus-square" aria-hidden="true"></i>Add a feature</button>
+  <button id="historyBtn" hidden><i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i>Go back to an earlier point</button>
   <button id="menuBrief" hidden><i class="ph ph-file-text" aria-hidden="true"></i>Open the Brief</button>
 </div>
 <div class="island stage" id="meter" hidden><span id="meterText"></span><div class="track"><i id="meterBar"></i></div><span id="pmSub"></span>
@@ -951,6 +973,23 @@
   <aside id="details" hidden aria-label="Details"></aside>
 </main>
 
+<div id="player" hidden role="dialog" aria-modal="true" aria-label="Play the flow">
+  <div class="brief-sheet play-sheet">
+    <div class="brief-bar"><button class="btn sm" id="playBack"><i class="ph ph-arrow-left" aria-hidden="true"></i>Back</button>
+      <span id="playHead" class="play-head"></span>
+      <button class="icon-btn" id="playClose" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button>
+    </div>
+    <div id="playBody"></div>
+  </div>
+</div>
+<div id="history" hidden role="dialog" aria-modal="true" aria-label="Go back to an earlier point">
+  <div class="brief-sheet">
+    <div class="brief-bar"><b>Go back to an earlier point</b>
+      <button class="icon-btn" id="historyClose" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button>
+    </div>
+    <div id="historyBody"></div>
+  </div>
+</div>
 <div id="boards" hidden role="dialog" aria-modal="true" aria-label="My boards">
   <div class="brief-sheet">
     <div class="brief-bar"><b>My boards</b>
@@ -1081,7 +1120,7 @@ async function load() {
   }
   if (!LINKED) store.set("bb_graph", g.total_nodes ? JSON.stringify({ product_name: g.product_name, spec_text: g.spec_text, entities: g.entities, sources: g.sources, needs_redraw: g.needs_redraw, comments: g.comments, signoffs: g.signoffs, nodes: g.nodes, edges: g.edges }) : "");
   S.stage = g.stage; S.needsRedraw = g.needs_redraw; S.comments = g.comments || []; S.round = g.round || 1; S.rounds = g.rounds || []; S.roundQ = new Set(g.round_questions || []);
-  S.ids = g.short_ids || {}; S.features = g.features || []; S.owner = g.owner || ""; S.roster = g.roster || []; S.conflicts = g.conflicts || []; S.sources = g.sources || []; S.mode = g.mode || "solo"; S.spec = g.spec_text || ""; S.lastCall = g.last_call;
+  S.ids = g.short_ids || {}; S.features = g.features || []; S.owner = g.owner || ""; S.roster = g.roster || []; S.conflicts = g.conflicts || []; S.sources = g.sources || []; S.mode = g.mode || "solo"; S.spec = g.spec_text || ""; S.lastCall = g.last_call; S.docs = g.docs || null;
   S.nodes = {}; S.fwd = {}; S.rev = {}; S.screens = {};
   g.nodes.forEach((n) => (S.nodes[n.id] = n));
   g.edges.forEach((e) => {
@@ -1118,7 +1157,7 @@ function screenOf(id) {
 function render() {
   const has = Object.keys(S.nodes).length > 0;
   $("start").hidden = has; $("work").hidden = !has;
-  $("newBtn").hidden = !has; $("meter").hidden = !has; $("briefBtn").hidden = !has; $("menuBrief").hidden = !has; $("featureBtn").hidden = !has; $("teamBtn").hidden = !has; $("roleBtn").hidden = !has || !ROLE; syncMenu();
+  $("newBtn").hidden = !has; $("meter").hidden = !has; $("briefBtn").hidden = !has; $("menuBrief").hidden = !has; $("historyBtn").hidden = !has; $("featureBtn").hidden = !has; $("teamBtn").hidden = !has; $("roleBtn").hidden = !has || !ROLE; syncMenu();
   renderEngine();
   if (!has) return;
 
@@ -1240,7 +1279,7 @@ function renderMap() {
   const feats = (S.features || []).length ? `<div class="features" aria-label="Features"><b>Features</b>${S.features.map((f) =>
     `<button class="feature ${esc(f.priority)}" data-feature="${esc(f.id)}" data-tip="${esc(f.why || f.name)}" data-tip-pos="bottom"><span class="id-chip">${esc(f.id)}</span>${esc(f.name)}<span class="pri">${f.priority === "must" ? "Must" : f.priority === "later" ? "Later" : "Should"}</span></button>`).join("")}</div>` : "";
   $("flows").innerHTML = chip + redraw + note + feats + rows.map((f) => { const last = f === lastFlow && S.stage === "flows"; return `<div class="flow ${f.id && ((PM.focus === f.id && !focusStep) || S.selected === f.id) ? "focus" : ""} ${sk && ((sk.target === f.id && !sk.step) || wide) ? "sketching-lane" : ""}">
-    <div class="flow-head"><h3>${f.id ? `<button data-id="${esc(f.id)}">${esc(f.title)}</button>` : esc(f.title)}</h3>${f.who ? `<span class="who">for ${esc(f.who)}</span>` : ""}${f.id ? `<button class="link" data-note="${esc(f.id)}" data-note-step="0" data-note-path="" data-note-label="${esc(f.title)}"><i class="ph ph-chat-circle-text" aria-hidden="true"></i> Comment</button>` : ""}${f.id ? idChip(f.id) + featChips(f.id) : ""}${f.id && mayProcess() && (!f.ids.length || S.view === "flows") ? `<button class="link" data-edit-flow="${esc(f.id)}"><i class="ph ph-pencil-simple" aria-hidden="true"></i> Edit steps</button>` : ""}</div>
+    <div class="flow-head"><h3>${f.id ? `<button data-id="${esc(f.id)}">${esc(f.title)}</button>` : esc(f.title)}</h3>${f.who ? `<span class="who">for ${esc(f.who)}</span>` : ""}${f.ids.length ? `<button class="link" data-play="${esc(f.ids.join(","))}"><i class="ph ph-play" aria-hidden="true"></i> Play the flow</button>` : ""}${f.id ? `<button class="link" data-note="${esc(f.id)}" data-note-step="0" data-note-path="" data-note-label="${esc(f.title)}"><i class="ph ph-chat-circle-text" aria-hidden="true"></i> Comment</button>` : ""}${f.id ? idChip(f.id) + featChips(f.id) : ""}${f.id && mayProcess() && (!f.ids.length || S.view === "flows") ? `<button class="link" data-edit-flow="${esc(f.id)}"><i class="ph ph-pencil-simple" aria-hidden="true"></i> Edit steps</button>` : ""}</div>
     ${f.ids.length && (S.view !== "flows" || !f.id)
       ? `<div class="flow-row wire">${f.ids.map(screenCard).join("")}</div>`
       : `<div class="steps wire">${f.steps.map((t, i) => {
@@ -1679,7 +1718,86 @@ function apiContract(n) {
   return `<div class="h">Contract</div><div class="contract"><div class="mono"><b>${esc((n.method || "").toUpperCase())}</b> ${esc(n.path)}</div>
     <div class="meta">Example request (shape from the fields, values are placeholders)</div><pre class="json">${esc(sampleJson(n.inputs_schema?.fields))}</pre>
     <div class="meta">Example response</div><pre class="json">${esc(sampleJson(n.outputs_schema?.fields))}</pre>
-    ${errs.length ? `<div class="meta">When it fails</div><ul class="reasons">${errs.map(([c, v]) => `<li><b>${esc(c)}</b> ${esc(Object.values(v || {}).join(", "))}</li>`).join("")}</ul>` : ""}</div>`;
+    ${errs.length ? `<div class="meta">When it fails</div><ul class="reasons">${errs.map(([c, v]) => `<li><b>${esc(c)}</b> ${esc(Object.values(v || {}).join(", "))}</li>`).join("")}</ul>` : ""}
+    <details class="suggest"><summary>Suggest a field change</summary>
+      <label>Which side <select id="sfSide"><option value="response">What it returns</option><option value="request">What it sends</option></select></label>
+      <label>Add fields <input id="sfAdd" placeholder="eta_minutes, store_name" autocomplete="off"></label>
+      <label>Remove fields <input id="sfRemove" placeholder="exact names from the lists above" autocomplete="off"></label>
+      <label>Why <input id="sfWhy" placeholder="The home screen shows the delivery time" autocomplete="off"></label>
+      <button class="btn sm" data-suggest-fields="${esc(n.id)}">Send to Bolt for approval</button>
+      <div class="meta">Nothing changes until the owner or the backend lead approves it. It shows up as a Backend question.</div></details></div>`;
+}
+// The last few points the board can go back to: before each round and before the screens were drawn.
+async function openHistory() {
+  const pts = (await api("/api/history")).points;
+  $("historyBody").innerHTML = pts.length ? `<ul class="history-list">${pts.map((p) => `<li><span><b>${esc(p.why)}</b><span class="muted"> ${esc(new Date(p.at + "Z").toLocaleString())}</span></span>${mayProcess() ? `<button class="btn sm" data-restore="${esc(p.at)}">Go back here</button>` : ""}</li>`).join("")}</ul>`
+    : '<p class="muted">No earlier points yet. One is kept before every Update the board and before the screens are drawn (the last 5).</p>';
+  $("history").hidden = false; $("historyClose").focus();
+}
+// "Play the flow" (Raju's idea, 26 Oct 2026): click through the drawn screens like a working app, following each
+// button's success screen, with its failure screen one tap away. Read-only: it never changes the board.
+const PLAY = { path: [], back: [], fail: false, opener: null };
+function playFlow(path) {
+  PLAY.path = path; PLAY.back = []; PLAY.fail = false; PLAY.opener = document.activeElement;
+  $("player").hidden = false; playShow(path[0]); $("playClose").focus();
+}
+function playShow(id, fail = false) {
+  const n = S.nodes[id]; if (!n) return;
+  PLAY.at = id; PLAY.fail = fail;
+  const pos = PLAY.path.indexOf(id);
+  const ctas = (S.fwd[id] || []).map((c) => S.nodes[c]).filter((c) => c && c.layer === "CTA");
+  $("playHead").innerHTML = `${idChip(id)}<b>${esc(n.title)}</b><span class="muted">${pos >= 0 ? `Screen ${pos + 1} of ${PLAY.path.length}` : "Off the main path"}</span>${fail ? '<span class="tag bad">Failure path</span>' : ""}`;
+  $("playBack").disabled = !PLAY.back.length;
+  $("playBody").innerHTML = `<div class="phone">${n.metadata?.elements?.length ? wireframe(n.metadata.elements) : '<p class="muted">This screen is not drawn yet.</p>'}</div>
+    <div class="play-ctas">${ctas.map((c) => {
+      const apis = (S.fwd[c.id] || []).map((a) => S.nodes[a]).filter((a) => a && a.layer === "API");
+      const bad = S.nodes[c.target_screen_on_failure]?.layer === "SCREEN" && c.target_screen_on_failure !== id;
+      return `<div><button class="btn primary" data-play-go="${esc(c.id)}">${esc(c.label || c.title)}</button>
+        ${apis.length ? `<div class="muted mono">${apis.map((a) => `calls ${esc(S.ids?.[a.id] || "")} ${esc(a.method)} ${esc(a.path)}`).join("; ")}</div>` : ""}
+        ${bad ? `<button class="link" data-play-fail="${esc(c.id)}">What if it fails?</button>` : ""}</div>`; }).join("")
+      || `<p>End of this path.</p><button class="btn" data-play-restart>Start again</button>`}</div>`;
+}
+function playGo(id, fail) {
+  const c = S.nodes[id], to = fail ? c.target_screen_on_failure : c.target_screen_on_success;
+  if (S.nodes[to]?.layer !== "SCREEN" || to === PLAY.at) return toast(fail ? "No failure screen is drawn for this button yet. Poke will ask." : "This button has no next screen yet. A bee will ask.");
+  PLAY.back.push([PLAY.at, PLAY.fail]); playShow(to, fail);
+}
+function playClose() { $("player").hidden = true; PLAY.opener?.focus?.(); }
+document.addEventListener("keydown", (e) => {
+  if ($("player").hidden) return;
+  if (e.key === "Escape") playClose();
+  if (e.key === "ArrowLeft" && PLAY.back.length) playShow(...PLAY.back.pop());
+});
+
+// Database diagram from the schema tables: boxes in a 3-column grid, a line from a "<table>_id" column (or a
+// relation naming the table) to that table. Pure function of the tables, so the diagram never says more than the doc.
+function erdSvg(tables, esc) {
+  const W = 270, HEAD = 28, ROW = 20, GX = 60, GY = 50, PAD = 10, COLS = 3;
+  const cols = (t) => t.columns || [];
+  const hOf = (t) => HEAD + Math.max(1, cols(t).length) * ROW + 6;
+  const pos = {}, rowH = [];
+  tables.forEach((t, i) => { const r = Math.floor(i / COLS); rowH[r] = Math.max(rowH[r] || 0, hOf(t)); });
+  tables.forEach((t, i) => { const r = Math.floor(i / COLS), c = i % COLS;
+    pos[t.name] = { x: PAD + c * (W + GX), y: PAD + rowH.slice(0, r).reduce((a, b) => a + b + GY, 0), t }; });
+  const key = (n) => String(n || "").toLowerCase();
+  const find = (word) => tables.find((t) => [key(t.name), key(t.name).replace(/s$/, "")].includes(key(word)));
+  const links = [], seen = new Set();
+  tables.forEach((t) => {
+    const add = (b, row) => { if (!b || b.name === t.name || seen.has(t.name + ">" + b.name)) return; seen.add(t.name + ">" + b.name); links.push([t, b, row]); };
+    cols(t).forEach((c, i) => { const m = key(c.name).match(/^(.+)_id$/); if (m) add(find(m[1]), i); });
+    (t.relations || []).forEach((r) => tables.forEach((b) => { if (new RegExp(`\\b${key(b.name).replace(/[^a-z0-9_]/g, "")}\\b`).test(key(r))) add(b, -1); }));
+  });
+  const boxes = tables.map((t) => { const p = pos[t.name], h = hOf(t);
+    return `<g><rect class="erd-box" x="${p.x}" y="${p.y}" width="${W}" height="${h}" rx="8"/><rect class="erd-head" x="${p.x}" y="${p.y}" width="${W}" height="${HEAD}" rx="8"/>
+      <text class="erd-title" x="${p.x + 10}" y="${p.y + 19}">${esc(t.name)}</text>${cols(t).map((c, i) =>
+      `<text class="erd-col" x="${p.x + 10}" y="${p.y + HEAD + 15 + i * ROW}">${esc(c.name)}</text><text class="erd-type" x="${p.x + W - 10}" y="${p.y + HEAD + 15 + i * ROW}" text-anchor="end">${esc(c.type || "")}</text>`).join("")}</g>`; }).join("");
+  const lines = links.map(([a, b, row]) => { const pa = pos[a.name], pb = pos[b.name];
+    const right = pb.x > pa.x, ya = pa.y + (row >= 0 ? HEAD + 10 + row * ROW : HEAD / 2);
+    const xa = right ? pa.x + W : pa.x, xb = pb.x + (pb.x > pa.x ? 0 : pb.x < pa.x ? W : W / 2), yb = pb.y + (pb.x === pa.x ? 0 : HEAD / 2);
+    const dx = Math.max(40, Math.abs(xb - xa) / 2) * (right ? 1 : -1);
+    return `<path class="erd-link" d="M${xa},${ya} C${xa + dx},${ya} ${xb - (pb.x === pa.x ? 0 : dx)},${yb} ${xb},${yb}"/><circle class="erd-end" cx="${xb}" cy="${yb}" r="3"/>`; }).join("");
+  const w = PAD * 2 + Math.min(COLS, tables.length) * (W + GX) - GX, h = PAD * 2 + rowH.reduce((a, b) => a + b + GY, 0) - GY;
+  return `<svg class="erd" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Tables and how they link">${lines}${boxes}</svg>`;
 }
 // The build prompt is plain text, so it skips api()'s JSON parsing; same board, role and sign-in headers.
 async function copyPrompt(short) {
@@ -1820,8 +1938,12 @@ function pmSet() {
   const qs = pmQueue(); if (!qs.length) return [];
   const same = qs.filter((q) => q.target_node_id === qs[0].target_node_id);
   const rest = qs.filter((q) => q.target_node_id !== qs[0].target_node_id);
-  return [...same, ...rest].slice(0, Math.max(SET_MIN, Math.min(same.length, SET_MAX)));
+  const set = [...same, ...rest].slice(0, Math.max(SET_MIN, Math.min(same.length, SET_MAX)));
+  return [...set.filter((q) => !beePick(q)), ...set.filter(beePick)];  // what only you can decide comes first
 }
+// Two tiers (Raju, 24 Oct 2026; Roger chose no silent auto-accept): a technical or nice-to-know question with a
+// suggestion is one the bees may pick, shown as recommended; product, design and compliance calls stay yours.
+const beePick = (q) => !!q.suggested_options?.length && (!q.is_blocking || ["FRONTEND", "BACKEND", "TESTER"].includes(q.category));
 // PM.draft maps question id -> { opts: [picked suggestions], text: typed answer, decided: bees chose }
 const draftText = (d) => d ? [...d.opts, d.text.trim()].filter(Boolean).join("; ") : "";
 function setLabel(set) {
@@ -1835,7 +1957,9 @@ function renderSet(ask, cite) {
   ask.innerHTML = `
     <div class="set-head"><b>${set.length} questions${set.every((q) => q.target_node_id === first.target_node_id) ? ` about ${esc(about)}` : ""}</b>
       <span class="muted">Round ${S.round} has ${roundLeft()} question${roundLeft() === 1 ? "" : "s"} left${later ? ` (${later} more wait for round ${S.round + 1})` : ""}. Nothing on the board changes until you press Update the board.</span></div>
-    ${set.map((q, n) => { const d = PM.draft[q.id] || { opts: [], text: "" }; return `
+    ${set.map((q, n) => { const d = PM.draft[q.id] || { opts: [], text: "" }; const tier = beePick(q) && (n === 0 || !beePick(set[n - 1]))
+      ? `<div class="tier"><span><b>The bees can pick these</b> <span class="muted">Their pick is marked Recommended; change any you disagree with.</span></span><button class="link" data-set-picks><i class="ph ph-magic-wand" aria-hidden="true"></i> Take the bees' picks</button></div>`
+      : n === 0 && !beePick(q) && set.some(beePick) ? '<div class="tier"><b>Only you can decide these</b></div>' : ""; return `${tier}
       <div class="set-q ${draftText(d) ? "done" : ""}">
         <div class="who">${beeIcon(q.category, true)}<b>${esc(beeTitle(q.category))}</b>${stepOf(q) ? ` <span class="muted">about step ${q.metadata.step}, ${esc(stepOf(q))}</span>` : ""}
           <span class="tag ${q.is_blocking ? "" : "soft"}">${q.is_blocking ? "Needed before building" : "Good to know"}</span></div>
@@ -1924,6 +2048,25 @@ document.addEventListener("click", (e) => {
   const t = e.target.closest("button, [data-id]");
   if (!t) return;
   if (t.dataset.copyPrompt) return copyPrompt(t.dataset.copyPrompt).catch(fail);
+  if (t.dataset.play) return playFlow(t.dataset.play.split(","));
+  if (t.dataset.playGo) return playGo(t.dataset.playGo, false);
+  if (t.dataset.playFail) return playGo(t.dataset.playFail, true);
+  if (t.dataset.playRestart !== undefined) { PLAY.back = []; return playShow(PLAY.path[0]); }
+  if (t.id === "playBack" && PLAY.back.length) return playShow(...PLAY.back.pop());
+  if (t.id === "playClose") return playClose();
+  if (t.dataset.suggestFields) {  // a developer's field edit becomes a Backend question (Raju's idea, approved by Roger 26 Oct)
+    const list = (id) => $(id).value.split(",").map((x) => x.trim()).filter(Boolean);
+    return api(`/api/nodes/${encodeURIComponent(t.dataset.suggestFields)}/suggest-fields`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ side: $("sfSide").value, add: list("sfAdd"), remove: list("sfRemove"), why: $("sfWhy").value, by: byLine() }) })
+      .then(load).then(() => toast("Sent. Bolt's question waits for the owner or the backend lead to approve it.")).catch(fail);
+  }
+  if (t.id === "historyBtn") { menu(false); return openHistory().catch(fail); }
+  if (t.id === "historyClose") { $("history").hidden = true; return; }
+  if (t.dataset.restore) {
+    if (!confirm("Go back to this point? The board as it is now is kept, so you can come back to it.")) return;
+    return api("/api/history/restore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ at: t.dataset.restore }) })
+      .then(() => { $("history").hidden = true; SEEN.clear(); return load(); }).then(() => toast("The board is back at that point.")).catch(fail);
+  }
   if (t.id === "chaosBtn") {  // Poke's view: dim the happy path so every failure and undecided path stands out
     const on = document.body.classList.toggle("chaos"); t.setAttribute("aria-pressed", on);
     if (on && !document.querySelector("#flows .steps.branch")) toast("No failure paths drawn yet. Open the Flows view, or answer Poke's questions to add them.");
@@ -1977,6 +2120,10 @@ document.addEventListener("click", (e) => {
     const d = PM.draft[t.dataset.sq] || { opts: [], text: "" };
     d.opts = d.opts.includes(t.dataset.sopt) ? d.opts.filter((o) => o !== t.dataset.sopt) : [...d.opts, t.dataset.sopt];
     d.decided = false; PM.draft[t.dataset.sq] = d; return render();
+  }
+  if (t.dataset.setPicks !== undefined) {  // fills in the recommended answer for every bee-pick question in this set
+    pmSet().filter(beePick).forEach((q) => { if (!draftText(PM.draft[q.id])) PM.draft[q.id] = { opts: [q.suggested_options[0]], text: "", decided: true }; });
+    return render();
   }
   if (t.dataset.sdecide) { const q = S.nodes[t.dataset.sdecide]; PM.draft[q.id] = { opts: [q.suggested_options[0]], text: "", decided: true }; return render(); }
   if (t.dataset.setDecide !== undefined) {
@@ -2140,7 +2287,9 @@ function showDoc(name) {
   if (d) { briefText = d.markdown; briefFile = d.file; }
   $("docTabs").innerHTML = [`<button role="tab" aria-selected="${name === "brief"}" data-doc="brief">Brief</button>`].concat(DOCS.filter((x) => x.name !== "brief").map((x) =>
     `<button role="tab" aria-selected="${name === x.name}" data-doc="${x.name}" title="${esc(x.title)}">${esc(x.file.replace(".md", ""))}<span class="pct ${x.ready === 100 ? "done" : ""}">${x.ready}%</span></button>`)).join("");
-  $("briefBody").innerHTML = mdToHtml(briefText);
+  // The schema tab opens with a diagram of the tables (Raju's idea), drawn from the same tables as the text.
+  const erd = name === "schema" && S.docs?.tables?.length ? `<div class="erd-wrap" aria-label="Database diagram">${erdSvg(S.docs.tables, esc)}</div>` : "";
+  $("briefBody").innerHTML = erd + mdToHtml(briefText);
 }
 $("briefBtn").onclick = async () => {
   try {

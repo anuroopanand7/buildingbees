@@ -245,3 +245,44 @@ def test_build_prompt_for_one_screen(monkeypatch):
     assert "do not guess" in r.text or "Decided by the team" in r.text or "Use the project's existing stack" in r.text
     flow = next(ids[n["id"]] for n in g["nodes"] if n["layer"] == "FLOW")
     assert client.get(f"/api/prompt/{flow}", headers=h).status_code == 404  # prompts are per screen
+
+
+def _drawn_board(monkeypatch, bid):
+    """A board with flows and screens from the fake Gemini engine."""
+    from tests.test_gemini_ingest import FakeGemini
+    monkeypatch.setitem(server.engines, "gemini", FakeGemini())
+    monkeypatch.setattr(server.tavily, "research", lambda text: [])
+    h = {"X-Board": bid}
+    server.boards.pop(bid, None)
+    server._mem_hist.pop(bid, None)
+    client.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "a shop"}, headers=h)
+    return h, client.post("/api/expand?engine=gemini", headers=h).json()
+
+
+def test_a_suggested_field_change_waits_for_approval(monkeypatch):
+    """Raju's idea, our way: a developer's field edit is a Backend question; only "Approve the change" applies it."""
+    h, g = _drawn_board(monkeypatch, "field-change")
+    api_id = next(n["id"] for n in g["nodes"] if n["layer"] == "API")
+    before = server.boards["field-change"].nodes[api_id].outputs_schema.get("fields", [])
+    r = client.post(f"/api/nodes/{api_id}/suggest-fields", json={"side": "response", "add": ["eta_minutes"], "why": "home shows it"}, headers=h).json()
+    assert server.boards["field-change"].nodes[api_id].outputs_schema.get("fields", []) == before  # nothing yet
+    q = server.boards["field-change"].nodes[r["question_id"]]
+    assert q.category.value == "BACKEND" and "eta_minutes" in q.question_text
+    client.post(f"/api/questions/{q.id}/resolve", json={"answer_text": "Approve the change", "by": "Bolt"}, headers=h)
+    assert "eta_minutes" in server.boards["field-change"].nodes[api_id].outputs_schema["fields"]
+    assert client.post(f"/api/nodes/{api_id}/suggest-fields", json={"side": "response"}, headers=h).status_code == 400
+
+
+def test_go_back_to_before_the_screens_and_undo_it(monkeypatch):
+    """Raju's undo: drawing screens keeps a snapshot; going back restores it and is itself undoable."""
+    h, g = _drawn_board(monkeypatch, "history-test")
+    screens = sum(n["layer"] == "SCREEN" for n in g["nodes"])
+    pts = client.get("/api/history", headers=h).json()["points"]
+    assert pts and pts[0]["why"] == "Before the screens were drawn"
+    back = client.post("/api/history/restore", json={"at": pts[0]["at"]}, headers=h).json()
+    assert screens and not any(n["layer"] == "SCREEN" for n in back["nodes"])
+    again = client.get("/api/history", headers=h).json()["points"][0]
+    assert again["why"] == "Before going back"
+    redo = client.post("/api/history/restore", json={"at": again["at"]}, headers=h).json()
+    assert sum(n["layer"] == "SCREEN" for n in redo["nodes"]) == screens
+    assert client.post("/api/history/restore", json={"at": "nope"}, headers=h).status_code == 404

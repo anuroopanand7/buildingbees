@@ -92,11 +92,15 @@ log = logging.getLogger("buildingbees")
 
 _store = None   # Firestore collection of boards
 _users = None   # Firestore collection of people and the boards they own
+_hist = None    # Firestore collection of board snapshots, one per round, for "go back to round N"
+HISTORY_KEEP = 5  # snapshots kept per board; older ones are deleted
+_mem_hist: Dict[str, List[Dict[str, Any]]] = {}  # the same, in memory, for tests and local runs
 if os.getenv("K_SERVICE"):  # set by Cloud Run; keeps tests and local runs off the network
     try:
         from google.cloud import firestore
         _db = firestore.Client()
         _store, _users = _db.collection("boards"), _db.collection("users")
+        _hist = _db.collection("board_history")
     except Exception as e:
         log.warning("Firestore unavailable, boards stay in memory: %s", e)
 
@@ -120,6 +124,38 @@ def _save_board(bid: str, g: Optional[BuildingBeesEngine] = None) -> bool:
     except Exception as e:
         log.warning("Could not save board: %s", e)
         return False
+
+
+def _snapshot(bid: str, g: BuildingBeesEngine, why: str) -> None:
+    """Keeps a copy of the board as it is now, before a round changes it, so the team can go back (Raju, 24 Oct 2026).
+    Stored apart from the board so the board document stays small; only the last HISTORY_KEEP are kept."""
+    entry = {"round": getattr(g, "round", 1), "why": why, "at": datetime.datetime.utcnow().isoformat(),
+             "data": zlib.compress(json.dumps(_state(g), default=str).encode())}
+    keep = (_mem_hist.get(bid, []) + [entry])[-HISTORY_KEEP:]
+    gone = [e for e in _mem_hist.get(bid, []) if e not in keep]
+    _mem_hist[bid] = keep
+    if _hist is None:
+        return
+    try:
+        key = hashlib.sha1(bid.encode()).hexdigest()
+        _hist.document(f"{key}_{entry['at']}").set({"board": key, **entry})
+        for e in gone:
+            _hist.document(f"{key}_{e['at']}").delete()
+    except Exception as e:
+        log.warning("Could not save a board snapshot: %s", e)  # the round still runs; only the undo point is missing
+
+
+def _history(bid: str) -> List[Dict[str, Any]]:
+    """The board's snapshots, oldest first (memory first, then Firestore after a restart)."""
+    if _mem_hist.get(bid) or _hist is None:
+        return _mem_hist.get(bid, [])
+    try:
+        key = hashlib.sha1(bid.encode()).hexdigest()
+        docs = [d.to_dict() for d in _hist.where("board", "==", key).stream()]
+        _mem_hist[bid] = sorted(docs, key=lambda e: e["at"])[-HISTORY_KEEP:]
+    except Exception as e:
+        log.warning("Could not read board history: %s", e)
+    return _mem_hist.get(bid, [])
 
 
 def _load_board(bid: str) -> Optional[BuildingBeesEngine]:
@@ -356,8 +392,7 @@ def resolve_question(question_id: str, payload: QuestionResolveRequest) -> Dict[
     else:
         node.metadata.pop("default", None)  # a person chose it now
     
-    # Target node status can be updated to READY if no other blocking questions exist
-    target_node = graph.get_node(node.target_node_id)
+    _apply_field_change(graph, node)
 
     return {
         "status": "RESOLVED",
@@ -365,6 +400,89 @@ def resolve_question(question_id: str, payload: QuestionResolveRequest) -> Dict[
         "target_node_id": node.target_node_id,
         "answer_text": node.answer_text
     }
+
+
+FIELD_YES = "Approve the change"
+
+
+class FieldChange(BaseModel):
+    side: str  # "request" (what the app sends) or "response" (what comes back)
+    add: List[str] = []
+    remove: List[str] = []
+    why: str = ""
+    by: str = ""
+
+
+@app.post("/api/nodes/{node_id}/suggest-fields")
+def suggest_field_change(node_id: str, payload: FieldChange) -> Dict[str, Any]:
+    """A developer proposes adding or removing API fields (Raju, 24 Oct 2026). It becomes a Backend question, so the
+    owner or the backend lead approves it and the decision log keeps the record; nothing changes until then."""
+    g = _board()
+    api_node = g.get_node(node_id)
+    if not isinstance(api_node, APINode):
+        raise HTTPException(status_code=404, detail="Field changes are suggested on an API")
+    side = "inputs_schema" if payload.side == "request" else "outputs_schema"
+    add = [f.strip()[:60] for f in payload.add if f.strip()][:10]
+    remove = [f.strip() for f in payload.remove if f.strip() in getattr(api_node, side).get("fields", [])][:10]
+    if not add and not remove:
+        raise HTTPException(status_code=400, detail="Add or remove at least one field")
+    what = "; ".join(x for x in (add and "add " + ", ".join(add), remove and "remove " + ", ".join(remove)) if x)
+    q = QuestionNode(target_node_id=node_id, title=f"Field change on {api_node.path}", category=QuestionCategory.BACKEND,
+                     question_text=f"Change what {api_node.method} {api_node.path} {'sends' if side == 'inputs_schema' else 'returns'}: {what}?"
+                                   + (f" Why: {payload.why.strip()[:200]}" if payload.why.strip() else ""),
+                     is_blocking=False, suggested_options=[FIELD_YES, "Keep it as it is"],
+                     metadata={"field_change": {"side": side, "add": add, "remove": remove},
+                               "suggested_by": (payload.by.strip() or "A teammate")[:60]})
+    g.add_node(q)
+    g.add_edge(node_id, q.id)
+    return {"status": "SUGGESTED", "question_id": q.id}
+
+
+def _apply_field_change(g: BuildingBeesEngine, q: QuestionNode) -> None:
+    """When a suggested field change is approved, the API's fields change at once; the tech docs pick it up when they
+    are written again. Anything other than approval leaves the API as it was."""
+    change = q.metadata.get("field_change")
+    api_node = g.get_node(q.target_node_id)
+    if not change or not isinstance(api_node, APINode) or q.metadata.get("applied"):
+        return
+    if (q.answer_text or "").strip() != FIELD_YES:
+        return
+    schema = getattr(api_node, change["side"])
+    fields = [f for f in schema.get("fields", []) if f not in change["remove"]]
+    schema["fields"] = fields + [f for f in change["add"] if f not in fields]
+    q.metadata["applied"] = True
+    q.metadata.pop("pending", None)  # nothing for the bees to redraw; the change is already on the board
+
+
+@app.get("/api/history")
+def list_history() -> Dict[str, Any]:
+    """The points this board can go back to (the last few rounds), newest first, without the board data."""
+    return {"points": [{"at": e["at"], "round": e["round"], "why": e["why"]} for e in reversed(_history(_board_id.get()))]}
+
+
+class RestoreRequest(BaseModel):
+    at: str
+
+
+@app.post("/api/history/restore")
+def restore_history(payload: RestoreRequest) -> Dict[str, Any]:
+    """Go back to an earlier point. The board as it is now is kept first, so going back can itself be undone.
+    Role links, the owner and the team stay as they are now: going back changes the plan, not who is on it."""
+    bid = _board_id.get()
+    g = _board()
+    if not _may_process(g):
+        raise HTTPException(status_code=403, detail="On a team board the owner or the product manager can go back.")
+    point = next((e for e in _history(bid) if e["at"] == payload.at), None)
+    if point is None:
+        raise HTTPException(status_code=404, detail="That point is no longer kept")
+    _snapshot(bid, g, "Before going back")
+    old = _rebuild(json.loads(zlib.decompress(point["data"])))
+    for keep in ("invites", "owner", "roster", "mode"):
+        if hasattr(g, keep):
+            setattr(old, keep, getattr(g, keep))
+    boards[bid] = old
+    _touch(old)
+    return get_graph_state()
 
 
 # Fields a bee may change on a drawn node after an answer, and how to read the text it sends.
@@ -584,6 +702,7 @@ def react_to_answers(payload: BatchRequest, engine: str) -> Dict[str, Any]:
     notes = [c for c in getattr(g, "comments", []) if c["status"] == "open"][:20] if not payload.question_ids else []
     if not qs and not notes:
         raise HTTPException(status_code=404, detail="Nothing is waiting to be applied")
+    _snapshot(_board_id.get(), g, f"Before round {getattr(g, 'round', 1)} was applied")
     stage, board = _react_board(g, list(dict.fromkeys([q.target_node_id for q in qs] + [c["target"] for c in notes if c["target"] in g.nodes])))
     ids = {q.id for q in qs}
     decisions = "\n".join(
@@ -886,6 +1005,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     flows = [n for n in old.nodes.values() if n.layer.value == "FLOW"]
     if not flows:
         raise HTTPException(status_code=400, detail="There are no flows to draw screens for yet")
+    _snapshot(_board_id.get(), old, "Before the screens were drawn")
     users = [n for n in old.nodes.values() if n.layer.value == "USER"]
     asked = [n for n in old.nodes.values() if isinstance(n, QuestionNode)]
     decisions = [q for q in asked if q.question_status == QuestionStatus.ANSWERED]
