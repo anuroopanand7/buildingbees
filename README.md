@@ -108,34 +108,35 @@ Both engines fill the same Pydantic schemas (`src/adapters/spec_prompts.py`), so
 ## NVIDIA Nemotron on Nebius Token Factory
 
 ### How Nemotron and Token Factory are used (Nebius x NVIDIA hackathon)
-Every reasoning step runs on NVIDIA Nemotron models through the Nebius Token Factory inference API (`src/adapters/nvidia_adapter.py`), routed the way the Best Apps and Agents track suggests:
 
-| Job | Model | Measured 20 Oct 2026 |
+Live, Nemotron only: https://buildingbees-nemotron-853213660594.asia-south1.run.app (a Cloud Run service with only the
+Nebius key). Every model call goes to NVIDIA Nemotron through the Token Factory API (`src/adapters/nvidia_adapter.py`),
+routed by job the way the Best Apps and Agents track suggests: Ultra for the heavy reasoning, Super for everyday calls.
+
+| Job | Model | Measured on the live service, 27 Oct 2026 |
 |---|---|---|
-| Draw the flows, splits and features from an idea | `nvidia/Nemotron-3.5-Super-VL` (won an A/B against Ultra: same quality, 5x cheaper, 2x faster) | 6.6 s, $0.003 |
-| Read a round of answers and notes, flag misalignments | `nvidia/nemotron-3-super-120b-a12b` | 8 s, $0.002 |
-| Draw the screens, buttons and APIs | Ultra | 19 s, $0.028 |
-| Write the full plan (stories, tests, build order) | Ultra | 10 s, $0.017 |
-| Read a photo of a whiteboard sketch | `nvidia/Nemotron-3.5-Super-VL` | 7 s, $0.004 |
+| Draw the flows, splits, features and first questions from an idea or a sketch photo | `nvidia/Nemotron-3.5-Super-VL` (won an A/B against Ultra: same quality, about 5x cheaper, 2x faster) | 10.6 s of model time, 3,518 tokens in, $0.004 |
+| Read a round of answers and notes, redraw the board | `nvidia/nemotron-3-super-120b-a12b` | about 4 s |
+| Draw the screens, buttons and APIs; write the plan and the tech docs | `nvidia/Nemotron-3-Ultra-550b-a55b` | screens 11 s, $0.015; plan about 8 s; docs about 15 s |
 
-A whole board costs about **$0.05**. Every call has a fallback model (Ultra and Super VL back each other up), so one busy model never stops a board (a busy Ultra hands over to Super VL after 45 s). We chose the routing by measuring it: the same ideas drawn by Ultra, Super VL and Lightning, scored by `scripts/eval_questions.py` (questions per idea, standard-topic questions, duplicates), with time and cost. Token Factory's OpenAI-compatible API let us reuse the same Pydantic schemas as the Gemini engine: we send the JSON Schema with thinking switched off (`/no_think`, `enable_thinking: false`), validate every reply, and retry once with the validation error. A daily spend guard (`NVIDIA_DAILY_BUDGET_USD`, default $1.50) is worked out from the token counts Token Factory returns, so the demo keeps running on the hackathon credit until judging ends. Tavily powers the Scout Bee (one web search per new board).
+What makes it work:
 
-**Nemotron-only demo:** https://buildingbees-nemotron-853213660594.asia-south1.run.app (a second Cloud Run service with only the Nebius key, so every call goes to `nvidia/Nemotron-3-Ultra-550b-a55b`; measured 20 Oct: a map in 14.5 to 16.5 s, a round in 3.5 s, 8 screens in 18.5 s, the full plan in 11 s).
-
-Pick "NVIDIA Nemotron" on the start screen and every model call in the product runs on Nemotron 3 through Token Factory (`src/adapters/nvidia_adapter.py`). Two models share the work:
-
-| Job | Model | Why | Measured (11 Oct 2026) |
-|---|---|---|---|
-| Read the idea, draw the flows, ask the first questions | `nvidia/nemotron-3-super-120b-a12b` | The founder is waiting; it has to be quick | about 10 s, including the web search |
-| Read each answer, catch a vague one, redraw the board | `nvidia/nemotron-3-super-120b-a12b` | Runs after every answer, so latency is the product | about 2 s |
-| Draw every screen, button, API and data entity from the agreed flows | `nvidia/Nemotron-3-Ultra-550b-a55b` | The one heavy reasoning job | about 8 s |
-
-What made it work:
-
-- **Thinking is switched off** (`chat_template_kwargs: {enable_thinking: false}`). Left on, Nemotron 3 spent its whole 8,192-token budget reasoning and the JSON came back cut short. Off, the same call returns valid JSON in a few seconds.
-- **Schema in the prompt, validated with Pydantic.** The reply is parsed against the same schema Gemini fills. If it does not validate, the error is sent back once and Nemotron corrects it.
-- **Token Factory's speed is what makes the interview possible.** A two-second reply after every answer feels like a colleague; a twenty-second one would not.
-- **A daily ceiling** (`NVIDIA_DAILY_CALLS`, default 200) keeps the public demo inside the hackathon credit.
+- **Native structured output.** Every call sends `response_format: {type: "json_schema"}`, so Token Factory's guided
+  decoding can only produce JSON of our Pydantic schema; we still validate it and retry once with the error. If a model
+  ever refuses the format, the adapter falls back to writing the schema into the prompt.
+- **Thinking off** (`chat_template_kwargs: {enable_thinking: false}`): left on, Nemotron 3 spent its token budget
+  reasoning and the JSON came back cut short.
+- **Fallbacks and timeouts:** Ultra and Super VL back each other up; a busy Ultra hands over after 45 s and the backup
+  gets 60 s, so a board never waits past Cloud Run's request limit.
+- **Visible usage:** the engine pill on the board shows each call's model, seconds, tokens, prefix-cache hits (from
+  `usage.prompt_tokens_details.cached_tokens`; prompts start with their fixed instructions so repeated calls share a
+  cacheable opening) and cost.
+- **Spend guard:** a daily ceiling (`NVIDIA_DAILY_BUDGET_USD`, default $1.50) from the token counts Token Factory returns,
+  kept in Firestore so a cold start does not reset it. A whole board costs about $0.05.
+- **Measured, not guessed:** model routing and every prompt change are scored by `scripts/eval_questions.py`
+  (27 Oct, Nemotron: 12.0 questions per idea, 0 on standard topics, 0 near-duplicates); skills are wired only if
+  `scripts/eval_skills.py` shows a gain. Nebius cannot fine-tune Nemotron, so the flows prompt was tuned with a
+  keep-only-if-better loop (`scripts/optimize_prompt.py`).
 
 ## Scout Bee: research with Tavily
 
