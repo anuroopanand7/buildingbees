@@ -45,6 +45,7 @@ from src.core.schema import (
 from src.adapters.gemini_adapter import GoogleGeminiAdapter
 from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.core.docs import build_docs
+from src.core import mock
 from src.core.skills import for_call
 from src.adapters.spec_prompts import TALENTS
 from src.core.agent_view import build_prompt, decision_log, item as plan_item, ready_wave
@@ -1452,6 +1453,20 @@ def get_build_prompt(short_id: str) -> str:
         return build_prompt(_board(), short_id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e.args[0]))
+
+
+@app.api_route("/mock/{board_id}/{api_path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+def mock_api(board_id: str, api_path: str, request: Request) -> JSONResponse:
+    """The board's APIs, answering with example JSON (src/core/mock.py). Open to any origin, so a frontend on
+    localhost can call it; it only ever returns placeholders shaped from field names."""
+    cors = {"Access-Control-Allow-Origin": "*"}
+    _board_id.set(board_id[:64])
+    node, allowed = mock.match(_board(), request.method, api_path)
+    if node is None:
+        status, why = (405, f"This path answers {', '.join(sorted(set(allowed)))}") if allowed else (404, "No API on this board has that path")
+        return JSONResponse(status_code=status, content={"detail": why}, headers=cors)
+    return JSONResponse(content=mock.sample_json(node.outputs_schema.get("fields", [])),
+                        headers={**cors, "X-Mock": "example data shaped from field names"})
 
 
 @app.get("/api/ready")

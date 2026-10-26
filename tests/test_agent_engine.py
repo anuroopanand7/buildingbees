@@ -286,3 +286,18 @@ def test_go_back_to_before_the_screens_and_undo_it(monkeypatch):
     redo = client.post("/api/history/restore", json={"at": again["at"]}, headers=h).json()
     assert sum(n["layer"] == "SCREEN" for n in redo["nodes"]) == screens
     assert client.post("/api/history/restore", json={"at": "nope"}, headers=h).status_code == 404
+
+
+def test_mock_api_answers_with_placeholders(monkeypatch):
+    """Raju's live mock: each API answers at /mock/<board>/<path> with example JSON from its response fields."""
+    from src.core import mock
+    h, g = _drawn_board(monkeypatch, "mock-test")
+    api = next(n for n in server.boards["mock-test"].nodes.values() if isinstance(n, server.APINode))
+    api.path, api.method = "/orders/{order_id}", "GET"
+    api.outputs_schema["fields"] = ["order_id", "total_amount", "is_paid", "items", "created_at"]
+    r = client.get("/mock/mock-test/orders/abc")
+    assert r.status_code == 200 and r.headers["access-control-allow-origin"] == "*"
+    assert r.json() == {"order_id": "order_123", "total_amount": 0, "is_paid": True, "items": [], "created_at": "2026-11-01T10:30:00Z"}
+    assert client.post("/mock/mock-test/orders/abc").status_code == 405
+    assert client.get("/mock/mock-test/nothing/here").status_code == 404
+    assert mock.sample_json(["email: string", "phone"]) == {"email": "name@example.com", "phone": "+91 90000 00000"}

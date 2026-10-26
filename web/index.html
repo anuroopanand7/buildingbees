@@ -399,11 +399,11 @@
   .suggest summary { cursor: pointer; font-weight: 600; }
   .suggest label { display: grid; gap: 4px; margin: 8px 0; color: var(--muted); }
   .suggest input, .suggest select { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); }
-  .play-sheet { max-width: 560px; }
+  .play-sheet { max-width: 620px; }
   .play-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; flex: 1; }
   .tag.bad { background: var(--bad-soft); color: var(--bad); }
-  .phone { max-width: 390px; margin: 16px auto; border: 1.5px solid var(--line-strong); border-radius: 22px; padding: 14px; }
-  .play-ctas { display: grid; gap: 12px; max-width: 390px; margin: 0 auto 8px; }
+  .phone { max-width: 480px; margin: 16px auto; }
+  .play-ctas { display: grid; gap: 12px; max-width: 480px; margin: 0 auto 8px; }
   .play-ctas .btn { width: 100%; min-height: 44px; justify-content: center; }
   .erd-wrap { overflow: auto; margin: 0 0 18px; padding-bottom: 6px; }
   .erd .erd-box { fill: var(--panel); stroke: var(--line-strong); }
@@ -1695,6 +1695,7 @@ function renderDetails() {
     <div class="mono muted">${esc(n.id)}</div>
     ${n.layer === "SCREEN" && n.metadata?.elements?.length ? `<div class="h" style="margin-top:14px">Wireframe</div>${wireframe(n.metadata.elements)}` : ""}
     ${n.layer === "SCREEN" && S.ids?.[n.id] ? `<button class="btn sm" data-copy-prompt="${esc(S.ids[n.id])}"><i class="ph ph-copy" aria-hidden="true"></i>Copy build prompt</button>` : ""}
+    ${n.layer === "SCREEN" && n.metadata?.elements?.length ? `<button class="btn sm" data-svg="${esc(n.id)}"><i class="ph ph-download-simple" aria-hidden="true"></i>Download SVG (opens in Figma)</button>` : ""}
     <dl class="kv">${rows}</dl>
     ${n.layer === "API" ? apiContract(n) : ""}
     ${r ? `<div class="h">Screen readiness</div>
@@ -1726,7 +1727,11 @@ const sampleFor = (f) => { const k = String(f).toLowerCase().split(/[:\s(]/)[0];
 const sampleJson = (fields) => JSON.stringify(Object.fromEntries((fields || []).map((f) => [String(f).split(/[:\s(]/)[0], sampleFor(f)])), null, 2);
 function apiContract(n) {
   const errs = Object.entries(n.error_codes || {});
+  // The live mock answers at the same path with the example response; {params} become a sample value.
+  const mockUrl = `${location.origin}/mock/${encodeURIComponent(BOARD)}/${(n.path || "").replace(/^\//, "").replace(/\{[^}]*\}|:\w+/g, "123")}`;
   return `<div class="h">Contract</div><div class="contract"><div class="mono"><b>${esc((n.method || "").toUpperCase())}</b> ${esc(n.path)}</div>
+    <div class="meta">Live mock (example data, for building the frontend before the backend exists)</div>
+    <div class="send-row"><input class="mono" readonly value="${esc(mockUrl)}" aria-label="Mock API address"><button class="btn sm" data-copy-text="${esc(mockUrl)}">Copy</button></div>
     <div class="meta">Example request (shape from the fields, values are placeholders)</div><pre class="json">${esc(sampleJson(n.inputs_schema?.fields))}</pre>
     <div class="meta">Example response</div><pre class="json">${esc(sampleJson(n.outputs_schema?.fields))}</pre>
     ${errs.length ? `<div class="meta">When it fails</div><ul class="reasons">${errs.map(([c, v]) => `<li><b>${esc(c)}</b> ${esc(Object.values(v || {}).join(", "))}</li>`).join("")}</ul>` : ""}
@@ -1815,6 +1820,30 @@ function erdSvg(tables, esc) {
     return `<path class="erd-link" d="${d}"/><circle class="erd-end" cx="${xb}" cy="${yb}" r="3"/>`; }).join("");
   const w = PAD * 2 + Math.min(COLS, tables.length) * (W + GX), h = PAD * 2 + GY / 2 + rowH.reduce((a, b) => a + b + GY, 0) - GY / 2;
   return `<svg class="erd" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Tables and how they link">${lines}${boxes}</svg>`;
+}
+// A screen's wireframe as a plain SVG file (Roger, 26 Oct 2026: SVG instead of Figma's private clipboard format).
+// Plain shapes and text, one per element, stacked as in the card; Figma, Illustrator and browsers open it.
+function wireSvg(n) {
+  const W = 360, P = 16, x = P, w = W - 2 * P; let y = P + 8; const out = [];
+  const txt = (t, yy, size = 13, weight = 400, fill = "#1d1d1b") => `<text x="${x}" y="${yy}" font-family="Inter, Arial, sans-serif" font-size="${size}" font-weight="${weight}" fill="${fill}">${esc(t)}</text>`;
+  for (const e of n.metadata?.elements || []) {
+    const label = e.label || "", k = wfKind(e.kind);
+    if (k === "heading") { out.push(txt(label, y + 16, 18, 700)); y += 30; }
+    else if (k === "button") { out.push(`<rect x="${x}" y="${y}" width="${w}" height="40" rx="8" fill="#ffc800" stroke="#1d1d1b"/>`, `<text x="${W / 2}" y="${y + 25}" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="600">${esc(label)}</text>`); y += 52; }
+    else if (k === "input") { out.push(txt(label, y + 12, 12, 500, "#5b5a55"), `<rect x="${x}" y="${y + 18}" width="${w}" height="34" rx="6" fill="#fff" stroke="#9a9890"/>`); y += 62; }
+    else if (k === "list") { out.push(txt(label, y + 12, 12, 600)); for (let i = 0; i < 3; i++) out.push(`<rect x="${x}" y="${y + 20 + i * 44}" width="${w}" height="36" rx="6" fill="#f2f1ed" stroke="#cfcdc7"/>`); y += 160; }
+    else if (k === "image") { out.push(`<rect x="${x}" y="${y}" width="${w}" height="120" rx="6" fill="#f2f1ed" stroke="#cfcdc7"/>`, `<path d="M${x} ${y}L${x + w} ${y + 120}M${x + w} ${y}L${x} ${y + 120}" stroke="#cfcdc7"/>`, txt(label, y + 138, 12, 400, "#5b5a55")); y += 150; }
+    else if (k === "choice") { out.push(txt(label, y + 12, 12, 600)); (e.detail || "Option A, Option B").split(",").slice(0, 4).forEach((o, i) => out.push(`<rect x="${x + i * 82}" y="${y + 20}" width="76" height="28" rx="14" fill="#fff" stroke="#9a9890"/>`, `<text x="${x + i * 82 + 38}" y="${y + 38}" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="11">${esc(o.trim().slice(0, 12))}</text>`)); y += 58; }
+    else { out.push(txt(label, y + 14, 13, 400, k === "note" ? "#5b5a55" : "#1d1d1b")); y += 24; }
+  }
+  const H = y + P;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><title>${esc((S.ids?.[n.id] || "") + " " + n.title)}</title><rect width="${W}" height="${H}" rx="12" fill="#fff" stroke="#1d1d1b"/>${out.join("")}</svg>`;
+}
+function downloadSvg(id) {
+  const n = S.nodes[id], a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([wireSvg(n)], { type: "image/svg+xml" }));
+  a.download = `${S.ids?.[id] || "screen"}-${(n.title || "screen").toLowerCase().replace(/[^a-z0-9]+/g, "-")}.svg`;
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 // The build prompt is plain text, so it skips api()'s JSON parsing; same board, role and sign-in headers.
 async function copyPrompt(short) {
@@ -2065,6 +2094,8 @@ document.addEventListener("click", (e) => {
   const t = e.target.closest("button, [data-id]");
   if (!t) return;
   if (t.dataset.copyPrompt) return copyPrompt(t.dataset.copyPrompt).catch(fail);
+  if (t.dataset.copyText) return navigator.clipboard.writeText(t.dataset.copyText).then(() => toast("Copied.")).catch(fail);
+  if (t.dataset.svg) return downloadSvg(t.dataset.svg);
   if (t.dataset.play) return playFlow(t.dataset.play.split(","));
   if (t.dataset.playGo) return playGo(t.dataset.playGo, false);
   if (t.dataset.playFail) return playGo(t.dataset.playFail, true);
