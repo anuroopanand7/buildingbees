@@ -901,6 +901,7 @@
   </div>
 </div>
 <div class="topright">
+  <button class="island btn sm" id="shareTeamBtn" hidden data-tip="Bring your team onto this board; everything you decided stays" data-tip-pos="bottom-end"><i class="ph ph-users-three" aria-hidden="true"></i>Share with team</button>
   <button class="island btn sm" id="fbBtn" data-tip="Report a bug or an idea, and see what other testers said" data-tip-pos="bottom-end"><i class="ph ph-megaphone" aria-hidden="true"></i>Feedback</button>
   <button class="island tool" id="signBtn" hidden aria-label="Sign in" data-tip="Sign in to keep your boards" data-tip-pos="bottom-end"><i class="ph ph-user" aria-hidden="true"></i></button>
   <button class="island btn sm brief-btn" id="briefBtn" hidden data-tip="Every decision and open question, for engineers" data-tip-pos="bottom-end"><i class="ph ph-file-text" aria-hidden="true"></i>Brief</button>
@@ -1165,7 +1166,7 @@ function screenOf(id) {
 function render() {
   const has = Object.keys(S.nodes).length > 0;
   $("start").hidden = has; $("work").hidden = !has;
-  $("newBtn").hidden = !has; $("meter").hidden = !has; $("briefBtn").hidden = !has; $("menuBrief").hidden = !has; $("historyBtn").hidden = !has; $("featureBtn").hidden = !has; $("teamBtn").hidden = !has; $("roleBtn").hidden = !has || !ROLE; syncMenu();
+  $("newBtn").hidden = !has; $("meter").hidden = !has; $("briefBtn").hidden = !has; $("menuBrief").hidden = !has; $("historyBtn").hidden = !has; $("shareTeamBtn").hidden = !has || S.mode === "team"; $("featureBtn").hidden = !has; $("teamBtn").hidden = !has; $("roleBtn").hidden = !has || !ROLE; syncMenu();
   renderEngine();
   if (!has) return;
 
@@ -2178,8 +2179,14 @@ document.addEventListener("click", (e) => {
     store.set("bb_role", ROLE); store.set("bb_name", WHO); PM.bee = null; return render();
   }
   if ("roleChange" in t.dataset || t.id === "roleBtn") { ROLE = ""; menu(false); dockMin(false); return render(); }
-  if ("invite" in t.dataset || t.id === "teamBtn") {
+  if ("invite" in t.dataset || t.id === "teamBtn" || t.id === "shareTeamBtn") {
     menu(false);
+    // Solo to team (Roger, 26 Oct 2026): the plan carries over; from now on each open question goes to the teammate
+    // whose role covers it, and the person who started the board still applies the rounds.
+    $("inviteNote").textContent = S.mode !== "team"
+      ? "This board becomes a team board. Everything you decided stays, and you still apply each round. Send this link: each person picks their role and answers only their own bees' questions."
+      : "Send this link to your team. Each person picks their role and answers only their own bees. The board owner or the product manager they invited processes each round.";
+    if (S.mode !== "team" && !ROLE) { ROLE = "PM"; store.set("bb_role", ROLE); }  // the person who started the board runs it
     if (S.mode !== "team") api("/api/mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "team" }) }).then(load).catch(fail);
     $("inviteLink").value = boardLink(); $("invite").hidden = false; renderTeam(); return $("inviteLink").select();
   }
