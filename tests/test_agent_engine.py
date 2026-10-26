@@ -317,3 +317,13 @@ def test_openapi_test_plan_and_saved_mock_data(monkeypatch):
     assert client.get("/mock/contract-test/orders/9").json() == {"name": "A very long dish name", "price": 0}
     client.post(f"/api/nodes/{api.id}/mock", json={"data": None}, headers=h)
     assert client.get("/mock/contract-test/orders/9").json() != {"name": "A very long dish name", "price": 0}
+
+
+def test_desktop_screens_are_tagged_and_anything_else_is_mobile():
+    """Raju's switcher, cheap: the screens call tags staff and admin screens "desktop"; unknown values fall back to mobile."""
+    from src.core.ingest import build_graph_from_extract
+    from tests.test_gemini_ingest import EXTRACT
+    x = EXTRACT.model_copy(deep=True)
+    x.screens[0].device, x.screens[1].device = "Desktop", "tablet?"
+    g = build_graph_from_extract(x)
+    assert g.nodes["W01_CART"].metadata["device"] == "desktop" and g.nodes["W02_DONE"].metadata["device"] == "mobile"

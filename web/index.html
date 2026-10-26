@@ -404,7 +404,11 @@
   .suggest summary { cursor: pointer; font-weight: 600; }
   .suggest label { display: grid; gap: 4px; margin: 8px 0; color: var(--muted); }
   .suggest input, .suggest select { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); }
-  .play-sheet { max-width: 620px; }
+  .play-sheet { max-width: 620px; transition: max-width .25s ease; }
+  #player.desk .play-sheet { max-width: min(1100px, 94vw); }
+  #player.desk .phone, #player.desk .play-ctas { max-width: 960px; }
+  .scr.desk { width: 440px; }
+  .desk-tag { margin-left: 6px; font-size: 11px; vertical-align: middle; }
   .play-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; flex: 1; }
   .tag.bad { background: var(--bad-soft); color: var(--bad); }
   .phone { max-width: 480px; margin: 16px auto; }
@@ -1257,9 +1261,10 @@ function screenCard(id) {
     : '<span class="tag soft">A few details to settle</span>';
   const ctas = (S.fwd[id] || []).map((c) => S.nodes[c]).filter((c) => c && c.layer === "CTA");
   const failScreen = byLayer("CTA").some((c) => c.target_screen_on_failure === id && c.parent_screen_id !== id);
-  return `<article class="scr ${failScreen ? "fail-screen" : ""} ${PM.focus === id || S.selected === id ? "focus" : ""} ${hit(id)}" data-id="${esc(id)}" data-node tabindex="0">
+  const desk = n.metadata?.device === "desktop";  // admin and staff screens are drawn wide (Raju, 27 Oct 2026)
+  return `<article class="scr ${desk ? "desk" : ""} ${failScreen ? "fail-screen" : ""} ${PM.focus === id || S.selected === id ? "focus" : ""} ${hit(id)}" data-id="${esc(id)}" data-node tabindex="0">
     ${pmQueue()[0] && screenOf(pmQueue()[0].target_node_id) === id ? `<span class="pin">${beeIcon(pmQueue()[0].category, true)}${esc(bee(pmQueue()[0].category)[0])} is asking</span>` : ""}
-    ${noteBtn(id, 0, "", n.title)}<h4>${idChip(id)}${esc(n.title)}</h4>${S.ids?.[id] ? `<button class="link copy-prompt" data-copy-prompt="${esc(S.ids[id])}" data-tip="Copy a prompt to build this screen in Cursor or Claude Code" data-tip-pos="top"><i class="ph ph-copy" aria-hidden="true"></i> Build prompt</button>` : ""}${state}${n.flow_id ? featChips(n.flow_id) : ""}${branchBees(id)}
+    ${noteBtn(id, 0, "", n.title)}<h4>${idChip(id)}${esc(n.title)}${desk ? '<span class="tag soft desk-tag" title="Used at a desk, drawn wide"><i class="ph ph-desktop" aria-hidden="true"></i>Desktop</span>' : ""}</h4>${S.ids?.[id] ? `<button class="link copy-prompt" data-copy-prompt="${esc(S.ids[id])}" data-tip="Copy a prompt to build this screen in Cursor or Claude Code" data-tip-pos="top"><i class="ph ph-copy" aria-hidden="true"></i> Build prompt</button>` : ""}${state}${n.flow_id ? featChips(n.flow_id) : ""}${branchBees(id)}
     ${n.metadata?.elements?.length ? wireframe(n.metadata.elements, true) : ""}
     ${ctas.length ? `<div class="behind">What the buttons do</div><ul class="ctas">${ctas.map((c) => {
       const apis = (S.fwd[c.id] || []).map((a) => S.nodes[a]).filter((a) => a && a.layer === "API");
@@ -1775,6 +1780,7 @@ function playShow(id, fail = false) {
   const ctas = (S.fwd[id] || []).map((c) => S.nodes[c]).filter((c) => c && c.layer === "CTA");
   $("playHead").innerHTML = `${idChip(id)}<b>${esc(n.title)}</b><span class="muted">${pos >= 0 ? `Screen ${pos + 1} of ${PLAY.path.length}` : "Off the main path"}</span>${fail ? '<span class="tag bad">Failure path</span>' : ""}`;
   $("playBack").disabled = !PLAY.back.length;
+  $("player").classList.toggle("desk", n.metadata?.device === "desktop");
   $("playBody").innerHTML = `<div class="phone">${n.metadata?.elements?.length ? wireframe(n.metadata.elements) : '<p class="muted">This screen is not drawn yet.</p>'}</div>
     <div class="play-ctas">${ctas.map((c) => {
       const apis = (S.fwd[c.id] || []).map((a) => S.nodes[a]).filter((a) => a && a.layer === "API");

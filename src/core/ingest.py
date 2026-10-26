@@ -118,7 +118,8 @@ def build_graph_from_extract(x: SpecExtract, source: str = "ai") -> BuildingBees
             states=ScreenStates(default=s.description, loading=_state(s.loading_state),
                                 empty=_state(s.empty_state), error=_state(s.error_state)),
             cta_ids=[c.id for c in x.ctas if c.screen_id == s.id],
-            metadata={"elements": [e.model_dump() for e in s.elements]},
+            metadata={"elements": [e.model_dump() for e in s.elements],
+                      "device": "desktop" if (s.device or "").lower() == "desktop" else "mobile"},
         ))
         if s.flow_id in g.nodes:
             g.add_edge(s.flow_id, s.id)

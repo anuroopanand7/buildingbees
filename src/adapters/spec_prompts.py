@@ -37,6 +37,7 @@ class XScreen(BaseModel):
     empty_state: str
     error_state: str
     elements: List[XElement] = []  # top to bottom, what the person sees: the wireframe
+    device: str = "mobile"  # "desktop" for dashboards and admin screens used at a desk (drawn wide); else "mobile"
 
 
 class XCTA(BaseModel):
@@ -364,6 +365,8 @@ Rules:
   detail says what the element shows, for the people who build it: for a list, the fields each card holds
   ("cake photo, name, price, pickup date"); for a choice, its options; for text, what it says. Leave it empty
   when the label already says it all.
+- Every screen has a "device": "desktop" only for dashboards, admin and staff screens used at a desk (a kitchen
+  order queue, a teacher's marks entry, a back office); everything a customer uses is "mobile".
 - Payments follow the decisions: use the payment methods and currency the team chose (UPI, cash, cards...);
   never draw a card form or a currency nobody decided. If it is not decided, the API vendor stays empty.
 - States only where they are real: a loading state when the screen fetches data it shows (a list, an image,
