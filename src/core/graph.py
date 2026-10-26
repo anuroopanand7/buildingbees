@@ -127,7 +127,9 @@ class BuildingBeesEngine:
                 if downstream_id not in visited_ids:
                     visited_ids.add(downstream_id)
                     downstream_node = self.nodes.get(downstream_id)
-                    if downstream_node and downstream_node.layer != NodeLayer.QUESTION:
+                    # Stop at other screens: a button's next screen has its own readiness. Walking into it made
+                    # one open question at the end of a flow block every screen before it (live audit, 27 Oct 2026).
+                    if downstream_node and downstream_node.layer not in (NodeLayer.QUESTION, NodeLayer.SCREEN):
                         branch_nodes.append(downstream_node)
                         queue.append(downstream_id)
 

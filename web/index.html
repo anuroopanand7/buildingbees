@@ -1128,7 +1128,7 @@ const engineReady = () => !!(S.engine && S.engines[S.engine] && S.engines[S.engi
 // Sign-in is optional (Firebase Authentication). Signed in, every board you work on is kept under your account.
 const AUTH = { user: null, sdk: null, fb: null };
 async function api(path, opts = {}) {
-  const headers = { ...(opts.headers || {}), "X-Board": BOARD, "X-Role": ROLE || "", "X-Invite": invite() };
+  const headers = { ...(opts.headers || {}), "X-Board": BOARD, "X-Role": ROLE || "", "X-Invite": invite(), "X-Owner-Key": store.get("bb_owner_" + BOARD) || "" };
   if (AUTH.user) { try { headers.Authorization = "Bearer " + await AUTH.user.getIdToken(); } catch (e) {} }
   const res = await fetch(path, { ...opts, headers });
   const body = await res.json().catch(() => ({}));
@@ -1211,7 +1211,9 @@ function render() {
   $("trace").hidden = !lc;
   if (lc) {
     $("trace").innerHTML = `<i class="ph ph-cpu" aria-hidden="true"></i><span>Last update by <b>${esc(lc.engine)}</b>${lc.engine === "Your own AI" ? " (via MCP)" : ` in ${lc.seconds}s`}</span><span class="ok"><i class="ph ph-check-circle" aria-hidden="true"></i>checked</span>`;
-    $("trace").dataset.tip = `Model: ${lc.model || lc.engine}. "Checked" means the reply was validated against our schema before it touched your board.`;
+    const st = lc.stats;  // Token Factory usage for this call: tokens, prefix-cache hits, cost (Nemotron only)
+    if (st) $("trace").querySelector("span").insertAdjacentHTML("beforeend", ` <span class="muted">${(st.prompt_tokens + st.output_tokens).toLocaleString()} tokens${st.cached_tokens ? `, ${st.cached_tokens.toLocaleString()} cached` : ""}, $${st.cost_usd.toFixed(4)}</span>`);
+    $("trace").dataset.tip = `Model: ${lc.model || lc.engine}.${st ? ` ${st.structured ? "Native structured output (JSON schema enforced by Token Factory)" : "Schema in the prompt"}; ${st.prompt_tokens} in, ${st.output_tokens} out, ${st.cached_tokens} from the prefix cache.` : ""} "Checked" means the reply was validated against our schema before it touched your board.`;
     $("trace").dataset.tipPos = "top";
   }
   $("meterText").hidden = flowsStage;  // the stage bar already says "Flows"; the screens count stays useful later
@@ -2295,7 +2297,9 @@ document.addEventListener("click", (e) => {
       ? "This board becomes a team board. Everything you decided stays, and you still apply each round. Send this link: each person picks their role and answers only their own bees' questions."
       : "Send this link to your team. Each person picks their role and answers only their own bees. The board owner or the product manager they invited processes each round.";
     if (S.mode !== "team" && !ROLE) { ROLE = "PM"; store.set("bb_role", ROLE); }  // the person who started the board runs it
-    if (S.mode !== "team") api("/api/mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "team" }) }).then(load).catch(fail);
+    // The server hands the person who turns a board into a team board its owner key, once; this browser keeps it.
+    if (S.mode !== "team") api("/api/mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "team" }) })
+      .then((r) => { if (r.owner_key) store.set("bb_owner_" + BOARD, r.owner_key); return load(); }).catch(fail);
     $("inviteLink").value = boardLink(); $("invite").hidden = false; renderTeam(); return $("inviteLink").select();
   }
   if (t.dataset.send) { const i = $("own"); return answer(t.dataset.send, i?.value || "").catch(fail); }
@@ -2491,7 +2495,7 @@ async function renderTeam() {
     ? `<button class="link" data-copy-invite="${esc(r.token)}">Copy link</button><button class="link" data-revoke="${esc(r.token)}">Revoke</button>` : ""}</div>`).join("") : "";
 }
 $("inviteMake").onclick = () => api("/api/invites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: $("inviteRole").value }) })
-  .then((r) => { $("inviteLink").value = `${boardLink()}&invite=${encodeURIComponent(r.token)}`; $("inviteNote").textContent = `A link for one ${r.label}. Send it to that person only.`; $("inviteLink").select(); renderTeam(); })
+  .then((r) => { if (r.owner_key) store.set("bb_owner_" + BOARD, r.owner_key); $("inviteLink").value = `${boardLink()}&invite=${encodeURIComponent(r.token)}`; $("inviteNote").textContent = `A link for one ${r.label}. Send it to that person only.`; $("inviteLink").select(); renderTeam(); })
   .catch(fail);
 $("teamList").onclick = (e) => { const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.copyInvite) { $("inviteLink").value = `${boardLink()}&invite=${encodeURIComponent(b.dataset.copyInvite)}`; return $("inviteLink").select(); }

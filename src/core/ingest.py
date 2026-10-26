@@ -169,6 +169,9 @@ def strip_guesses(g: BuildingBeesEngine, said: str) -> list:
 
 # Steps that can fail for reasons outside the person's control: money, a slot someone else can take, a file, a check.
 RISKY_STEP = re.compile(r"\b(pay|checkout|book|reserv|upload|order)\w*", re.I)
+# A step that only looks at or receives something ("See new order", "Walker accepts the booking") cannot fail the way
+# paying or uploading can; those got an empty "No" path and the same junk question on every board (live audit, 27 Oct).
+WATCH_STEP = re.compile(r"^\s*(\w+\s+)?(see|sees|view|views|show|shows|get|gets|receive|receives|accept|accepts|notif\w*|check|checks)\b", re.I)
 
 
 def clean_branches(branches, n_steps: int, steps: Optional[List[str]] = None) -> list:
@@ -184,7 +187,8 @@ def clean_branches(branches, n_steps: int, steps: Optional[List[str]] = None) ->
             out.append(d)
     # One exit per flow at most, on the first risky step title, and only when the flow has no split of its own: more
     # than that doubled the questions in the eval (23 Oct: 15.2 an idea, 34 near-duplicates).
-    risky = [i for i, step in enumerate(steps or [], 1) if RISKY_STEP.search(step.split(":")[0])]
+    risky = [i for i, step in enumerate(steps or [], 1)
+             if RISKY_STEP.search(step.split(":")[0]) and not WATCH_STEP.search(step.split(":")[0])]
     if risky and not out:
         title = steps[risky[0] - 1].split(":")[0].strip()
         out.append({"at_step": risky[0], "decision": f"{title} went through?", "main_label": "Yes", "label": "No",

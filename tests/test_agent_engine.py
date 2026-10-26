@@ -327,3 +327,46 @@ def test_desktop_screens_are_tagged_and_anything_else_is_mobile():
     x.screens[0].device, x.screens[1].device = "Desktop", "tablet?"
     g = build_graph_from_extract(x)
     assert g.nodes["W01_CART"].metadata["device"] == "desktop" and g.nodes["W02_DONE"].metadata["device"] == "mobile"
+
+
+def test_owner_key_guards_an_unclaimed_team_board(monkeypatch):
+    """Live audit fix: once a signed-out board becomes a team board, only its owner key can change mode or clear it."""
+    h, g = _drawn_board(monkeypatch, "owner-key")
+    key = client.post("/api/mode", json={"mode": "team"}, headers=h).json()["owner_key"]
+    assert "owner_key" not in client.post("/api/mode", json={"mode": "team"}, headers={**h, "X-Owner-Key": key}).json()  # once
+    assert key not in client.get("/api/graph", headers=h).text  # never in the board anyone can read
+    assert client.post("/api/mode", json={"mode": "solo"}, headers={**h, "X-Role": "BACKEND"}).status_code == 403
+    assert client.post("/api/reset", headers={**h, "X-Role": "BACKEND"}).status_code == 403
+    q = next(n for n in server.boards["owner-key"].nodes.values() if isinstance(n, server.QuestionNode)
+             and n.question_status.value == "OPEN" and n.category.value != "BACKEND")
+    assert client.post(f"/api/questions/{q.id}/resolve", json={"answer_text": "x"}, headers={**h, "X-Role": "BACKEND"}).status_code == 403
+    assert client.post(f"/api/questions/{q.id}/resolve", json={"answer_text": "x"}, headers={**h, "X-Owner-Key": key}).status_code == 200
+
+
+def test_round_one_asks_at_most_one_compliance_question():
+    """Opus audit fix: a solo round 1 is about the product; Shield's other questions wait for later rounds."""
+    from src.core.graph import BuildingBeesEngine
+    g = BuildingBeesEngine()
+    g.mode, g.round = "solo", 1
+    for i in range(5):
+        g.add_node(server.QuestionNode(target_node_id="x", title="q", question_text=f"Law {i}?", category=server.QuestionCategory.COMPLIANCE))
+    for i in range(3):
+        g.add_node(server.QuestionNode(target_node_id="x", title="q", question_text=f"Product {i}?", category=server.QuestionCategory.PM))
+    server._start_round(g)
+    cats = [g.nodes[i].category.value for i in g.round_questions]
+    assert len(cats) == 6 and cats[:4].count("COMPLIANCE") == 1 and cats.count("PM") == 3
+
+
+def test_mock_preflight_and_unknown_boards():
+    """Live audit fixes: CORS preflight answers 204; a made-up board id is a 404 and is not created."""
+    r = client.options("/mock/any-board/orders")
+    assert r.status_code == 204 and "POST" in r.headers["access-control-allow-methods"]
+    assert client.get("/mock/no-such-board-xyz/orders").status_code == 404 and "no-such-board-xyz" not in server.boards
+
+
+def test_watching_steps_get_no_failure_exit():
+    """Live audit fix: "See new order" or "Walker accepts the booking" is not a step that fails like paying."""
+    from src.core.ingest import clean_branches
+    steps = ["See New Order: kitchen sees it", "Walker accepts the booking: yes", "Pay: by UPI"]
+    out = clean_branches([], 3, steps)
+    assert [b["at_step"] for b in out] == [3]

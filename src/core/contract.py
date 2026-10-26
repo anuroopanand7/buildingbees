@@ -15,6 +15,13 @@ def _params(path: str) -> List[str]:
     return [a or b for a, b in re.findall(r"\{([^}]+)\}|:(\w+)", path)]
 
 
+def _props(fields: List[str]) -> Dict[str, Any]:
+    """Each field as an OpenAPI property, its type read from the example value (string, number, boolean, array)."""
+    kind = {bool: "boolean", int: "number", float: "number", list: "array"}
+    return {k: ({"type": "array", "items": {}} if isinstance(v, list) else {"type": kind.get(type(v), "string")})
+            for k, v in sample_json(fields).items()}
+
+
 def openapi(g: BuildingBeesEngine) -> Dict[str, Any]:
     """OpenAPI 3.0 for every API on the board. Field names come from the board; types and examples are placeholders
     (the board does not decide types), and each operation says so, so a reader never mistakes them for decisions."""
@@ -31,15 +38,15 @@ def openapi(g: BuildingBeesEngine) -> Dict[str, Any]:
             "description": "Fields from the BuildingBees board; types and examples are placeholders, not decisions.",
             "parameters": [{"name": p, "in": "path", "required": True, "schema": {"type": "string"}} for p in _params(a.path)],
             "responses": {"200": {"description": "OK", "content": {"application/json": {
-                "schema": {"type": "object", "properties": {k: {} for k in sample_json(res)}},
+                "schema": {"type": "object", "properties": _props(res)},
                 "example": custom.get(a.id, sample_json(res))}}}}}
         if req and a.method.upper() in ("POST", "PUT", "PATCH"):
             op["requestBody"] = {"content": {"application/json": {
-                "schema": {"type": "object", "properties": {k: {} for k in sample_json(req)}}, "example": sample_json(req)}}}
+                "schema": {"type": "object", "properties": _props(req)}, "example": sample_json(req)}}}
         for code, info in (a.error_codes or {}).items():
             op["responses"][str(code)] = {"description": ", ".join(str(v) for v in (info or {}).values()) or "Error"}
         paths.setdefault(path, {})[(a.method or "GET").lower()] = op
-    return {"openapi": "3.0.3", "info": {"title": f"{getattr(g, 'product_name', '') or 'Product'} API", "version": "0.1.0",
+    return {"openapi": "3.0.3", "servers": [{"url": "/", "description": "Your API"}], "info": {"title": f"{getattr(g, 'product_name', '') or 'Product'} API", "version": "0.1.0",
             "description": "Generated from a BuildingBees board."}, "paths": paths}
 
 

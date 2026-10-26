@@ -8,6 +8,7 @@ ran. PDFs are converted to text first; a photo of a sketch goes to the vision mo
 
 import io
 import json
+from contextvars import ContextVar
 import os
 import re
 from typing import List, Optional
@@ -36,6 +37,9 @@ FALLBACK = {DEFAULT_HEAVY_MODEL: VISION_MODEL, VISION_MODEL: DEFAULT_HEAVY_MODEL
 PRICES = {DEFAULT_HEAVY_MODEL: (1.0e-6, 3.0e-6), DEFAULT_MODEL: (3.0e-7, 9.0e-7), VISION_MODEL: (3.0e-7, 9.0e-7)}
 # Spend guard: we have $25 of credit that must last until judging ends on 15 Dec, so a day may spend at most this.
 DAILY_BUDGET_USD = float(os.getenv("NVIDIA_DAILY_BUDGET_USD", "1.5"))
+# What the last Nemotron call in THIS request did (model, tokens, cache hits, cost, seconds), for the engine pill.
+# A ContextVar, not an attribute, so two people using the board at once never see each other's call.
+LAST_CALL: ContextVar[Optional[dict]] = ContextVar("nemotron_last_call", default=None)
 # The flows prompt tuned for Nemotron by scripts/optimize_prompt.py (yes/no checks, one edit per round, kept only when
 # the score rises). Nebius cannot fine-tune Nemotron, so this is how it adapts to our job. Gemini keeps the shared prompt.
 _TUNED = os.path.join(os.path.dirname(__file__), "tuned", "flows_nemotron.txt")
@@ -71,9 +75,12 @@ class NvidiaNemotronAdapter:
         self.model = model or os.getenv("NVIDIA_MODEL") or DEFAULT_MODEL
         self.heavy_model = os.getenv("NVIDIA_HEAVY_MODEL") or DEFAULT_HEAVY_MODEL
         self.base_url = (base_url or os.getenv("NVIDIA_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
-        # shortcut: the spend count lives in memory (one Cloud Run instance, max-instances 1); a restart resets it.
-        # Move it to Firestore if the service ever runs more than one instance.
         self._day, self.spent_today = "", 0.0
+        # The server can keep the day's spend in Firestore so a cold start does not reset the guard (Opus audit,
+        # 27 Oct 2026): load() returns (day, dollars) and save(day, dollars) stores them. Unset in tests.
+        self.load_spend = None
+        self.save_spend = None
+        self.guided = {}  # model -> False once Token Factory refuses response_format for it; then the schema goes in the prompt
 
     @property
     def enabled(self) -> bool:
@@ -84,6 +91,11 @@ class NvidiaNemotronAdapter:
         """Adds one call's cost (from the token counts Token Factory returns) to today's total."""
         price_in, price_out = PRICES.get(model, PRICES[DEFAULT_HEAVY_MODEL])
         self.spent_today += usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out
+        if self.save_spend:
+            try:
+                self.save_spend(self._day, self.spent_today)
+            except Exception:
+                pass  # the guard still works in memory for this instance
 
     def _generate(self, prompt: str, schema, model: Optional[str] = None, image: Optional[tuple] = None):
         """Calls one Nemotron model; if it errors or never fits the schema, its fallback model answers instead."""
@@ -96,23 +108,35 @@ class NvidiaNemotronAdapter:
             backup = FALLBACK.get(model)
             if not backup or (image and backup != VISION_MODEL):
                 raise
-            return self._generate_once(prompt, schema, backup, image)
+            # The backup gets 60 s, so primary (45 s) plus backup stays inside Cloud Run's 300 s request limit.
+            return self._generate_once(prompt, schema, backup, image, timeout=60)
 
-    def _generate_once(self, prompt: str, schema, model: Optional[str] = None, image: Optional[tuple] = None):
-        """Calls Nemotron with the schema in the prompt and validates the JSON; one retry with the validation error when it does not fit."""
+    def _generate_once(self, prompt: str, schema, model: Optional[str] = None, image: Optional[tuple] = None,
+                       timeout: Optional[float] = None):
+        """Calls Nemotron with Token Factory's native structured output (response_format json_schema, so the model can
+        only produce JSON of that shape), validates it with Pydantic, and retries once with the validation error. If a
+        model refuses response_format, it falls back to the schema written into the prompt."""
         if not self.enabled:
             raise EngineNotConfigured("NVIDIA_API_KEY is not set")
         import time as _t
         today = _t.strftime("%Y-%m-%d")
         if today != self._day:
             self._day, self.spent_today = today, 0.0
+            if self.load_spend:  # after a cold start, pick up what today already spent
+                try:
+                    day, dollars = self.load_spend()
+                    if day == today:
+                        self.spent_today = float(dollars)
+                except Exception:
+                    pass
         if self.spent_today >= DAILY_BUDGET_USD:
             raise RuntimeError("Today's Nemotron budget is used up, so the demo keeps its credit for tomorrow. Please try again tomorrow.")
-        instructions = (
-            prompt
-            + "\n\nReply with ONLY one JSON object matching this JSON Schema, no prose:\n"
-            + json.dumps(schema.model_json_schema())
-        )
+        model = model or self.model
+        guided = self.guided.get(model, True)
+        json_schema = schema.model_json_schema()
+        # Guided decoding enforces the shape, so the prompt only needs the instruction; without it, the schema goes inline.
+        instructions = prompt + ("\n\nReply with ONLY one JSON object, no prose." if guided else
+                                 "\n\nReply with ONLY one JSON object matching this JSON Schema, no prose:\n" + json.dumps(json_schema))
         user = instructions
         if image:  # OpenAI-style image part: the vision model reads the sketch next to the instructions
             import base64
@@ -124,21 +148,32 @@ class NvidiaNemotronAdapter:
         ]
         last_error = None
         for _ in range(2):  # one retry when the reply is not valid JSON for the schema
-            resp = httpx.post(
-                f"{self.base_url}/chat/completions",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                # Thinking off: left on, Nemotron 3 spends the whole token budget reasoning and the JSON is cut short.
-                json={"model": model or self.model, "messages": messages, "temperature": 0.2, "max_tokens": 8192,
-                      "chat_template_kwargs": {"enable_thinking": False}},
-                timeout=HEAVY_TIMEOUT_S if model == DEFAULT_HEAVY_MODEL else 180,  # a busy Ultra hands over
-            )
+            # Thinking off: left on, Nemotron 3 spends the whole token budget reasoning and the JSON is cut short.
+            payload = {"model": model, "messages": messages, "temperature": 0.2, "max_tokens": 8192,
+                       "chat_template_kwargs": {"enable_thinking": False}}
+            if guided:
+                payload["response_format"] = {"type": "json_schema",
+                                              "json_schema": {"name": schema.__name__, "schema": json_schema}}
+            started = _t.time()
+            resp = httpx.post(f"{self.base_url}/chat/completions", headers={"Authorization": f"Bearer {self.api_key}"},
+                              json=payload, timeout=timeout or (HEAVY_TIMEOUT_S if model == DEFAULT_HEAVY_MODEL else 180))
+            if guided and getattr(resp, "status_code", 200) in (400, 422):  # this model will not take the schema natively: write it inline
+                self.guided[model] = False
+                return self._generate_once(prompt, schema, model, image, timeout)
             resp.raise_for_status()
             body = resp.json()
-            self._spend(model or self.model, body.get("usage") or {})
+            usage = body.get("usage") or {}
+            self._spend(model, usage)
+            price_in, price_out = PRICES.get(model, PRICES[DEFAULT_HEAVY_MODEL])
+            LAST_CALL.set({"model": model, "prompt_tokens": usage.get("prompt_tokens", 0),
+                           "cached_tokens": (usage.get("prompt_tokens_details") or {}).get("cached_tokens") or 0,
+                           "output_tokens": usage.get("completion_tokens", 0), "structured": guided,
+                           "cost_usd": round(usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out, 5),
+                           "model_seconds": round(_t.time() - started, 1)})
             content = body["choices"][0]["message"]["content"] or ""
             try:
                 out = schema.model_validate_json(_first_json_object(content))
-                self.last_model = model or self.model
+                self.last_model = model
                 return out
             except Exception as e:
                 last_error = e
@@ -157,7 +192,7 @@ class NvidiaNemotronAdapter:
     def extract_flows(self, text: str = "", pdf_bytes: Optional[bytes] = None,
                       image: Optional[tuple] = None) -> FlowsExtract:
         """Turns an idea, a PDF or a photo of a sketch into users, flows, branches and the first questions (stage one).
-        Ultra reasons over text; a sketch photo goes to the vision model, which reads its boxes and arrows."""
+        Super VL drew the best flows in our A/B, so it reads text and sketch photos alike (FLOWS_MODEL)."""
         if pdf_bytes:
             text = pdf_to_text(pdf_bytes)
         if image:

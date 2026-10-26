@@ -42,10 +42,11 @@ def _pick(sections: Dict[str, str], wanted: List[str]) -> str:
 
 
 def _ready(g: BuildingBeesEngine, bees: set) -> int:
-    """Percent of the questions from these bees that are decided; 100 when they have asked nothing."""
+    """Percent of the questions from these bees that are decided; 100 when they have asked nothing on a drawn board,
+    0 on an empty one (an empty board scored 100, live audit 27 Oct 2026)."""
     qs = [q for q in g.nodes.values() if isinstance(q, QuestionNode) and q.category.value in bees]
     if not qs:
-        return 100
+        return 100 if any(n.layer.value == "SCREEN" for n in g.nodes.values()) else 0
     return round(100 * sum(q.question_status == QuestionStatus.ANSWERED for q in qs) / len(qs))
 
 

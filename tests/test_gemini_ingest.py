@@ -571,7 +571,7 @@ def test_solo_and_team_boards_are_asked_differently(monkeypatch):
     assert "ONE PERSON" in seen[0] and "A PRODUCT TEAM" in seen[1]
     assert solo["mode"] == "solo" and team["mode"] == "team"
     assert server.boards["mode-solo"].spec_text == "shop"  # the instruction never becomes part of the founder's spec
-    assert c.post("/api/mode", json={"mode": "team"}, headers={"X-Board": "mode-solo"}).json() == {"mode": "team"}
+    assert c.post("/api/mode", json={"mode": "team"}, headers={"X-Board": "mode-solo"}).json()["mode"] == "team"
     assert c.post("/api/mode", json={"mode": "crowd"}, headers={"X-Board": "mode-solo"}).status_code == 400
 
 
@@ -836,7 +836,10 @@ def test_team_rounds_are_processed_by_the_owner(monkeypatch):
     assert blocked.status_code == 403
     assert c.post("/api/flows/F_BUY/steps", json={"steps": ["x"]}, headers={**h, "X-Role": "DESIGN"}).status_code == 403
     Reactor.reaction = Reaction(is_vague=False, note="Done.", follow_up=[], user_updates=[], field_updates=[], flow_updates=[])
-    c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "No, sign-in required", "later": True}, headers=h)
+    # on a team board each person answers only their own bee's questions (live audit, 27 Oct 2026)
+    assert c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "x"}, headers=h).status_code == 403
+    c.post(f"/api/questions/{q['id']}/resolve", json={"answer_text": "No, sign-in required", "later": True},
+           headers={**h, "X-Role": "CLIENT" if q["category"] == "PM" else q["category"]})  # a picked PM does not count here
     # a self-picked "PM" no longer counts on an owned board (Roger, 21 Oct 2026): only an owner-issued link does
     assert c.post("/api/questions/react-batch?engine=gemini", json={}, headers={**h, "X-Role": "PM"}).status_code == 403
     assert c.post("/api/invites", json={"role": "PM"}, headers=h).status_code == 403  # only the owner hands out roles
@@ -1012,4 +1015,4 @@ def test_busy_ultra_times_out_and_super_vl_answers(monkeypatch):
     monkeypatch.setattr(nv.httpx, "post", slow)
     out = nv.NvidiaNemotronAdapter(api_key="k")._generate("prompt", FlowsExtract, model=nv.DEFAULT_HEAVY_MODEL)
     assert out.product_name == "Tiny Shop"
-    assert seen == [(nv.DEFAULT_HEAVY_MODEL, nv.HEAVY_TIMEOUT_S), (nv.VISION_MODEL, 180)]
+    assert seen == [(nv.DEFAULT_HEAVY_MODEL, nv.HEAVY_TIMEOUT_S), (nv.VISION_MODEL, 60)]  # backup capped so both fit 300 s

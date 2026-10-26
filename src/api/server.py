@@ -17,7 +17,10 @@ import re
 import logging
 import os
 import time
+import hmac
 import zlib
+
+import httpx
 from collections import OrderedDict
 from contextvars import ContextVar
 
@@ -43,7 +46,7 @@ from src.core.schema import (
     QuestionCategory
 )
 from src.adapters.gemini_adapter import GoogleGeminiAdapter
-from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
+from src.adapters.nvidia_adapter import LAST_CALL as NEMOTRON_CALL, NvidiaNemotronAdapter
 from src.core.docs import build_docs
 from src.core import mock
 from src.core.contract import openapi, test_plan
@@ -88,8 +91,9 @@ boards: "OrderedDict[str, BuildingBeesEngine]" = OrderedDict()
 _board_id: ContextVar[str] = ContextVar("board_id", default="default")
 _auth: ContextVar[str] = ContextVar("auth", default="")  # this request's Authorization header, to record who made a board
 _role: ContextVar[str] = ContextVar("role", default="")  # the role a teammate picked on a team board (X-Role header)
-_invite: ContextVar[str] = ContextVar("invite", default="")
-_touched: ContextVar[list] = ContextVar("touched")  # the board objects this request used, so the save writes those  # an owner-issued role link's token (X-Invite header)
+_invite: ContextVar[str] = ContextVar("invite", default="")  # an owner-issued role link's token (X-Invite header)
+_owner_key: ContextVar[str] = ContextVar("owner_key", default="")  # X-Owner-Key: proves "I started this board" without sign-in
+_touched: ContextVar[list] = ContextVar("touched")  # the board objects this request used, so the save writes those
 log = logging.getLogger("buildingbees")
 
 _store = None   # Firestore collection of boards
@@ -120,7 +124,8 @@ def _save_board(bid: str, g: Optional[BuildingBeesEngine] = None) -> bool:
         return True
     try:
         # One compressed blob: a board with a long spec stays far under Firestore's 1 MiB document limit.
-        blob = zlib.compress(json.dumps({**_state(g), "invites": getattr(g, "invites", {})}, default=str).encode())  # tokens only in storage
+        blob = zlib.compress(json.dumps({**_state(g), "invites": getattr(g, "invites", {}), "owner_key": getattr(g, "owner_key", "")},
+                                        default=str).encode())  # tokens and the owner key only in storage, never in _state
         _doc(bid).set({"data": blob, "updated": datetime.datetime.now(datetime.timezone.utc)})
         return True
     except Exception as e:
@@ -271,6 +276,7 @@ async def _select_board(request, call_next):
     _auth.set(request.headers.get("authorization", ""))
     _role.set((request.headers.get("x-role") or "")[:20].upper())
     _invite.set((request.headers.get("x-invite") or request.query_params.get("invite") or "")[:64])
+    _owner_key.set((request.headers.get("x-owner-key") or "")[:64])
     used: list = []
     _touched.set(used)
     response = await call_next(request)
@@ -283,6 +289,27 @@ async def _select_board(request, call_next):
             await run_in_threadpool(lambda: _remember_board(_uid(auth), bid))
     return response
 engines = {e.key: e for e in (GoogleGeminiAdapter(), NvidiaNemotronAdapter(), AgentAdapter())}
+
+
+def _usage_doc():
+    """Firestore doc holding today's Nemotron spend, so the daily guard survives Cloud Run cold starts."""
+    return _db.collection("usage").document("nvidia") if _store is not None else None
+
+
+def _load_spend():
+    """(day, dollars) spent so far, from Firestore."""
+    snap = _usage_doc().get()
+    d = snap.to_dict() if snap.exists else {}
+    return d.get("day", ""), d.get("spent", 0.0)
+
+
+def _save_spend(day: str, dollars: float) -> None:
+    """Stores today's spend after each Nemotron call."""
+    _usage_doc().set({"day": day, "spent": round(dollars, 5)})
+
+
+if _store is not None:
+    engines["nvidia"].load_spend, engines["nvidia"].save_spend = _load_spend, _save_spend
 engines["agent"].board = lambda: _board_id.get()  # bring your own AI: answers are kept per board
 app.include_router(feedback.router)  # the beta testers' feedback board (src/api/feedback.py)
 
@@ -383,6 +410,10 @@ def resolve_question(question_id: str, payload: QuestionResolveRequest) -> Dict[
 
     if not payload.answer_text.strip():
         raise HTTPException(status_code=400, detail="Answer is empty")
+    role = _eff_role(graph)
+    if (getattr(graph, "mode", "solo") == "team" and not _is_owner(graph) and role not in ("PM", "CLIENT")
+            and role != node.category.value):
+        raise HTTPException(status_code=403, detail="On a team board each person answers their own bee's questions.")
     node.question_status = QuestionStatus.ANSWERED
     node.answer_text = payload.answer_text
     node.answered_at = datetime.datetime.utcnow().isoformat()
@@ -463,12 +494,12 @@ def list_history() -> Dict[str, Any]:
     return {"points": [{"at": e["at"], "round": e["round"], "why": e["why"]} for e in reversed(_history(_board_id.get()))]}
 
 
-class RestoreRequest(BaseModel):
+class HistoryPoint(BaseModel):
     at: str
 
 
 @app.post("/api/history/restore")
-def restore_history(payload: RestoreRequest) -> Dict[str, Any]:
+def restore_history(payload: HistoryPoint) -> Dict[str, Any]:
     """Go back to an earlier point. The board as it is now is kept first, so going back can itself be undone.
     Role links, the owner and the team stay as they are now: going back changes the plan, not who is on it."""
     bid = _board_id.get()
@@ -480,7 +511,7 @@ def restore_history(payload: RestoreRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail="That point is no longer kept")
     _snapshot(bid, g, "Before going back")
     old = _rebuild(json.loads(zlib.decompress(point["data"])))
-    for keep in ("invites", "owner", "roster", "mode"):
+    for keep in ("invites", "owner", "owner_key", "roster", "mode"):
         if hasattr(g, keep):
             setattr(old, keep, getattr(g, keep))
     boards[bid] = old
@@ -587,7 +618,7 @@ def react_to_answer(question_id: str, engine: str) -> Dict[str, Any]:
     except NeedAgent:
         raise  # bring your own AI: hand the prompt to the person's agent, not a 502
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"{eng.label} could not process the answer: {e}")
+        raise _engine_error(eng, "could not process the answer", e)
     _trace(g, eng, started)
 
     changed = [] if r.is_vague else _apply_reaction(g, r)
@@ -613,7 +644,15 @@ def _start_round(g: BuildingBeesEngine) -> None:
     count never grows mid-round; anything the next update asks waits for the next round. Team: all of them."""
     open_qs = sorted((n for n in g.nodes.values() if isinstance(n, QuestionNode) and n.question_status == QuestionStatus.OPEN),
                      key=lambda q: (not q.is_blocking, q.created_at))
-    g.round_questions = [q.id for q in open_qs][:ROUND_BUDGET if getattr(g, "mode", "solo") != "team" else 50]
+    if getattr(g, "mode", "solo") == "team":
+        g.round_questions = [q.id for q in open_qs][:50]
+        return
+    # Solo: at most 2 compliance questions a round (1 in round 1), so the first round is about the product, not a
+    # legal checklist (Opus audit, 27 Oct 2026: 4 of 6 round-1 questions were Shield's). The rest wait, in order.
+    cap = 1 if getattr(g, "round", 1) <= 1 else 2
+    shield = [q for q in open_qs if q.category == QuestionCategory.COMPLIANCE]
+    first = [q for q in open_qs if q.category != QuestionCategory.COMPLIANCE or q in shield[:cap]]
+    g.round_questions = [q.id for q in (first + [q for q in open_qs if q not in first])][:ROUND_BUDGET]
 
 
 def _may_process(g: BuildingBeesEngine) -> bool:
@@ -621,8 +660,10 @@ def _may_process(g: BuildingBeesEngine) -> bool:
     ritual, where everyone adds input by day and one person processes all of it in the evening."""
     if getattr(g, "mode", "solo") != "team":
         return True
-    owner = getattr(g, "owner", "")
-    return _eff_role(g) == "PM" or not owner or _uid(_auth.get()) == owner
+    if _is_owner(g):
+        return True
+    inv = _member(g)  # only a PM link counts: a picked "PM" on a team board proves nothing
+    return bool(inv and inv["role"] == "PM") or (_role.get() == "PM" and not getattr(g, "owner", "") and not getattr(g, "owner_key", ""))
 
 
 # Team roles the owner hands out (Roger, 21 Oct 2026). Before this anyone could pick "product manager" and process
@@ -650,9 +691,23 @@ def _eff_role(g: BuildingBeesEngine) -> str:
 
 
 def _is_owner(g: BuildingBeesEngine) -> bool:
-    """The signed-in owner, or anyone on a board nobody has claimed (it was made signed out)."""
+    """The signed-in owner; on a board made signed out, whoever holds its owner key (minted when it became a team
+    board); on a solo board nobody has claimed, anyone with the link. Before the key (27 Oct 2026, live audit), any
+    teammate on an unclaimed team board counted as owner and could process rounds or switch the board back to solo."""
     owner = getattr(g, "owner", "")
-    return not owner or _uid(_auth.get()) == owner
+    if owner:
+        return _uid(_auth.get()) == owner
+    key = getattr(g, "owner_key", "")
+    return not key or hmac.compare_digest(_owner_key.get(), key)
+
+
+def _claim(g: BuildingBeesEngine) -> str:
+    """Mints the owner key the first time a signed-out board becomes a team board; returns it once, to its creator."""
+    if getattr(g, "owner", "") or getattr(g, "owner_key", ""):
+        return ""
+    import secrets
+    g.owner_key = secrets.token_urlsafe(18)
+    return g.owner_key
 
 
 def _after_reaction(g: BuildingBeesEngine, stage: str, eng) -> None:
@@ -729,7 +784,7 @@ def react_to_answers(payload: BatchRequest, engine: str) -> Dict[str, Any]:
     except NeedAgent:
         raise  # bring your own AI: hand the prompt to the person's agent, not a 502
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"{eng.label} could not process the answers: {e}")
+        raise _engine_error(eng, "could not process the answers", e)
     _trace(g, eng, started)
     changed = [] if r.is_vague else _apply_reaction(g, r)
     settled = [q for q in qs if q.metadata.get("default")]  # "Decide for me" answers are decisions: never asked again (Ravi's test)
@@ -865,7 +920,7 @@ def restore_board(payload: RestoreRequest) -> Dict[str, Any]:
         return get_graph_state()
     new = _rebuild(payload.model_dump())
     if getattr(old, "owner", "") or getattr(old, "invites", {}):  # a browser copy may not change who owns the board
-        new.owner, new.invites = old.owner, getattr(old, "invites", {})
+        new.owner, new.invites, new.owner_key = old.owner, getattr(old, "invites", {}), getattr(old, "owner_key", "")
     elif "invites" in payload.model_fields_set:
         new.invites = {}
     _set_graph(new)
@@ -889,6 +944,7 @@ def _rebuild(d: Dict[str, Any]) -> BuildingBeesEngine:
     g.mode = d.get("mode") if d.get("mode") in AUDIENCE else "solo"
     g.owner = d.get("owner", "")
     g.invites = dict(d.get("invites") or {})
+    g.owner_key = d.get("owner_key") or ""
     g.plan, g.plan_decisions = d.get("plan"), int(d.get("plan_decisions") or 0)
     g.docs = d.get("docs")
     g.mock_data = d.get("mock_data") or {}
@@ -928,7 +984,7 @@ def _engine(name: str):
         today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
         used = _nvidia_day.get(today, 0)
         if used >= NVIDIA_DAILY_CALLS:
-            raise HTTPException(status_code=429, detail="NVIDIA Nemotron has reached today's free limit. Try Google Gemini, or come back tomorrow.")
+            raise HTTPException(status_code=429, detail="Today's NVIDIA Nemotron credit for this demo is used up. Please come back tomorrow.")
         _nvidia_day.clear()  # drops yesterday's count
         _nvidia_day[today] = used + 1
     _recent_calls.append(now)
@@ -938,11 +994,28 @@ def _engine(name: str):
 SPEC_LIMIT = 60_000
 
 
+def _engine_error(eng, what: str, e: Exception) -> HTTPException:
+    """A model failure in words a judge or founder can act on; the raw upstream error goes to the log only.
+    (Opus audit, 27 Oct 2026: a used-up credit used to show "Client error '402 ...' for url ...".)"""
+    raw = str(e)
+    log.warning("%s %s: %s", eng.label, what, raw[:500])
+    if isinstance(e, RuntimeError) and "budget" in raw.lower():
+        return HTTPException(status_code=429, detail=raw)  # our own daily guard, already in plain words
+    if re.search(r"\b(402|429)\b|insufficient|quota|balance|credit", raw, re.I):
+        return HTTPException(status_code=429, detail=f"{eng.label} is out of credit or busy for this demo right now. "
+                             "Please try again in a while; the sample board in the Brief shows a finished plan.")
+    if isinstance(e, httpx.TimeoutException) or "timed out" in raw.lower():
+        return HTTPException(status_code=504, detail=f"{eng.label} took too long to {what.replace('could not ', '')}. "
+                             "Please press the button again; it usually answers in 10 to 20 seconds.")
+    return HTTPException(status_code=502, detail=f"{eng.label} {what}. Please try again.")
+
+
 def _trace(g: BuildingBeesEngine, eng, started: float) -> None:
     """Records which model answered the last bee call and how long it took; the board shows it as the engine pill.
     "validated" because every reply was parsed against its Pydantic schema before it reached the board."""
-    g.last_call = {"engine": eng.label, "model": getattr(eng, "last_model", "") or getattr(eng, "model", ""),
-                   "seconds": round(time.time() - started, 1), "schema": "validated"}
+    stats = NEMOTRON_CALL.get() if eng.key == "nvidia" else None  # tokens, cache hits, cost of this request's call
+    g.last_call = {"engine": eng.label, "model": (stats or {}).get("model") or getattr(eng, "last_model", "") or getattr(eng, "model", ""),
+                   "seconds": round(time.time() - started, 1), "schema": "validated", **({"stats": stats} if stats else {})}
 
 
 def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None, mode: str = "solo",
@@ -965,7 +1038,7 @@ def _start_board(eng, text: str = "", pdf_bytes: Optional[bytes] = None, mode: s
     except NeedAgent:
         raise  # bring your own AI: hand the prompt to the person's agent, not a 502
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"{eng.label} could not read the spec: {e}")
+        raise _engine_error(eng, "could not read the spec", e)
     g.sources = [{"title": s["title"], "url": s["url"]} for s in sources]
     for q in g.nodes.values():  # turn the page number the engine gave into the page itself
         if isinstance(q, QuestionNode):
@@ -996,13 +1069,28 @@ async def ingest_file(engine: str, file: UploadFile = File(...), mode: str = "so
         raise HTTPException(status_code=413, detail="File is over 20 MB")
     if data[:4] == b"%PDF":
         return _start_board(eng, pdf_bytes=data, mode=mode)
-    if (file.content_type or "").startswith("image/"):  # a photo of a whiteboard or napkin sketch: Gemini vision reads it
+    if (file.content_type or "").startswith("image/"):  # a photo of a whiteboard or napkin sketch: the engine's vision model reads it
         return _start_board(eng, mode=mode, image=(data, file.content_type))
     return _start_board(eng, text=data.decode("utf-8", errors="ignore"), mode=mode)
 
 
+_drawing: set = set()  # boards whose screens are being drawn right now
+
+
 @app.post("/api/expand")
 def expand_to_screens(engine: str) -> Dict[str, Any]:
+    """Draws the screens, with one call per board at a time."""
+    bid = _board_id.get()
+    if bid in _drawing:  # a second tab pressing Draw would pay for a second Ultra call
+        raise HTTPException(status_code=409, detail="The screens are already being drawn on this board. They will appear in a moment.")
+    _drawing.add(bid)
+    try:
+        return _expand_to_screens(engine)
+    finally:
+        _drawing.discard(bid)  # only the call that added the flag gets here
+
+
+def _expand_to_screens(engine: str) -> Dict[str, Any]:
     """Stage two: draw screens, buttons and APIs from the agreed flows and the decisions made so far."""
     eng = _engine(engine)
     old = _board()
@@ -1034,7 +1122,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     except NeedAgent:
         raise  # bring your own AI: hand the prompt to the person's agent, not a 502
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"{eng.label} could not draw the screens: {e}")
+        raise _engine_error(eng, "could not draw the screens", e)
     _trace(g, eng, started)
     g.spec_text = getattr(old, "spec_text", "")
     g.product_name = getattr(old, "product_name", "") or g.product_name  # the name the founder already saw stays
@@ -1047,7 +1135,7 @@ def expand_to_screens(engine: str) -> Dict[str, Any]:
     g.short_ids = dict(getattr(old, "short_ids", {}))  # S1 stays S1 when the screens are redrawn
     g.mode = getattr(old, "mode", "solo")
     g.owner = getattr(old, "owner", "")
-    g.invites = getattr(old, "invites", {})
+    g.invites, g.owner_key = getattr(old, "invites", {}), getattr(old, "owner_key", "")
     g.plan, g.plan_decisions = getattr(old, "plan", None), getattr(old, "plan_decisions", 0)
     g.docs = getattr(old, "docs", None)
     strip_guesses(g, g.spec_text + " " + " ".join(q.answer_text or "" for q in decisions))
@@ -1097,7 +1185,7 @@ def interrogate_node(node_id: str, engine: str) -> Dict[str, Any]:
     except NeedAgent:
         raise  # bring your own AI: hand the prompt to the person's agent, not a 502
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"{eng.label} interrogation failed: {e}")
+        raise _engine_error(eng, "interrogation failed", e)
     added = add_questions(graph, questions, eng.label)
     return {"node_id": node_id, "added": [q.model_dump() for q in added]}
 
@@ -1118,8 +1206,12 @@ def set_mode(payload: ModeRequest) -> Dict[str, Any]:
     """Switches a board between one founder ("solo") and a team; inviting a teammate makes a board a team board."""
     if payload.mode not in AUDIENCE:
         raise HTTPException(status_code=400, detail="Mode is solo or team")
-    _board().mode = payload.mode
-    return {"mode": payload.mode}
+    g = _board()
+    if not _is_owner(g):
+        raise HTTPException(status_code=403, detail="Only the person who started this board can change its mode.")
+    g.mode = payload.mode
+    key = _claim(g) if payload.mode == "team" else ""
+    return {"mode": payload.mode, **({"owner_key": key} if key else {})}
 
 
 class StepsRequest(BaseModel):
@@ -1264,7 +1356,7 @@ def add_feature(payload: FeatureRequest, engine: str) -> Dict[str, Any]:
     except NeedAgent:
         raise  # bring your own AI: hand the prompt to the person's agent, not a 502
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"{eng.label} could not add the feature: {e}")
+        raise _engine_error(eng, "could not add the feature", e)
     _trace(g, eng, started)
     added = merge_feature(g, new)
     if not added:
@@ -1310,7 +1402,7 @@ def write_plan(engine: str) -> Dict[str, Any]:
     except NeedAgent:
         raise  # bring your own AI: hand the prompt to the person's agent, not a 502
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"{eng.label} could not write the plan: {e}")
+        raise _engine_error(eng, "could not write the plan", e)
     _trace(g, eng, started)
     from src.adapters.spec_prompts import XProductFeature
     add_features(g, [XProductFeature(name=f.name, priority=f.priority, flow_ids=f.flow_ids, why=f.why) for f in x.features])
@@ -1341,7 +1433,7 @@ def write_docs(engine: str) -> Dict[str, Any]:
     except NeedAgent:
         raise  # bring your own AI: hand the prompt to the person's agent, not a 502
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"{eng.label} could not write the docs: {e}")
+        raise _engine_error(eng, "could not write the docs", e)
     _trace(g, eng, started)
     added = add_questions(g, x.questions[:6])
     g.round_questions = list(getattr(g, "round_questions", []) or []) + [q.id for q in added]  # asked in this round
@@ -1425,9 +1517,10 @@ def create_invite(payload: InviteRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail=f"role must be one of {sorted(ROLE_LABELS)}")
     import secrets
     tok = secrets.token_urlsafe(12)
+    key = _claim(g)
     g.invites = {**getattr(g, "invites", {}), tok: {"role": role, "at": datetime.datetime.utcnow().isoformat(), "name": ""}}
     g.mode = "team"
-    return {"token": tok, "role": role, "label": ROLE_LABELS[role]}
+    return {"token": tok, "role": role, "label": ROLE_LABELS[role], **({"owner_key": key} if key else {})}
 
 
 @app.get("/api/invites")
@@ -1486,17 +1579,25 @@ def get_build_prompt(short_id: str) -> str:
         raise HTTPException(status_code=404, detail=str(e.args[0]))
 
 
-@app.api_route("/mock/{board_id}/{api_path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+@app.api_route("/mock/{board_id}/{api_path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 def mock_api(board_id: str, api_path: str, request: Request) -> JSONResponse:
     """The board's APIs, answering with example JSON (src/core/mock.py). Open to any origin, so a frontend on
     localhost can call it; it only ever returns placeholders shaped from field names."""
     cors = {"Access-Control-Allow-Origin": "*"}
-    _board_id.set(board_id[:64])
-    node, allowed = mock.match(_board(), request.method, api_path)
+    if request.method == "OPTIONS":  # the browser's preflight before a JSON POST from another origin
+        return Response(status_code=204, headers={**cors, "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE",
+                                                  "Access-Control-Allow-Headers": "Content-Type, Authorization", "Access-Control-Max-Age": "86400"})
+    bid = board_id[:64]
+    # Never create or cache a board for a made-up id: each would cost a read and push real boards out of memory.
+    g = boards.get(bid) or _load_board(bid)
+    if g is None:
+        return JSONResponse(status_code=404, content={"detail": "No board with that id"}, headers=cors)
+    _board_id.set(bid)
+    node, allowed = mock.match(g, request.method, api_path)
     if node is None:
         status, why = (405, f"This path answers {', '.join(sorted(set(allowed)))}") if allowed else (404, "No API on this board has that path")
         return JSONResponse(status_code=status, content={"detail": why}, headers=cors)
-    saved = (getattr(_board(), "mock_data", {}) or {}).get(node.id)
+    saved = (getattr(g, "mock_data", {}) or {}).get(node.id)
     return JSONResponse(content=saved if saved is not None else mock.sample_json(node.outputs_schema.get("fields", [])),
                         headers={**cors, "X-Mock": "example data shaped from field names"})
 
@@ -1550,7 +1651,11 @@ def get_share_page() -> str:
 
 @app.post("/api/reset")
 def reset_to_sample() -> Dict[str, Any]:
-    """Clears the board."""
+    """Clears the board (owner or the person who processes rounds only); a copy is kept so it can be undone."""
+    g = _board()
+    if not _may_process(g):
+        raise HTTPException(status_code=403, detail="Only the board's owner can clear it.")
+    _snapshot(_board_id.get(), g, "Before the board was cleared")
     _set_graph(BuildingBeesEngine())
     return get_graph_state()
 
