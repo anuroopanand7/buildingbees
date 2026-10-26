@@ -214,7 +214,7 @@ def test_every_skill_has_its_header_and_stays_in_its_token_cap():
         assert found == keys, path
         cap = int([ln for ln in head.splitlines() if ln.startswith("max_tokens")][0].split(":")[1])
         assert len(body) / 4 <= cap * 1.1, f"{path} is about {len(body) // 4} tokens, cap {cap}"
-        assert "—" not in body
+        assert "\u2014" not in body
 
 
 def test_the_india_pack_is_added_only_for_indian_products():
