@@ -948,6 +948,7 @@ def _rebuild(d: Dict[str, Any]) -> BuildingBeesEngine:
     g.plan, g.plan_decisions = d.get("plan"), int(d.get("plan_decisions") or 0)
     g.docs = d.get("docs")
     g.mock_data = d.get("mock_data") or {}
+    g.last_call = d.get("last_call")  # the engine pill survives a restart, so judges always see which model answered
     g.needs_redraw = bool(d.get("needs_redraw"))
     for n in d["nodes"][:2000]:
         cls = LAYER_CLASSES.get(n.get("layer"))

@@ -370,3 +370,10 @@ def test_watching_steps_get_no_failure_exit():
     steps = ["See New Order: kitchen sees it", "Walker accepts the booking: yes", "Pay: by UPI"]
     out = clean_branches([], 3, steps)
     assert [b["at_step"] for b in out] == [3]
+
+
+def test_engine_pill_survives_a_restart(monkeypatch):
+    """The last call (model, seconds) is stored with the board, so a board reloaded after a cold start still shows it."""
+    h, g = _drawn_board(monkeypatch, "pill-restart")
+    state = client.get("/api/graph", headers=h).json()
+    assert state["last_call"] and server._rebuild(state).last_call == state["last_call"]
