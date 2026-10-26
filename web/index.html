@@ -411,14 +411,22 @@
   .erd .erd-title { font: 600 13px Inter, system-ui, sans-serif; fill: var(--text); }
   .erd .erd-col { font: 12px ui-monospace, monospace; fill: var(--text); }
   .erd .erd-type { font: 11px ui-monospace, monospace; fill: var(--muted); }
-  .erd .erd-link { fill: none; stroke: var(--wire, var(--muted)); stroke-width: 1.5; }
+  .erd .erd-link { fill: none; stroke: var(--wire, var(--muted)); stroke-width: 1.5; stroke-linejoin: round; opacity: .8; }
   .erd .erd-end { fill: var(--wire, var(--muted)); }
   .history-list { list-style: none; padding: 0; margin: 0; }
   .history-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
   .tier { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 14px 0 4px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.12); font-size: 13px; }
   #chaosBtn { width: auto; padding: 0 10px; gap: 6px; display: inline-flex; align-items: center; font-size: 12px; }
   #chaosBtn[aria-pressed="true"] { background: var(--warn-soft); color: var(--text); }
-  body.chaos .flow-row, body.chaos .steps:not(.branch) > .step:not(.decision) { opacity: .3; }
+  body.chaos .steps:not(.branch) > .step:not(.decision) { opacity: .3; }
+  .fail-to { display: none; margin-left: 6px; font-size: 11px; color: var(--bad); }
+  body.chaos .fail-to { display: inline; }
+  body.chaos .scr:not(.fail-screen) > :not(.ctas):not(h4) { opacity: .35; }
+  body.chaos .scr.fail-screen { outline: 2px solid var(--bad); outline-offset: 3px; }
+  body.chaos .cta:not(.has-fail):not(.no-fail) { opacity: .35; }
+  body.chaos .cta.has-fail { outline: 2px solid var(--bad); outline-offset: 1px; border-radius: 8px; }
+  body.chaos .cta.no-fail { outline: 2px dashed var(--warn); outline-offset: 1px; border-radius: 8px; }
+  body.chaos .cta.no-fail::after { content: "No failure screen yet"; display: block; font-size: 11px; color: var(--warn); }
   body.chaos .steps.branch .step { outline: 2px solid var(--warn); outline-offset: 2px; }
   body.chaos .step.open { outline: 2px dashed var(--warn); }
   .kv dd.missing { color: var(--bad); }
@@ -1240,15 +1248,17 @@ function screenCard(id) {
     : open ? `<span class="tag soft"><i class="ph ph-question" aria-hidden="true"></i>${open} open question${open > 1 ? "s" : ""}</span>`
     : '<span class="tag soft">A few details to settle</span>';
   const ctas = (S.fwd[id] || []).map((c) => S.nodes[c]).filter((c) => c && c.layer === "CTA");
-  return `<article class="scr ${PM.focus === id || S.selected === id ? "focus" : ""} ${hit(id)}" data-id="${esc(id)}" data-node tabindex="0">
+  const failScreen = byLayer("CTA").some((c) => c.target_screen_on_failure === id && c.parent_screen_id !== id);
+  return `<article class="scr ${failScreen ? "fail-screen" : ""} ${PM.focus === id || S.selected === id ? "focus" : ""} ${hit(id)}" data-id="${esc(id)}" data-node tabindex="0">
     ${pmQueue()[0] && screenOf(pmQueue()[0].target_node_id) === id ? `<span class="pin">${beeIcon(pmQueue()[0].category, true)}${esc(bee(pmQueue()[0].category)[0])} is asking</span>` : ""}
     ${noteBtn(id, 0, "", n.title)}<h4>${idChip(id)}${esc(n.title)}</h4>${S.ids?.[id] ? `<button class="link copy-prompt" data-copy-prompt="${esc(S.ids[id])}" data-tip="Copy a prompt to build this screen in Cursor or Claude Code" data-tip-pos="top"><i class="ph ph-copy" aria-hidden="true"></i> Build prompt</button>` : ""}${state}${n.flow_id ? featChips(n.flow_id) : ""}${branchBees(id)}
     ${n.metadata?.elements?.length ? wireframe(n.metadata.elements, true) : ""}
     ${ctas.length ? `<div class="behind">What the buttons do</div><ul class="ctas">${ctas.map((c) => {
       const apis = (S.fwd[c.id] || []).map((a) => S.nodes[a]).filter((a) => a && a.layer === "API");
       const cnt = openBlocking(c.id) + apis.reduce((t, a) => t + openBlocking(a.id), 0);
-      return `<li class="cta ${PM.focus === c.id || S.selected === c.id ? "focus" : ""} ${hit(c.id) || apis.map((a) => hit(a.id)).find(Boolean) || ""}" data-id="${esc(c.id)}" tabindex="0">
-        <div class="cta-top"><span class="cta-label">${idChip(c.id)}${esc(c.label || c.title)}${apis.length ? "" : ' <span class="muted">goes to the next screen</span>'}</span>${cnt ? `<span class="count" title="Open blocking questions">${cnt}</span>` : ""}</div>
+      const failTo = S.nodes[c.target_screen_on_failure]?.layer === "SCREEN" && c.target_screen_on_failure !== id;
+      return `<li class="cta ${failTo ? "has-fail" : apis.length ? "no-fail" : ""} ${PM.focus === c.id || S.selected === c.id ? "focus" : ""} ${hit(c.id) || apis.map((a) => hit(a.id)).find(Boolean) || ""}" data-id="${esc(c.id)}" tabindex="0">
+        <div class="cta-top"><span class="cta-label">${idChip(c.id)}${esc(c.label || c.title)}${apis.length ? "" : ' <span class="muted">goes to the next screen</span>'}${failTo ? `<span class="fail-to">if it fails: ${esc(S.ids?.[c.target_screen_on_failure] || S.nodes[c.target_screen_on_failure].title)}</span>` : ""}</span>${cnt ? `<span class="count" title="Open blocking questions">${cnt}</span>` : ""}</div>
         ${apis.length ? `<div class="apis">${apis.map((a) => `<button class="api mono ${PM.focus === a.id || S.selected === a.id ? "focus" : ""}" data-id="${esc(a.id)}" title="${esc(a.method)} ${esc(a.path)}">${idChip(a.id)}${S.mode === "team" ? `${esc(a.method)} ${esc(a.path)}` : esc(apiWords(a))}</button>`).join("")}</div>` : ""}
       </li>`;
     }).join("")}</ul>` : '<div class="no-ctas">No buttons defined</div>'}
@@ -1778,7 +1788,7 @@ function erdSvg(tables, esc) {
   const pos = {}, rowH = [];
   tables.forEach((t, i) => { const r = Math.floor(i / COLS); rowH[r] = Math.max(rowH[r] || 0, hOf(t)); });
   tables.forEach((t, i) => { const r = Math.floor(i / COLS), c = i % COLS;
-    pos[t.name] = { x: PAD + c * (W + GX), y: PAD + rowH.slice(0, r).reduce((a, b) => a + b + GY, 0), t }; });
+    pos[t.name] = { x: PAD + GX / 2 + c * (W + GX), y: PAD + GY / 2 + rowH.slice(0, r).reduce((a, b) => a + b + GY, 0), t }; });
   const key = (n) => String(n || "").toLowerCase();
   const find = (word) => tables.find((t) => [key(t.name), key(t.name).replace(/s$/, "")].includes(key(word)));
   const links = [], seen = new Set();
@@ -1791,12 +1801,18 @@ function erdSvg(tables, esc) {
     return `<g><rect class="erd-box" x="${p.x}" y="${p.y}" width="${W}" height="${h}" rx="8"/><rect class="erd-head" x="${p.x}" y="${p.y}" width="${W}" height="${HEAD}" rx="8"/>
       <text class="erd-title" x="${p.x + 10}" y="${p.y + 19}">${esc(t.name)}</text>${cols(t).map((c, i) =>
       `<text class="erd-col" x="${p.x + 10}" y="${p.y + HEAD + 15 + i * ROW}">${esc(c.name)}</text><text class="erd-type" x="${p.x + W - 10}" y="${p.y + HEAD + 15 + i * ROW}" text-anchor="end">${esc(c.type || "")}</text>`).join("")}</g>`; }).join("");
-  const lines = links.map(([a, b, row]) => { const pa = pos[a.name], pb = pos[b.name];
-    const right = pb.x > pa.x, ya = pa.y + (row >= 0 ? HEAD + 10 + row * ROW : HEAD / 2);
-    const xa = right ? pa.x + W : pa.x, xb = pb.x + (pb.x > pa.x ? 0 : pb.x < pa.x ? W : W / 2), yb = pb.y + (pb.x === pa.x ? 0 : HEAD / 2);
-    const dx = Math.max(40, Math.abs(xb - xa) / 2) * (right ? 1 : -1);
-    return `<path class="erd-link" d="M${xa},${ya} C${xa + dx},${ya} ${xb - (pb.x === pa.x ? 0 : dx)},${yb} ${xb},${yb}"/><circle class="erd-end" cx="${xb}" cy="${yb}" r="3"/>`; }).join("");
-  const w = PAD * 2 + Math.min(COLS, tables.length) * (W + GX) - GX, h = PAD * 2 + rowH.reduce((a, b) => a + b + GY, 0) - GY;
+  // Lines run only through the empty gaps: out of the source's side into the column gap beside it, along the row gap
+  // just above the target's row, down the gap beside the target, into its header. Gaps hold no boxes, so no line
+  // crosses a table; a small offset per line keeps parallel lines apart.
+  const lines = links.map(([a, b, row], i) => { const pa = pos[a.name], pb = pos[b.name], o = (i % 6) * 4 - 10;
+    const right = pb.x >= pa.x, ya = pa.y + (row >= 0 ? HEAD + 10 + row * ROW : HEAD / 2);
+    const xa = right ? pa.x + W : pa.x, x1 = xa + (right ? GX / 2 + o : -GX / 2 - o);
+    const into = pb.x > pa.x ? "left" : pb.x < pa.x ? "right" : right ? "right" : "left";
+    const xb = into === "left" ? pb.x : pb.x + W, x2 = xb + (into === "left" ? -GX / 2 + o : GX / 2 - o);
+    const yb = pb.y + HEAD / 2, band = pb.y - GY / 2 + o / 2;
+    const d = `M${xa},${ya} H${x1} V${band} H${x2} V${yb} H${xb}`;
+    return `<path class="erd-link" d="${d}"/><circle class="erd-end" cx="${xb}" cy="${yb}" r="3"/>`; }).join("");
+  const w = PAD * 2 + Math.min(COLS, tables.length) * (W + GX), h = PAD * 2 + GY / 2 + rowH.reduce((a, b) => a + b + GY, 0) - GY / 2;
   return `<svg class="erd" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Tables and how they link">${lines}${boxes}</svg>`;
 }
 // The build prompt is plain text, so it skips api()'s JSON parsing; same board, role and sign-in headers.
@@ -2069,7 +2085,7 @@ document.addEventListener("click", (e) => {
   }
   if (t.id === "chaosBtn") {  // Poke's view: dim the happy path so every failure and undecided path stands out
     const on = document.body.classList.toggle("chaos"); t.setAttribute("aria-pressed", on);
-    if (on && !document.querySelector("#flows .steps.branch")) toast("No failure paths drawn yet. Open the Flows view, or answer Poke's questions to add them.");
+    if (on && !document.querySelector("#flows .steps.branch, #flows .cta.has-fail, #flows .cta.no-fail")) toast("No failure paths drawn yet. Open the Flows view, or answer Poke's questions to add them.");
     return requestAnimationFrame(drawWires);
   }
   if (t.dataset.idea) {
