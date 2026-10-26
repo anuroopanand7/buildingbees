@@ -101,3 +101,40 @@ def ready_wave(g: BuildingBeesEngine) -> Dict[str, Any]:
     return {"ready": ready, "blocked": blocked,
             "build_order": [s.get("title") for s in plan.get("build_order", [])],
             "rule": "Build only the ready screens. Do not build or guess around a blocked one: ask the person, or add a note."}
+
+
+def _plain(v) -> Dict[str, Any]:
+    """A Pydantic model (ScreenStates) or a dict, as a dict."""
+    return v.model_dump() if hasattr(v, "model_dump") else (v or {})
+
+
+def build_prompt(g: BuildingBeesEngine, short: str) -> str:
+    """A paste-ready prompt for a coding agent to build one screen: its parts, buttons, the APIs they call, the decisions
+    about any of them and what is still open. Built from the board, so it never says more than the team decided."""
+    s = item(g, short)
+    if s["kind"] != "screen":
+        raise KeyError(f"{short} is not a screen. Build prompts are per screen (S1, S2...).")
+    buttons = [item(g, b) for b in s["buttons"] if b]
+    apis = [item(g, a) for b in buttons for a in b.get("calls", []) if a]
+    parts = [s, *buttons, *apis]
+    lines = [f"Build the screen {s['id']}: {s['title']}.", s.get("description") or "",
+             "", "What is on it: " + (", ".join(f"{e.get('kind', 'text')} \"{e.get('label', '')}\"" + (f" ({e['detail']})" if e.get("detail") else "") for e in s["elements"]) or "not drawn yet"),
+             "States: " + "; ".join(f"{k}: {v}" for k, v in _plain(s.get("states")).items() if v)]
+    for b in buttons:
+        to = "; ".join(x for x in (b["on_success"] and f"on success go to {b['on_success']}",
+                                        b["on_failure"] and f"on failure go to {b['on_failure']}") if x)
+        lines.append(f"Button {b['id']} \"{b['label'] or b['title']}\"" + (f" calls {', '.join(b['calls'])}" if b["calls"] else "")
+                     + (f"; {to}" if to else ""))
+    for a in apis:
+        lines.append(f"API {a['id']}: {a['method']} {a['path']}; sends {', '.join(a['inputs'].get('fields', [])) or 'nothing'};"
+                     f" returns {', '.join(a['outputs'].get('fields', [])) or 'nothing'}"
+                     + (f"; timeout {a['timeout_ms']} ms" if a.get("timeout_ms") else "")
+                     + ("; must be idempotent" if a.get("idempotent") else ""))
+    decided = [f"- {d['about']}: {d['question']} Answer: {d['decision']}" for p in parts for d in p["decisions"]]
+    open_qs = [f"- {p['id']}: {q['question']}" for p in parts for q in p["open_questions"]]
+    if decided:
+        lines += ["", "Decided by the team (do not change):", *decided]
+    if open_qs:
+        lines += ["", "Not decided yet (do not guess; leave a TODO and ask):", *open_qs]
+    lines += ["", "Use the project's existing stack and conventions. Build only this screen and the calls listed."]
+    return "\n".join(x for x in lines if x is not None).strip() + "\n"

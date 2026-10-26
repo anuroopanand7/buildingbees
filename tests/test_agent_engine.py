@@ -227,3 +227,21 @@ def test_the_india_pack_is_added_only_for_indian_products():
     g = server.BuildingBeesEngine()
     g.spec_text = "fees in rupees for a school in Delhi"
     assert "LOCAL RULES" in server.audience(g) and "LOCAL RULES" not in server.audience(server.BuildingBeesEngine())
+
+
+def test_build_prompt_for_one_screen(monkeypatch):
+    """Raju's idea: a paste-ready prompt per screen, with its buttons and APIs, decisions kept and open questions not guessed."""
+    from tests.test_gemini_ingest import FakeGemini
+    monkeypatch.setitem(server.engines, "gemini", FakeGemini())
+    monkeypatch.setattr(server.tavily, "research", lambda text: [])
+    h = {"X-Board": "build-prompt-test"}
+    server.boards.pop(h["X-Board"], None)
+    client.post("/api/ingest-prd?engine=gemini", json={"prd_markdown": "a shop"}, headers=h)
+    g = client.post("/api/expand?engine=gemini", headers=h).json()
+    ids = g["short_ids"]
+    screen = next(ids[n["id"]] for n in g["nodes"] if n["layer"] == "SCREEN")
+    r = client.get(f"/api/prompt/{screen}", headers=h)
+    assert r.status_code == 200 and r.text.startswith(f"Build the screen {screen}")
+    assert "do not guess" in r.text or "Decided by the team" in r.text or "Use the project's existing stack" in r.text
+    flow = next(ids[n["id"]] for n in g["nodes"] if n["layer"] == "FLOW")
+    assert client.get(f"/api/prompt/{flow}", headers=h).status_code == 404  # prompts are per screen

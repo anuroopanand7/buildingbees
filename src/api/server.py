@@ -47,7 +47,7 @@ from src.adapters.nvidia_adapter import NvidiaNemotronAdapter
 from src.core.docs import build_docs
 from src.core.skills import for_call
 from src.adapters.spec_prompts import TALENTS
-from src.core.agent_view import decision_log, item as plan_item, ready_wave
+from src.core.agent_view import build_prompt, decision_log, item as plan_item, ready_wave
 from src.adapters.agent_adapter import AgentAdapter, NeedAgent, SCHEMAS as AGENT_SCHEMAS
 from src.adapters.nvidia_adapter import pdf_to_text
 from src.adapters.spec_prompts import AUDIENCE, BATCH_NOTE, REACT_PROMPT
@@ -1321,6 +1321,15 @@ def get_plan_item(short_id: str) -> Dict[str, Any]:
     """One part of the plan by its short id (F1, FL1, S2, B3, A1), for an agent that needs a slice, not the whole Brief."""
     try:
         return plan_item(_board(), short_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e.args[0]))
+
+
+@app.get("/api/prompt/{short_id}", response_class=PlainTextResponse)
+def get_build_prompt(short_id: str) -> str:
+    """A paste-ready prompt for a coding agent to build one screen (Raju's idea, 24 Oct 2026)."""
+    try:
+        return build_prompt(_board(), short_id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e.args[0]))
 

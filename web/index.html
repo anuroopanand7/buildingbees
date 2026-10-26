@@ -392,6 +392,14 @@
   .kv { display: grid; grid-template-columns: 104px 1fr; gap: 6px 12px; font-size: 13px; margin: 14px 0 18px; }
   .kv dt { color: var(--muted); }
   .kv dd { margin: 0; overflow-wrap: anywhere; }
+  .contract pre.json { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; overflow: auto; margin: 4px 0 10px; }
+  .contract .meta { margin-top: 8px; }
+  .copy-prompt { font-size: 12px; }
+  #chaosBtn { width: auto; padding: 0 10px; gap: 6px; display: inline-flex; align-items: center; font-size: 12px; }
+  #chaosBtn[aria-pressed="true"] { background: var(--warn-soft); color: var(--text); }
+  body.chaos .flow-row, body.chaos .steps:not(.branch) > .step:not(.decision) { opacity: .3; }
+  body.chaos .steps.branch .step { outline: 2px solid var(--warn); outline-offset: 2px; }
+  body.chaos .step.open { outline: 2px dashed var(--warn); }
   .kv dd.missing { color: var(--bad); }
   .h { font-size: 13px; font-weight: 600; margin: 18px 0 8px; }
   .reasons { font-size: 13px; color: var(--muted); padding-left: 18px; margin: 6px 0 0; }
@@ -937,6 +945,7 @@
     <button id="zoomPct" aria-label="Reset zoom to 100%" data-tip="Reset to 100%" data-tip-pos="top">100%</button>
     <button id="zoomIn" aria-label="Zoom in" data-tip="Zoom in" data-tip-pos="top"><i class="ph ph-plus" aria-hidden="true"></i></button>
     <button id="zoomFit" aria-label="Recenter: fit the whole board" data-tip="Recenter: fit the whole board" data-tip-pos="top"><i class="ph ph-arrows-in-simple" aria-hidden="true"></i></button>
+    <button id="chaosBtn" aria-pressed="false" data-tip="What can go wrong: show only the failure and undecided paths" data-tip-pos="top"><i class="ph ph-warning" aria-hidden="true"></i> What can go wrong</button>
   </div>
   <button class="island btn sm recenter" id="recenter" hidden><i class="ph ph-crosshair" aria-hidden="true"></i>Back to the board</button>
   <aside id="details" hidden aria-label="Details"></aside>
@@ -1194,7 +1203,7 @@ function screenCard(id) {
   const ctas = (S.fwd[id] || []).map((c) => S.nodes[c]).filter((c) => c && c.layer === "CTA");
   return `<article class="scr ${PM.focus === id || S.selected === id ? "focus" : ""} ${hit(id)}" data-id="${esc(id)}" data-node tabindex="0">
     ${pmQueue()[0] && screenOf(pmQueue()[0].target_node_id) === id ? `<span class="pin">${beeIcon(pmQueue()[0].category, true)}${esc(bee(pmQueue()[0].category)[0])} is asking</span>` : ""}
-    ${noteBtn(id, 0, "", n.title)}<h4>${idChip(id)}${esc(n.title)}</h4>${state}${n.flow_id ? featChips(n.flow_id) : ""}${branchBees(id)}
+    ${noteBtn(id, 0, "", n.title)}<h4>${idChip(id)}${esc(n.title)}</h4>${S.ids?.[id] ? `<button class="link copy-prompt" data-copy-prompt="${esc(S.ids[id])}" data-tip="Copy a prompt to build this screen in Cursor or Claude Code" data-tip-pos="top"><i class="ph ph-copy" aria-hidden="true"></i> Build prompt</button>` : ""}${state}${n.flow_id ? featChips(n.flow_id) : ""}${branchBees(id)}
     ${n.metadata?.elements?.length ? wireframe(n.metadata.elements, true) : ""}
     ${ctas.length ? `<div class="behind">What the buttons do</div><ul class="ctas">${ctas.map((c) => {
       const apis = (S.fwd[c.id] || []).map((a) => S.nodes[a]).filter((a) => a && a.layer === "API");
@@ -1635,7 +1644,9 @@ function renderDetails() {
     <h3>${esc(n.label || n.title)}</h3>
     <div class="mono muted">${esc(n.id)}</div>
     ${n.layer === "SCREEN" && n.metadata?.elements?.length ? `<div class="h" style="margin-top:14px">Wireframe</div>${wireframe(n.metadata.elements)}` : ""}
+    ${n.layer === "SCREEN" && S.ids?.[n.id] ? `<button class="btn sm" data-copy-prompt="${esc(S.ids[n.id])}"><i class="ph ph-copy" aria-hidden="true"></i>Copy build prompt</button>` : ""}
     <dl class="kv">${rows}</dl>
+    ${n.layer === "API" ? apiContract(n) : ""}
     ${r ? `<div class="h">Screen readiness</div>
       <div class="summary-num" style="font-size:30px;color:${color(r.readiness_score)}">${Math.round(r.readiness_score * 100)}%</div>
       <ul class="reasons">${r.completeness_reasons.map((x) => `<li>${esc(x)}</li>`).join("") || "<li>Every blocking question is answered.</li>"}</ul>` : ""}
@@ -1650,6 +1661,34 @@ function renderDetails() {
              <div class="field"><input data-answer="${esc(q.id)}" aria-label="Your decision" placeholder="Type your decision and press Enter"></div>`}
       </div>`;
     }).join("") || '<div class="muted" style="font-size:13px">None yet.</div>'}`;
+}
+
+// An example value from a field name only (Raju, 24 Oct 2026): the shape a developer can start from, never a decision.
+const sampleFor = (f) => { const k = String(f).toLowerCase().split(/[:\s(]/)[0];
+  if (/^(is|has|can)_|enabled|active|paid$/.test(k)) return true;
+  if (/(_at|date|time)$/.test(k)) return "2026-11-01T10:30:00Z";
+  if (/(count|qty|quantity|amount|price|total|fee|rating|age|minutes)/.test(k)) return 0;
+  if (/(^id$|_id$)/.test(k)) return k.replace(/_id$/, "") + "_123";
+  if (/email/.test(k)) return "name@example.com";
+  if (/phone|mobile/.test(k)) return "+91 90000 00000";
+  if (/(s|list|items)$/.test(k) && !/status|address/.test(k)) return [];
+  return "text"; };
+const sampleJson = (fields) => JSON.stringify(Object.fromEntries((fields || []).map((f) => [String(f).split(/[:\s(]/)[0], sampleFor(f)])), null, 2);
+function apiContract(n) {
+  const errs = Object.entries(n.error_codes || {});
+  return `<div class="h">Contract</div><div class="contract"><div class="mono"><b>${esc((n.method || "").toUpperCase())}</b> ${esc(n.path)}</div>
+    <div class="meta">Example request (shape from the fields, values are placeholders)</div><pre class="json">${esc(sampleJson(n.inputs_schema?.fields))}</pre>
+    <div class="meta">Example response</div><pre class="json">${esc(sampleJson(n.outputs_schema?.fields))}</pre>
+    ${errs.length ? `<div class="meta">When it fails</div><ul class="reasons">${errs.map(([c, v]) => `<li><b>${esc(c)}</b> ${esc(Object.values(v || {}).join(", "))}</li>`).join("")}</ul>` : ""}</div>`;
+}
+// The build prompt is plain text, so it skips api()'s JSON parsing; same board, role and sign-in headers.
+async function copyPrompt(short) {
+  const headers = { "X-Board": BOARD, "X-Role": ROLE || "", "X-Invite": invite() };
+  if (AUTH.user) { try { headers.Authorization = "Bearer " + await AUTH.user.getIdToken(); } catch (e) {} }
+  const res = await fetch(`/api/prompt/${encodeURIComponent(short)}`, { headers });
+  if (!res.ok) return toast("Could not make the prompt for " + short);
+  await navigator.clipboard.writeText(await res.text());
+  toast(`Build prompt for ${short} copied. Paste it into Cursor or Claude Code.`);
 }
 
 // ---------- actions ----------
@@ -1884,6 +1923,12 @@ const fail = (err) => { PM.error = err.message; toast(err.message); };
 document.addEventListener("click", (e) => {
   const t = e.target.closest("button, [data-id]");
   if (!t) return;
+  if (t.dataset.copyPrompt) return copyPrompt(t.dataset.copyPrompt).catch(fail);
+  if (t.id === "chaosBtn") {  // Poke's view: dim the happy path so every failure and undecided path stands out
+    const on = document.body.classList.toggle("chaos"); t.setAttribute("aria-pressed", on);
+    if (on && !document.querySelector("#flows .steps.branch")) toast("No failure paths drawn yet. Open the Flows view, or answer Poke's questions to add them.");
+    return requestAnimationFrame(drawWires);
+  }
   if (t.dataset.idea) {
     if (!modePicked) return say("First choose: Just me, or With my team.", true);
     $("prd").value = t.dataset.idea; say("Idea added. Press Map it."); return $("prd").focus();
