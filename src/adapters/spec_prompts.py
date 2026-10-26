@@ -540,6 +540,8 @@ A. If the answer is vague, evasive or too broad to build from ("everyone", "all 
    is_blocking true. Be warm about it. Example: "everyone" becomes "Pick the one person who needs this most".
 
 B. Otherwise set is_vague false and apply the decision to the board. Change only what the answer implies.
+   Never add scope the answer did not name: if the founder says "delivery and pickup", do not add dine-in;
+   if they pick one option, the others they were offered are turned down, not kept.
    - Flows (the board is at the flows stage): return every flow that changes in flow_updates with its full new
      list of steps (add, reword, reorder or remove steps). Keep each step in the board's form, "Short title:
      one short sentence" (a one to three word title, then what happens), and copy unchanged steps exactly.
