@@ -506,7 +506,68 @@
   .working-card .bee-fly { display: block; margin: -8px auto 4px; border-radius: 50%; mix-blend-mode: multiply; }  /* the bee flies a loop while the model works; its white frame vanishes on the card */
   .working-card .bee-fly + .sketch { display: none; }
   /* The why, before anything else: a first-time visitor (BSR, 20 Oct) asked who made this, why, and towards what end. */
-  #start .why { display: inline-block; margin: 0 0 14px; padding: 6px 12px; border: 1.5px solid var(--ink); border-radius: 12px; background: var(--bee); font-size: 14px; font-weight: 600; color: var(--ink); }
+  /* ===== Start screen, redesigned 28 Oct 2026 (craft lane: technical evaluator; paper, hairlines, mono eyebrow, one accent). ===== */
+  .start-inner { align-items: start; }
+  .start-inner > * { min-width: 0; }  /* the demo's no-wrap steps must never widen the page on a phone */
+  .start-copy { position: sticky; top: clamp(84px, 11vh, 120px); padding-top: clamp(8px, 4vh, 40px); }
+  #start .eyebrow { font: 500 11.5px/1 "Geist Mono", ui-monospace, monospace; letter-spacing: .22em; text-transform: uppercase; color: var(--muted); margin: 0 0 18px; display: flex; gap: 10px; align-items: center; }
+  #start .eyebrow::before { content: ""; width: 22px; height: 1.5px; background: var(--ink); }
+  #start .eyebrow span { opacity: .4; }
+  #start h1 { font-size: clamp(38px, 4.4vw, 66px); line-height: 1; letter-spacing: -.045em; margin: 0 0 22px; font-weight: 650; }
+  #start h1 .h-dim { color: color-mix(in srgb, var(--text) 38%, transparent); font-weight: 550; display: block; }
+  #start h1 .h-mark { position: relative; white-space: nowrap; z-index: 0; }
+  #start h1 .h-mark::after { content: ""; position: absolute; left: -.04em; right: -.06em; bottom: .06em; height: .3em; background: var(--bee); z-index: -1; border-radius: 3px; transform-origin: left; animation: mark-in .7s .35s var(--ease-out) both; }
+  @keyframes mark-in { from { transform: scaleX(0); } }
+  #start p.lead { font-size: clamp(16px, 1.35vw, 19px); line-height: 1.55; max-width: 48ch; margin: 0 0 14px; }
+  #start .why { display: block; margin: 0 0 30px; padding-left: 12px; border-left: 2.5px solid var(--bee); font-size: 14px; font-weight: 500; color: var(--text); max-width: 52ch; }
+  .start-copy > * { animation: rise .6s var(--ease-out) both; }
+  .start-copy > :nth-child(2) { animation-delay: 60ms; } .start-copy > :nth-child(3) { animation-delay: 120ms; }
+  .start-copy > :nth-child(4) { animation-delay: 170ms; } .start-copy > :nth-child(n+5) { animation-delay: 220ms; }
+  .team { padding: 22px; border-radius: 18px; }
+  .team h2 { font: 500 11.5px/1 "Geist Mono", ui-monospace, monospace; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); margin: 22px 0 12px; }
+  .crew { list-style: none; margin: 0; padding: 0; display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px !important; }
+  .crew li { display: block !important; }
+  .crew details { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); transition: border-color .2s, box-shadow .2s; }
+  .crew details:hover { border-color: var(--line-strong); }
+  .crew details[open] { grid-column: 1 / -1; box-shadow: var(--shadow); }
+  .crew summary { list-style: none; display: flex; gap: 10px; align-items: center; padding: 10px 12px; cursor: pointer; min-height: 44px; }
+  .crew summary::-webkit-details-marker { display: none; }
+  .crew summary b { display: block; font-size: 14px; font-weight: 600; }
+  .crew summary small { display: block; font-size: 12px; color: var(--muted); }
+  .crew details p { margin: 0 12px 8px; font-size: 13px; color: var(--muted); }
+  .crew details .talents { padding: 0 12px 12px; }
+  .crew li:has(details[open]), .crew #scoutCrew { grid-column: 1 / -1; }
+  /* The demo: a looping 9 s story. Reduced motion shows the finished state. */
+  .demo { position: relative; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); padding: 16px; min-height: 270px; overflow: hidden;
+          background-image: radial-gradient(var(--line-strong) 1px, transparent 1px); background-size: 16px 16px; }
+  .demo-idea { display: flex; gap: 8px; align-items: center; font-size: 13px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; width: fit-content; max-width: 100%; }
+  .demo-idea span { overflow: hidden; white-space: nowrap; border-right: 2px solid var(--ink); animation: type 9s steps(42) infinite; width: 42ch; max-width: 100%; }
+  @keyframes type { 0% { width: 0; } 18%, 100% { width: 42ch; } }
+  .demo-steps { display: flex; gap: 10px; margin: 16px 0 0; }
+  .demo-step { flex: 1; white-space: nowrap; background: var(--panel); border: 1.5px solid var(--ink); border-radius: 10px; padding: 9px 10px; font-size: 12.5px; font-weight: 600; opacity: 0; animation: step 9s infinite; }
+  .demo-step b { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: var(--on-ink); font-size: 11px; margin-right: 6px; }
+  .demo-step.s2 { animation-delay: .25s; } .demo-step.s3 { animation-delay: .5s; }
+  @keyframes step { 0%, 20% { opacity: 0; transform: translateY(8px); } 26%, 94% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+  .demo-pin { position: absolute; display: flex; gap: 8px; align-items: flex-start; background: var(--ink); color: var(--on-ink); border-radius: 12px; padding: 8px 12px 8px 8px; font-size: 12.5px; max-width: 64%; box-shadow: var(--shadow); opacity: 0; animation: pin 9s infinite; }
+  .demo-pin b { display: block; font-size: 11px; color: var(--bee); font-weight: 600; }
+  .demo-pin .bee { flex: none; }
+  .demo-pin.p1 { left: 16px; top: 124px; animation-delay: 0s; }
+  .demo-pin.p2 { right: 16px; top: 180px; animation-delay: .9s; }
+  @keyframes pin { 0%, 34% { opacity: 0; transform: translateY(6px) scale(.96); } 40%, 92% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+  .demo-done { position: absolute; left: 16px; right: 16px; bottom: 12px; font-size: 12.5px; font-weight: 600; display: flex; gap: 6px; align-items: center; color: var(--ok); opacity: 0; animation: done 9s infinite; }
+  @keyframes done { 0%, 66% { opacity: 0; } 72%, 94% { opacity: 1; } 100% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .demo-idea span, .demo-step, .demo-pin, .demo-done, .start-copy > *, #start h1 .h-mark::after { animation: none !important; opacity: 1 !important; width: auto; }
+  }
+  @media (max-width: 900px) {
+    .start-copy { position: static; padding-top: 0; }
+    .demo-pin { position: static; max-width: none; margin-top: 10px; }
+    .demo-done { position: static; margin-top: 10px; }
+    .demo { min-height: 0; }
+    .demo-steps { flex-wrap: wrap; }
+    .demo-idea span { width: auto; animation: none; border-right: 0; white-space: normal; }
+    #start .eyebrow { letter-spacing: .14em; }
+  }
   .bee-clip { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; mix-blend-mode: multiply; vertical-align: middle; margin-right: 8px; flex: none; }
   @media (prefers-reduced-motion: reduce) { .bee-clip { display: none; } }
   .cite .scout { width: 20px; height: 20px; border-radius: 50%; box-shadow: 0 0 0 1.2px var(--ink); vertical-align: middle; margin-right: 4px; background: #fff; }  /* the Scout Bee with binoculars */
@@ -929,10 +990,11 @@
 
 <main id="start" hidden>
   <div class="start-inner">
-   <div>
-    <p class="why">Agents build only what is decided. BuildingBees gets your team to decide everything first.</p>
-    <h1>Other tools guess. We ask.</h1>
+   <div class="start-copy">
+    <p class="eyebrow">Plan before you build<span aria-hidden="true">/</span>Six AI bees</p>
+    <h1><span class="h-dim">Other tools guess.</span> <span class="h-mark">We ask.</span></h1>
     <p class="lead">Tell us what you want to build. Six bees map the flows, ask your product team what the idea leaves out, and redraw the board with every answer. Nothing gets built on a guess.</p>
+    <p class="why">Agents build only what is decided. BuildingBees gets your team to decide everything first.</p>
     <div class="who-first" id="modeSeg" role="group" aria-label="Who is building this">
       <div class="cap">First: who is building this?</div>
       <div class="who-cards">
@@ -959,9 +1021,21 @@
     <div class="start-note"><button class="btn ghost sm" id="exampleBtn"><i class="ph ph-sparkle" aria-hidden="true"></i>Load the food delivery example</button><span id="msg" role="status" aria-live="polite"></span></div>
    </div>
    <aside class="team" aria-label="The bees who will ask you questions">
-    <h2>Six bees will question your idea</h2>
-    <p>Each one owns a part of the product. They ask, you decide, and the board changes with every answer.</p>
-    <ul id="crew"></ul>
+    <!-- The signature moment (craft rule: one effect that shows the product, not decoration): a one-line idea becomes
+         flow steps, and two bees pin questions on the gaps a one-prompt tool would have guessed. CSS only. -->
+    <div class="demo" aria-hidden="true">
+      <div class="demo-idea"><i class="ph ph-lightbulb"></i><span>An app to book a haircut at my local salon</span></div>
+      <div class="demo-steps">
+        <div class="demo-step s1"><b>1</b>Pick a time</div>
+        <div class="demo-step s2"><b>2</b>Pay</div>
+        <div class="demo-step s3"><b>3</b>Confirmed</div>
+      </div>
+      <div class="demo-pin p1"><span class="bee sm"><i class="ph ph-crown-simple"></i></span><span><b>North asks</b>Walk-ins too, or only bookings?</span></div>
+      <div class="demo-pin p2"><span class="bee sm"><i class="ph ph-bug"></i></span><span><b>Poke asks</b>What if the payment fails?</span></div>
+      <div class="demo-done"><i class="ph ph-check-circle"></i>You decide. The board redraws. Nothing is guessed.</div>
+    </div>
+    <h2>Six bees, one for every part of the product</h2>
+    <ul id="crew" class="crew"></ul>
    </aside>
   </div>
   <figure class="proof">
@@ -2727,8 +2801,10 @@ $("engineBtn").onclick = () => {
   menu(false); toast(`Switched to ${S.engines[S.engine]?.label || S.engine}. The next update and the next drawing use it; the board stays as it is.`);  // Sravani, 17 Oct: "no changes happening"
 };
 
-const renderCrew = () => $("crew").innerHTML = Object.entries(BEES).map(([c, [role, , , asks, name, voice]]) => `<li>${beeIcon(c)}<span><b>${name} the ${role}</b><span>${voice} ${asks}</span>${talentsHtml(c)}</span></li>`).join("")
-  + '<li id="scoutCrew" hidden><span class="bee" aria-hidden="true"><i class="ph ph-binoculars"></i></span><span><b>Scout Bee</b><span>Reads the web first, so the others ask about real rules and real failures.</span></span></li>';
+// Compact tiles: name, role and the question each bee always asks; the talents open on tap (the full list made the
+// start screen so tall that the hero sank to the bottom, Roger, 28 Oct 2026).
+const renderCrew = () => $("crew").innerHTML = Object.entries(BEES).map(([c, [role, , , asks, name]]) => `<li><details><summary>${beeIcon(c)}<span><b>${name}</b><small>${role}</small></span></summary><p>${asks}</p>${talentsHtml(c)}</details></li>`).join("")
+  + '<li id="scoutCrew" hidden><details><summary><span class="bee" aria-hidden="true"><i class="ph ph-binoculars"></i></span><span><b>Scout</b><small>Research Bee</small></span></summary><p>Reads the web first, so the others ask about real rules and real failures.</p></details></li>';
 renderCrew();
 $("prd").value = store.get("bb_spec") || "";
 load().catch((err) => { $("start").hidden = false; say(err.message, true); });
