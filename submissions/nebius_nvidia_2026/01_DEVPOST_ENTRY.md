@@ -6,7 +6,7 @@ Judged equally on technological implementation, design, potential impact and qua
 
 **Demo URL (Nemotron only, no login):** https://buildingbees-nemotron-853213660594.asia-south1.run.app
 **Repo:** https://github.com/anuroopanand7/buildingbees
-**Video:** (add the YouTube link)
+**Video:** https://youtu.be/gzDuGUC0sPQ
 
 ---
 
