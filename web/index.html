@@ -544,7 +544,7 @@
   .demo-idea span { overflow: hidden; white-space: nowrap; border-right: 2px solid var(--ink); animation: type 9s steps(42) infinite; width: 42ch; max-width: 100%; }
   @keyframes type { 0% { width: 0; } 18%, 100% { width: 42ch; } }
   .demo-steps { display: flex; gap: 10px; margin: 16px 0 0; }
-  .demo-step { flex: 1; white-space: nowrap; background: var(--panel); border: 1.5px solid var(--ink); border-radius: 10px; padding: 9px 10px; font-size: 12.5px; font-weight: 600; opacity: 0; animation: step 9s infinite; }
+  .demo-step { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--panel); border: 1.5px solid var(--ink); border-radius: 10px; padding: 9px 10px; font-size: 12.5px; font-weight: 600; opacity: 0; animation: step 9s infinite; }
   .demo-step b { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: var(--on-ink); font-size: 11px; margin-right: 6px; }
   .demo-step.s2 { animation-delay: .25s; } .demo-step.s3 { animation-delay: .5s; }
   @keyframes step { 0%, 20% { opacity: 0; transform: translateY(8px); } 26%, 94% { opacity: 1; transform: none; } 100% { opacity: 0; } }
