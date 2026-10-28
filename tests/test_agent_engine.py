@@ -377,3 +377,12 @@ def test_engine_pill_survives_a_restart(monkeypatch):
     h, g = _drawn_board(monkeypatch, "pill-restart")
     state = client.get("/api/graph", headers=h).json()
     assert state["last_call"] and server._rebuild(state).last_call == state["last_call"]
+
+
+def test_mock_matches_a_path_with_a_query_string():
+    """Recording the demo found it: GET /meals?date=today never matched its own mock."""
+    from src.core import mock
+    from src.core.graph import BuildingBeesEngine
+    g = BuildingBeesEngine()
+    g.add_node(server.APINode(id="A1", title="meals", method="GET", path="/meals?date=today", service="meals"))
+    assert mock.match(g, "GET", "meals")[0].id == "A1"

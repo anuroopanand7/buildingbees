@@ -36,6 +36,7 @@ def sample_json(fields: List[str]) -> Dict[str, Any]:
 
 def _pattern(path: str) -> re.Pattern:
     """An API path as a regex: {id} or :id segments match any one segment."""
+    path = path.split("?")[0]  # "/meals?date=today": the query is not part of the route
     parts = [r"[^/]+" if re.fullmatch(r"\{[^}]*\}|:\w+", p) else re.escape(p) for p in path.strip("/").split("/")]
     return re.compile("^" + "/".join(parts) + "/?$")
 
