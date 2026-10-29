@@ -103,6 +103,8 @@ Values nobody stated are removed: if the engine fills in a vendor or a timeout t
 | Google Gemini | Google Cloud AI Builder Cup | Gemini API with structured output (`response_schema`) and native PDF input. Falls over to a second model when one is overloaded. |
 | NVIDIA Nemotron | Nebius x NVIDIA Global AI Hackathon | NVIDIA Nemotron 3 on Nebius Token Factory (OpenAI-compatible API). See the section below. PDFs are converted to text first. |
 
+![BuildingBees architecture](docs/diagrams/architecture.svg)
+
 Both engines fill the same Pydantic schemas (`src/adapters/spec_prompts.py`), so the board code does not care which one ran. The six bees are roles inside one engine call: the prompt assigns every question to the bee that owns that aspect. They are not six separate agents.
 
 ## NVIDIA Nemotron on Nebius Token Factory

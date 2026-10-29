@@ -8,6 +8,10 @@ A team describes a product in a line or a PDF. An engine (Google Gemini, or NVID
 
 ## Request flow
 
+![BuildingBees architecture: board, FastAPI server, engine adapter, Gemini or Nemotron, schema guardrail, board graph, Firestore and the agent exports](diagrams/architecture.svg)
+
+The source is `docs/diagrams/architecture.html`; re-export the SVG after editing it.
+
 ```mermaid
 sequenceDiagram
   participant UI as web/index.html
