@@ -713,6 +713,12 @@
     .zoombar { display: none; }
     #canvas { padding: 76px 16px 46dvh 64px; }
   }
+  /* Phones: the top-right buttons show icons only (their words stay as the accessible name), so they never cover the product name (live check, 29 Oct). */
+  @media (max-width: 640px) {
+    .topright .btn { font-size: 0; gap: 0; width: 38px; height: 38px; padding: 0; justify-content: center; }
+    .topright .btn .ph { font-size: 18px; }
+    .brand { max-width: calc(100vw - 24px - 3 * 38px - 3 * 8px - 12px); }
+  }
 
   /* ── Interaction layer (rules in docs/DESIGN_RULES.md) ───────────────────────
      Testers said buttons did not look clickable. Every clickable thing now has
@@ -2251,7 +2257,11 @@ document.addEventListener("click", (e) => {
   if (t.id === "historyBtn") { menu(false); return openHistory().catch(fail); }
   if (t.id === "historyClose") { $("history").hidden = true; return; }
   if (t.dataset.restore) {
-    if (!confirm("Go back to this point? The board as it is now is kept, so you can come back to it.")) return;
+    // A second press confirms (no confirm(): in-app browsers like WhatsApp's block it, tester report 16 Oct)
+    if (!t.classList.contains("armed")) {
+      const was = t.textContent; t.classList.add("armed"); t.textContent = "Press again to go back";
+      return setTimeout(() => { t.classList.remove("armed"); t.textContent = was; }, 4000);
+    }
     return api("/api/history/restore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ at: t.dataset.restore }) })
       .then(() => { $("history").hidden = true; SEEN.clear(); return load(); }).then(() => toast("The board is back at that point.")).catch(fail);
   }
